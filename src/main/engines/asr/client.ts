@@ -1,9 +1,9 @@
-import { fork } from 'node:child_process'
+import { fork, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { assetDir } from '../paths'
 import { track, killTree } from '../sidecars'
-import type { AsrMessage, AsrSegment } from './protocol'
+import type { AsrMessage, AsrRequest, AsrSegment, SpeakerTurn } from './protocol'
 
 export interface AsrResult { segments: AsrSegment[]; loadMs: number; decodeMs: number; audioSec: number }
 
@@ -24,9 +24,10 @@ function nodeBinary(): string {
   return exe
 }
 
-/** Transkribiert eine 16-kHz-Mono-WAV mit Parakeet in einem Kindprozess; Prozessende = ASR entladen. */
-export function transcribeWav(wav: string, opts: { maxSeconds?: number; signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {}): Promise<AsrResult> {
-  const child = fork(workerPath(), [], {
+/** Startet den Worker mit einer Anfrage; `onMessage` sieht alle Nachrichten, Rückgabe = erste Endnachricht. */
+function runWorker(req: AsrRequest, onMessage: (m: AsrMessage) => void, signal?: AbortSignal): Promise<AsrMessage> {
+  signal?.throwIfAborted()
+  const child: ChildProcess = fork(workerPath(), [], {
     execPath: nodeBinary(),
     execArgv: process.versions.electron ? [] : process.execArgv,
     stdio: ['ignore', 'ignore', 'pipe', 'ipc']
@@ -34,15 +35,59 @@ export function transcribeWav(wav: string, opts: { maxSeconds?: number; signal?:
   void track(child, 'asr-worker', basename(nodeBinary()))
   return new Promise((resolve, reject) => {
     let err = ''
+    let settled = false
+    const finish = (fn: () => void): void => {
+      if (settled) return
+      settled = true
+      signal?.removeEventListener('abort', abort)
+      if (child.pid && child.exitCode === null) void killTree(child.pid)
+      fn()
+    }
+    const abort = (): void => finish(() => reject(new Error('Abgebrochen')))
     child.stderr?.on('data', (d) => (err = (err + d).slice(-800)))
-    const abort = (): void => { if (child.pid) void killTree(child.pid); reject(new Error('Abgebrochen')) }
-    opts.signal?.addEventListener('abort', abort, { once: true })
+    signal?.addEventListener('abort', abort, { once: true })
     child.on('message', (m: AsrMessage) => {
-      if (m.type === 'progress') opts.onProgress?.(m.done, m.total)
-      else if (m.type === 'result') resolve(m)
-      else reject(new Error(m.message))
+      onMessage(m)
+      if (m.type === 'result' || m.type === 'turns') finish(() => resolve(m))
+      else if (m.type === 'error') finish(() => reject(new Error(m.message)))
     })
-    child.once('exit', (code) => reject(new Error(`ASR-Prozess beendet (Code ${code}) ${err}`)))
-    child.send({ modelDir: join(assetDir('parakeet-v3'), 'sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8'), vadModel: join(assetDir('silero-vad'), 'silero_vad.onnx'), wav, maxSeconds: opts.maxSeconds })
+    child.once('exit', (code) => finish(() => reject(new Error(`ASR-Prozess beendet (Code ${code}) ${err}`))))
+    child.send(req)
   })
+}
+
+export interface TranscribeOpts {
+  maxSeconds?: number
+  /** Ab dieser Sekunde fortsetzen (Checkpoint). */
+  resumeFrom?: number
+  signal?: AbortSignal
+  onProgress?: (done: number, total: number) => void
+  /** Jedes fertige Segment (zum sofortigen Speichern). */
+  onSegment?: (s: AsrSegment) => void
+}
+
+/** Transkribiert eine 16-kHz-Mono-WAV mit Parakeet; Prozessende = ASR entladen. */
+export async function transcribeWav(wav: string, opts: TranscribeOpts = {}): Promise<AsrResult> {
+  const segments: AsrSegment[] = []
+  const end = await runWorker(
+    { mode: 'asr', modelDir: join(assetDir('parakeet-v3'), 'sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8'), vadModel: join(assetDir('silero-vad'), 'silero_vad.onnx'), wav, maxSeconds: opts.maxSeconds, resumeFrom: opts.resumeFrom },
+    (m) => {
+      if (m.type === 'progress') opts.onProgress?.(m.done, m.total)
+      else if (m.type === 'segment') { segments.push(m.segment); opts.onSegment?.(m.segment) }
+    },
+    opts.signal
+  )
+  if (end.type !== 'result') throw new Error('Unerwartete Antwort des ASR-Prozesses')
+  return { segments, loadMs: end.loadMs, decodeMs: end.decodeMs, audioSec: end.audioSec }
+}
+
+/** Sprecher-Segmentierung (pyannote 3.0 + wespeaker); Ergebnis: Sprecher-Abschnitte. */
+export async function diarizeWav(wav: string, opts: { numClusters?: number; threshold?: number; signal?: AbortSignal } = {}): Promise<SpeakerTurn[]> {
+  const end = await runWorker(
+    { mode: 'diarize', segModel: join(assetDir('speaker-segmentation'), 'sherpa-onnx-pyannote-segmentation-3-0', 'model.int8.onnx'), embModel: join(assetDir('speaker-embedding'), 'wespeaker_en_voxceleb_resnet34_LM.onnx'), wav, numClusters: opts.numClusters, threshold: opts.threshold },
+    () => undefined,
+    opts.signal
+  )
+  if (end.type !== 'turns') throw new Error('Unerwartete Antwort des ASR-Prozesses')
+  return end.turns
 }

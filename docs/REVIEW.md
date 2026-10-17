@@ -28,3 +28,11 @@
 - [ ] Ordner-Import (USB): Ordner mit den Modelldateien (z. B. `Qwen3-14B-Q4_K_M.gguf`) wählen → wird erkannt und geprüft
 - [ ] Zweiter Rechner (12-GB-Karte?): Profil „kompakt“/KV-Cache-Kompression wird empfohlen und läuft (nicht von mir getestet)
 - [ ] Task-Manager nach dem Schließen: kein `llama-server.exe`/`node.exe` (Laufzeit) bleibt zurück
+
+## M3
+- [ ] Im echten Fenster: Video auf Start ziehen → Sheet zeigt echtes Standbild/Dauer/Auflösung; „Clips finden“ startet echte Transkription; Pausieren/Fortsetzen/Stoppen/Verwerfen in der Verarbeitung
+- [ ] App während der Transkription hart beenden (Task-Manager) und neu starten → gleiches Video erneut importieren → setzt fort statt neu zu beginnen
+- [ ] Transkript-Qualität stichprobenartig (siehe M0-Liste): fehlende Einwürfe, Eigennamen
+- [ ] Sprecher-Erkennung (Option „Sprecher unterscheiden“) bei Dialog-Videos: sinnvoll oder zu viele Sprecher? (bei mir 4 statt 2)
+- [ ] nofaces.mp4 (wenn vorhanden): Transkription ohne Sprache/Musik → keine erfundenen Wörter in Stille
+- [ ] URL-Import (YouTube-Link) einmal ausprobieren – von mir nicht automatisch getestet (kein Testlink)

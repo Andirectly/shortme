@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { Pause, Play, Square, Trash2, Check, Loader2, AlertTriangle, LayoutGrid, List, Download, Wand2 } from 'lucide-react'
 import { useStore } from './store'
+import { useProject } from './projectStore'
 import { CLIPS, PROJECTS, type Clip } from './data'
 import { Button, Pill, Score } from './ui'
 import { useSprings } from './motion'
@@ -13,7 +14,7 @@ const STAGES = [
   { id: 'render', label: 'Rendern', from: 0.75, to: 1 }
 ]
 
-export function ProcessingScreen(): React.JSX.Element {
+function DemoProcessing(): React.JSX.Element {
   const progress = useStore((s) => s.progress)
   const paused = useStore((s) => s.paused)
   const setProgress = useStore((s) => s.setProgress)
@@ -174,4 +175,52 @@ export function ProjectsScreen(): React.JSX.Element {
       ))}
     </div>
   )
+}
+
+const REAL_RANGES: Record<string, [number, number]> = { audio: [0, 0.05], asr: [0.05, 0.85], speakers: [0.85, 0.97], finalize: [0.97, 1] }
+
+/** Echte Transkription (M3): Fortschritt aus dem Job; spätere Stufen sind noch nicht angebunden. */
+function RealProcessing(): React.JSX.Element {
+  const job = useProject((s) => s.job)!
+  const pause = useProject((s) => s.pause)
+  const resume = useProject((s) => s.resume)
+  const stop = useProject((s) => s.stop)
+  const discard = useProject((s) => s.discard)
+  const go = useStore((s) => s.go)
+  const range = REAL_RANGES[job.stage] ?? [0, 1]
+  const total = job.state === 'done' ? 1 : range[0] + (range[1] - range[0]) * job.progress
+  const busy = job.state === 'running' || job.state === 'queued'
+  const title = job.state === 'done' ? 'Transkript fertig' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : 'Transkribiert …'
+  const later = ['Analysieren', 'Clips finden', 'Rendern']
+  return (
+    <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 24, paddingTop: 12 }}>
+      <div><h1>{title}</h1><small>{job.title} · {job.message}</small></div>
+      <div className="sm-glass" style={{ padding: 22, display: 'grid', gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '28px 160px 1fr 48px', alignItems: 'center', gap: 12 }}>
+          {job.state === 'done' ? <Check size={18} color="var(--ok)" /> : busy ? <Loader2 size={18} className="sm-spin" /> : <span />}
+          <span>Transkribieren</span>
+          <div className="sm-bar"><i style={{ width: `${total * 100}%` }} /></div>
+          <small style={{ textAlign: 'right' }}>{Math.round(total * 100)} %</small>
+        </div>
+        {later.map((l) => (
+          <div key={l} style={{ display: 'grid', gridTemplateColumns: '28px 160px 1fr', alignItems: 'center', gap: 12, opacity: 0.4 }}>
+            <span /><span>{l}</span><small>folgt in einem späteren Meilenstein</small>
+          </div>
+        ))}
+        {job.error && <small style={{ color: 'var(--warn)' }}>{job.error}</small>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          {job.state === 'running' && <Button variant="secondary" onClick={() => void pause()}><Pause size={15} /> Pausieren</Button>}
+          {['paused', 'stopped', 'error'].includes(job.state) && <Button variant="secondary" onClick={() => void resume()}><Play size={15} /> Fortsetzen</Button>}
+          {busy && <Button variant="secondary" onClick={() => void stop()}><Square size={14} /> Stoppen &amp; behalten</Button>}
+          <Button variant="secondary" onClick={() => { void discard(); go('start') }}><Trash2 size={15} /> Verwerfen</Button>
+          {job.state === 'done' && <Button variant="primary" onClick={() => go('clips')}>Weiter</Button>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function ProcessingScreen(): React.JSX.Element {
+  const job = useProject((s) => s.job)
+  return job ? <RealProcessing /> : <DemoProcessing />
 }

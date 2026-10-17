@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence, useMotionValue, animate, type PanInfo } from 'motion/react'
 import { UploadCloud, Link2, Sparkles, ChevronDown, Clock } from 'lucide-react'
 import { useStore } from './store'
+import { useProject } from './projectStore'
 import { IMG, PRESETS, PROJECTS } from './data'
 import { Button, Pill, Segmented, Switch, Row } from './ui'
 import { useSprings } from './motion'
@@ -10,6 +11,20 @@ export function StartScreen(): React.JSX.Element {
   const openSheet = useStore((s) => s.openSheet)
   const go = useStore((s) => s.go)
   const [over, setOver] = useState(false)
+  const [link, setLink] = useState('')
+  const hasApi = useProject((s) => s.hasApi)
+  const importing = useProject((s) => s.importing)
+  const importMessage = useProject((s) => s.importMessage)
+  const importError = useProject((s) => s.importError)
+  const importPath = useProject((s) => s.importPath)
+  const importUrl = useProject((s) => s.importUrl)
+  useEffect(() => { useProject.getState().init() }, [])
+  const open = async (path?: string): Promise<void> => {
+    if (!hasApi) { openSheet(true); return }
+    const p = path ?? (await window.cutawan.selectVideo())
+    if (p && (await importPath(p))) openSheet(true)
+  }
+  const openLink = async (): Promise<void> => { if (!link.trim()) return; if (!hasApi) { openSheet(true); return } if (await importUrl(link.trim())) openSheet(true) }
   const { base } = useSprings()
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gap: 28, paddingTop: 12 }}>
@@ -26,23 +41,23 @@ export function StartScreen(): React.JSX.Element {
         transition={base}
         onDragOver={(e) => { e.preventDefault(); setOver(true) }}
         onDragLeave={() => setOver(false)}
-        onDrop={(e) => { e.preventDefault(); setOver(false); openSheet(true) }}
-        onClick={() => openSheet(true)}
-        onKeyDown={(e) => e.key === 'Enter' && openSheet(true)}
+        onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; void open(f && hasApi ? window.cutawan.pathForFile(f) : undefined) }}
+        onClick={() => void open()}
+        onKeyDown={(e) => e.key === 'Enter' && void open()}
         style={{ height: 260, display: 'grid', placeItems: 'center', textAlign: 'center', borderStyle: 'dashed' }}
       >
         <div style={{ display: 'grid', gap: 10, justifyItems: 'center' }}>
           <UploadCloud size={44} strokeWidth={1.4} color="rgba(255,255,255,0.7)" />
           <h2>Video hierher ziehen</h2>
-          <small>oder klicken zum Auswählen · MP4, MOV, MKV</small>
+          <small>{importing ? importMessage : 'oder klicken zum Auswählen · MP4, MOV, MKV'}</small>{importError && <small style={{ color: 'var(--warn)' }}>{importError}</small>}
         </div>
       </motion.div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <Link2 size={16} style={{ position: 'absolute', left: 16, top: 12, color: 'var(--text-3)' }} />
-          <input className="sm-input" style={{ paddingLeft: 42 }} placeholder="Oder Link einfügen (YouTube, …)" aria-label="Video-Link" />
+          <input className="sm-input" style={{ paddingLeft: 42 }} placeholder="Oder Link einfügen (YouTube, …)" aria-label="Video-Link" value={link} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void openLink()} />
         </div>
-        <Button variant="secondary" onClick={() => openSheet(true)}>Laden</Button>
+        <Button variant="secondary" disabled={importing} onClick={() => void openLink()}>Laden</Button>
       </div>
       <section>
         <h3 style={{ marginBottom: 12 }}>Zuletzt geöffnet</h3>
@@ -71,6 +86,10 @@ function CreateSheet(): React.JSX.Element {
   const presetId = useStore((s) => s.presetId)
   const setPreset = useStore((s) => s.setPreset)
   const go = useStore((s) => s.go)
+  const imported = useProject((s) => s.imported)
+  const startTranscribe = useProject((s) => s.startTranscribe)
+  const hasApi = useProject((s) => s.hasApi)
+  const [diarize, setDiarize] = useState(false)
   const [adv, setAdv] = useState(false)
   const { bounce, reduced } = useSprings()
   const y = useMotionValue(0)
@@ -89,7 +108,7 @@ function CreateSheet(): React.JSX.Element {
     if (projected > 260 || info.velocity.y > 800) openSheet(false)
     else animate(y, 0, { type: 'spring', duration: 0.3, bounce: 0.2, velocity: info.velocity.y })
   }
-  const start = (): void => { openSheet(false); go('processing') }
+  const start = async (): Promise<void> => { if (hasApi && !(await startTranscribe(diarize))) return; openSheet(false); go('processing') }
   const stop = { onPointerDownCapture: (e: React.PointerEvent) => e.stopPropagation() }
 
   return (
@@ -117,10 +136,12 @@ function CreateSheet(): React.JSX.Element {
               <span style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.25)' }} />
             </div>
             <div style={{ display: 'flex', gap: 16, padding: '4px 24px 12px' }} {...stop}>
-              <img src={IMG.source} alt="" style={{ width: 160, borderRadius: 10, border: '1px solid var(--edge)' }} />
+              <img src={imported?.poster ?? IMG.source} alt="" style={{ width: 160, borderRadius: 10, border: '1px solid var(--edge)' }} />
               <div style={{ display: 'grid', alignContent: 'center', gap: 4 }}>
-                <h2>Tattoo-Folge (Sidequests).mp4</h2>
-                <small>12:09 · 1920×1080 · Deutsch erkannt</small>
+                <h2>{imported?.meta.title ?? 'Tattoo-Folge (Sidequests)'}</h2>
+                <small>{imported ? `${fmtDur(imported.meta.durationSec)} · ${imported.meta.width}×${imported.meta.height}${imported.cached ? ' · schon bekannt (Cache)' : ''}` : '12:09 · 1920×1080 · Deutsch erkannt'}</small>
+                {imported?.preflight.errors.map((e) => <small key={e} style={{ color: 'var(--warn)' }}>{e}</small>)}
+                {imported?.preflight.warnings.map((e) => <small key={e}>{e}</small>)}
               </div>
             </div>
             <div style={{ overflowY: 'auto', padding: '0 24px 12px' }} {...stop}>
@@ -156,13 +177,15 @@ function CreateSheet(): React.JSX.Element {
                     <Segmented options={['Automatisch', 'Deutsch', 'Englisch']} value="Automatisch" onChange={() => undefined} />
                     <small>Modell</small>
                     <Segmented options={['Parakeet v3 + Qwen3-14B', 'Whisper turbo + Qwen3-14B']} value="Parakeet v3 + Qwen3-14B" onChange={() => undefined} />
+                    <small>Sprecher unterscheiden (langsamer, Stimmen-Erkennung)</small>
+                    <Switch on={diarize} onChange={setDiarize} label="Sprecher unterscheiden" />
                   </div>
                 )}
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 24px', borderTop: '1px solid var(--edge)' }}>
               <Button variant="secondary" onClick={() => openSheet(false)}>Abbrechen</Button>
-              <Button variant="primary" onClick={start}><Sparkles size={16} /> Clips finden</Button>
+              <Button variant="primary" disabled={!!imported && !imported.preflight.ok} onClick={() => void start()}><Sparkles size={16} /> Clips finden</Button>
             </div>
           </motion.div>
         </>
@@ -170,3 +193,5 @@ function CreateSheet(): React.JSX.Element {
     </AnimatePresence>
   )
 }
+
+const fmtDur = (sec: number): string => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`

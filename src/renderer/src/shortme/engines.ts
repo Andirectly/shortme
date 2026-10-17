@@ -77,7 +77,7 @@ export const useEngines = create<EnginesState>((set, get) => ({
 
 /** Assets, die die Basis-Installation braucht (Hardware-abhängig). */
 export function requiredIds(hw: HardwareInfo | null): string[] {
-  return ['silero-vad', 'transnetv2', 'llama-server', 'node-runtime', 'parakeet-v3', hw?.recommendedLlm ?? 'qwen3-14b']
+  return ['silero-vad', 'transnetv2', 'llama-server', 'node-runtime', 'speaker-segmentation', 'speaker-embedding', 'parakeet-v3', hw?.recommendedLlm ?? 'qwen3-14b']
 }
 
 export const fmtBytes = (n: number): string => (n >= 1e9 ? `${(n / 1e9).toFixed(1).replace('.', ',')} GB` : `${Math.round(n / 1e6)} MB`)

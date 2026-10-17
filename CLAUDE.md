@@ -65,3 +65,6 @@ Für Suchen in Referenz-Repos einen Subagenten nutzen, der nur eine kurze Zusamm
 - M2: sherpa-onnx-node crasht in Electron (External buffers) → ASR läuft als Kindprozess in eigener Node-22-Laufzeit (Asset `node-runtime`); `src/main/engines/` enthält Katalog, Downloader, Manager, Sidecars, VRAM-Sequenzierung, Systemcheck
 - M2: llama-server schreibt `--version` auf stderr; Windows-Prozess bleibt nach Kill kurz sichtbar, solange der Elternprozess das Handle hält
 - M2: Abnahme-Skript `scripts/test-engines.ts` (frischer Ordner via `SHORTME_DATA`), Electron-Selbsttest via `SHORTME_SELFTEST=<wav> npx electron .` nach `electron-vite build`
+- M3: Projekte unter `<userData>/projects/<hash>/` (project.json, audio.wav, asr.jsonl = Checkpoint, transcript.json = Cache); Datei-Hash = Größe + 3×4 MB
+- M3: pyannote+WeSpeaker übersegmentiert Dialoge (4 statt 2 Sprecher) → Diarisierung optional/aus; Worker-Prozess nie selbst `process.exit` (Nachrichten gehen sonst verloren), Client beendet ihn
+- M3: Windows `rename` über vorhandene Datei: EPERM/EBUSY mit Wiederholung (atomic.ts, projects.ts)

@@ -73,6 +73,25 @@ export const CATALOG: AssetSpec[] = [
     recommendedFromVramMb: 0
   },
   {
+    id: 'speaker-segmentation',
+    name: 'pyannote Segmentierung 3.0',
+    kind: 'vad',
+    note: 'Sprecher-Wechsel erkennen (7 MB)',
+    files: [{ url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2', name: 'pyannote.tar.bz2', size: 6958444, sha256: '24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488' }],
+    extract: true,
+    expect: ['sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx'],
+    recommendedFromVramMb: 0
+  },
+  {
+    id: 'speaker-embedding',
+    name: 'WeSpeaker ResNet34',
+    kind: 'vad',
+    note: 'Sprecher-Stimmabdruck (27 MB)',
+    files: [{ url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_resnet34_LM.onnx', name: 'wespeaker_en_voxceleb_resnet34_LM.onnx', size: 26530550, sha256: 'e9848563da86f263117134dfd7ad63c92355b37de492b55e325400c9d9c39012' }],
+    expect: ['wespeaker_en_voxceleb_resnet34_LM.onnx'],
+    recommendedFromVramMb: 0
+  },
+  {
     id: 'llama-server',
     name: 'llama.cpp (CUDA 13.4)',
     kind: 'engine',

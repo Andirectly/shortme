@@ -24,7 +24,7 @@ async function main(): Promise<void> {
 
   let last = 0
   assets.on('status', (s) => { if (s.state !== 'downloading' || Date.now() - last > 15000) { last = Date.now(); console.log(`  ${s.id} ${s.state} ${(s.progress * 100).toFixed(0)}%${s.error ? ' ' + s.error : ''}`) } })
-  const ids = ['silero-vad', 'transnetv2', 'llama-server', 'node-runtime', 'parakeet-v3', hw.recommendedLlm]
+  const ids = ['silero-vad', 'transnetv2', 'llama-server', 'node-runtime', 'speaker-segmentation', 'speaker-embedding', 'parakeet-v3', hw.recommendedLlm]
   const t0 = Date.now()
   for (const id of ids) await assets.install(id)
   await ensureYtDlp(() => undefined)

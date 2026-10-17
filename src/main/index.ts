@@ -1,6 +1,7 @@
 import { app, BrowserWindow, nativeTheme, protocol, screen, shell } from 'electron'
 import { release } from 'node:os'
 import { registerEngineIpc, installEngineLifecycle, runSelfTestIfRequested } from './engines'
+import { registerShortmeIpc } from './shortme/ipc'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { migrateLegacyCookiesDir } from './cookies'
@@ -321,6 +322,7 @@ app.whenReady().then(() => {
 
   registerIpcHandlers()
   registerEngineIpc()
+  registerShortmeIpc()
   installEngineLifecycle()
   runSelfTestIfRequested()
   applyAppIcon()

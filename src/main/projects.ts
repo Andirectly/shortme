@@ -54,7 +54,14 @@ async function persistProject(project: Project): Promise<void> {
   const temporary = join(dir, `.project-${randomUUID()}.tmp`)
   try {
     await writeFile(temporary, JSON.stringify(persisted), 'utf8')
-    await rename(temporary, join(dir, 'project.json'))
+    // Windows: Virenscanner/Indexer halten die Zieldatei kurz offen → EPERM/EBUSY, nur wiederholen.
+    for (let attempt = 0; ; attempt++) {
+      try { await rename(temporary, join(dir, 'project.json')); break } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (attempt >= 20 || !(code === 'EPERM' || code === 'EBUSY' || code === 'EACCES')) throw error
+        await new Promise((resolve) => setTimeout(resolve, 15 * (attempt + 1)))
+      }
+    }
   } finally {
     await rm(temporary, { force: true })
   }
