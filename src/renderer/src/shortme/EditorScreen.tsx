@@ -17,6 +17,8 @@ export function EditorScreen(): React.JSX.Element {
   const clip = list.find((c) => c.id === clipId) ?? list[0]
   const real = useProject((s) => s.clipsFile?.clips.find((c) => c.id === clipId))
   const transcript = useProject((s) => s.transcript)
+  const exportClips = useProject((s) => s.exportClips)
+  const exportJob = useProject((s) => s.exportJob)
   const trim = useStore((s) => s.trim)
   const hook = useStore((s) => s.hookText)
   const presetId = useStore((s) => s.presetId)
@@ -94,7 +96,7 @@ export function EditorScreen(): React.JSX.Element {
         <small style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{saved ? <><Check size={13} /> Gespeichert</> : 'Speichert …'}</small>
         <Button variant="ghost" aria-label="Rückgängig (Strg+Z)" disabled={!canUndo} onClick={undo}><Undo2 size={16} /></Button>
         <Button variant="ghost" aria-label="Wiederholen (Strg+Y)" disabled={!canRedo} onClick={redo}><Redo2 size={16} /></Button>
-        <Button variant="primary">Exportieren</Button>
+        <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportClips([clipId], presetId, false)}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr) 320px', gap: 14, minHeight: 0 }}>

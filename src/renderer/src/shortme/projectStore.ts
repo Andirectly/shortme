@@ -19,6 +19,8 @@ interface ProjectState {
   importUrl: (url: string) => Promise<boolean>
   clearImport: () => void
   startTranscribe: (diarize: boolean, query?: string) => Promise<boolean>
+  exportClips: (clipIds: string[], presetId: string, srt: boolean) => Promise<boolean>
+  exportJob: ShortmeJob | null
   pause: () => Promise<void>
   resume: () => Promise<void>
   stop: () => Promise<void>
@@ -35,6 +37,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   job: null,
   clipsFile: null,
   transcript: null,
+  exportJob: null,
   hasApi: false,
   loadResults: async (hash) => {
     const a = api()
@@ -49,6 +52,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     unsub.forEach((u) => u())
     unsub = [
       a.onJob((j) => {
+        if (j.title.startsWith('Export')) { set({ exportJob: j }); return }
         set((s) => (s.job && s.job.id !== j.id && s.job.state === 'running' ? s : { job: j }))
         if (j.state === 'done') void get().loadResults(j.hash)
       }),
@@ -89,6 +93,13 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (!a || !imp) return false
     const job = await a.transcribe(imp.meta.hash, { diarize, query })
     set({ job, clipsFile: null, transcript: null })
+    return true
+  },
+  exportClips: async (clipIds, presetId, srt) => {
+    const a = api()
+    const hash = get().clipsFile?.hash
+    if (!a || !hash || clipIds.length === 0) return false
+    set({ exportJob: await a.exportClips(hash, clipIds, { presetId, srt }) })
     return true
   },
   pause: async () => { const j = get().job; if (j) await api()?.pause(j.id) },

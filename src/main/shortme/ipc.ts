@@ -1,11 +1,16 @@
-import { readFile } from 'node:fs/promises'
-import { BrowserWindow, ipcMain } from 'electron'
+import { readFile, writeFile } from 'node:fs/promises'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { join } from 'node:path'
 import { importFile, importUrl, type ImportResult } from './importer'
 import { JobQueue } from './jobs'
 import { discardProject, loadMeta, projectFile } from './project'
 import { loadTranscript, runTranscription } from './transcription'
 import { loadClips, runAnalysis } from './clips/analysis'
 import { thumbPath } from './clips/thumbs'
+import { ensureSignals } from './clips/analysis'
+import { exportClip } from './render/exporter'
+import { PRESETS, type CaptionPreset } from './render/ass'
+import { safeFileName } from './render/profiles'
 
 export const jobs = new JobQueue()
 
@@ -39,6 +44,39 @@ export function registerShortmeIpc(): void {
     const thumbs: Record<string, string | null> = {}
     for (const c of file.clips) thumbs[c.id] = await dataUrl(thumbPath(hash, c.id))
     return { ...file, thumbs }
+  })
+  /** Export: ausgewählte Clips nacheinander rendern (Pausen entfernt, −14 LUFS, Untertitel eingebrannt). */
+  ipcMain.handle('shortme:export', async (_e, hash: string, clipIds: string[], opts: { presetId?: string; srt?: boolean; captions?: boolean }) => {
+    const meta = await loadMeta(hash)
+    const file = await loadClips(hash)
+    const transcript = await loadTranscript(hash)
+    if (!meta || !file || !transcript) throw new Error('Projekt, Clips oder Transkript fehlen')
+    const clips = file.clips.filter((c) => clipIds.includes(c.id))
+    const outDir = join(app.getPath('videos'), 'Shortme', safeFileName(meta.title, 'Projekt'))
+    return jobs.enqueue(hash, `Export: ${meta.title}`, async ({ signal, report }) => {
+      const signals = await ensureSignals(meta)
+      for (let i = 0; i < clips.length; i++) {
+        await exportClip(meta, clips[i], transcript, signals, { outDir, presetId: opts?.presetId, srt: !!opts?.srt, captions: opts?.captions !== false, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+      }
+      void shell.openPath(outDir)
+    })
+  })
+  /** Preset als Datei speichern/laden (JSON, Format = CaptionPreset). */
+  ipcMain.handle('shortme:presetExport', async (_e, id: string) => {
+    const preset = PRESETS.find((p) => p.id === id)
+    if (!preset) return false
+    const r = await dialog.showSaveDialog({ defaultPath: `${preset.name}.shortme-preset.json`, filters: [{ name: 'Shortme-Preset', extensions: ['json'] }] })
+    if (r.canceled || !r.filePath) return false
+    await writeFile(r.filePath, JSON.stringify(preset, null, 2), 'utf8')
+    return true
+  })
+  ipcMain.handle('shortme:presetImport', async () => {
+    const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Shortme-Preset', extensions: ['json'] }] })
+    if (r.canceled || !r.filePaths[0]) return null
+    const p = JSON.parse(await readFile(r.filePaths[0], 'utf8')) as Partial<CaptionPreset>
+    const ok = typeof p.id === 'string' && typeof p.name === 'string' && typeof p.font === 'string' && typeof p.size === 'number' && typeof p.color === 'string' && typeof p.highlight === 'string'
+    if (!ok) throw new Error('Keine gültige Preset-Datei')
+    return p
   })
   ipcMain.handle('shortme:jobs', () => jobs.list())
   ipcMain.handle('shortme:pause', (_e, id: string) => jobs.pause(id))

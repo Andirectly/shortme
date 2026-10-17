@@ -124,6 +124,9 @@ export function ClipsScreen(): React.JSX.Element {
   const openClip = useStore((s) => s.openClip)
   const { base } = useSprings()
   const list = useClipList()
+  const exportClips = useProject((s) => s.exportClips)
+  const exportJob = useProject((s) => s.exportJob)
+  const presetId = useStore((s) => s.presetId)
   const title = useProject((s) => s.imported?.meta.title ?? s.job?.title)
   const sorted = [...list].sort((a, b) => b.score - a.score)
   return (
@@ -157,7 +160,7 @@ export function ClipsScreen(): React.JSX.Element {
           <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }} transition={base} className="sm-glass" style={{ position: 'fixed', bottom: 20, left: '50%', translate: '-50% 0', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderRadius: 999, zIndex: 30, background: 'rgba(24,24,32,0.9)' }}>
             <small style={{ color: 'var(--text-1)', paddingLeft: 8 }}>{selected.length} ausgewählt</small>
             <Button variant="secondary"><Wand2 size={15} /> Auf alle anwenden</Button>
-            <Button variant="primary"><Download size={15} /> Exportieren</Button>
+            <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportClips(selected, presetId, false)}><Download size={15} /> {exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
           </motion.div>
         )}
       </AnimatePresence>

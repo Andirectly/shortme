@@ -1,0 +1,106 @@
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import type { ShortmeClip, ShortmeShot } from '@shared/shortme'
+import { FFMPEG_PATH, runBinary } from '../../pipeline/ffmpeg'
+import { fontsDir } from '../../pipeline/captions'
+import { encoderArgs, audioArgs, resolveEncoder } from '../../pipeline/encoders'
+import { loudnormFilter, measureLoudness } from '../../pipeline/loudness'
+import type { ProjectMeta } from '../project'
+import type { Transcript } from '../transcription'
+import type { Signals } from '../clips/signals'
+import { buildFilterGraph, OUT_H, OUT_W } from './graph'
+import { buildAss, PRESETS, type CapWord, type CaptionPreset } from './ass'
+import { buildPieces, keepsFromCuts, planPauseCuts, TimeMap, type Interval } from './timeline'
+import { safeFileName, uniquePath, type QualityTier } from './profiles'
+
+export interface ExportOptions {
+  outDir: string
+  presetId?: string
+  /** Untertitel eingebrannt; false = ohne. */
+  captions?: boolean
+  srt?: boolean
+  hook?: boolean
+  hookText?: string
+  removePauses?: boolean
+  quality?: QualityTier
+  encoder?: 'auto' | 'cpu' | 'gpu'
+  signal?: AbortSignal
+  onProgress?: (fraction: number, message: string) => void
+}
+
+export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number }
+
+/** Reine Planung eines Clips: Pausenschnitte, Zeitachse, Stücke, Wörter auf der gekürzten Zeitleiste. */
+export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean) {
+  const range: Interval = [clip.start, clip.end]
+  const words = t.words.slice(clip.firstWord, clip.lastWord + 1)
+  const cuts = removePauses ? planPauseCuts(range, words, signals.silences, t.speech) : []
+  const map = new TimeMap(keepsFromCuts(range, cuts))
+  const fallback: ShortmeShot = { start: 0, end: clip.end - clip.start, layout: 'fixed', cx: 0.5, zoom: 1 }
+  const pieces = buildPieces(map, clip.shots?.length ? clip.shots : [fallback], clip.start)
+  const tagByWord = new Map(clip.tags.map((g) => [g.word, g.kind]))
+  const capWords: CapWord[] = map.words(words.map((w, i) => ({ w: w.w, start: w.start, end: w.end, tag: tagByWord.get(clip.firstWord + i) })))
+  return { map, pieces, cuts, words: capWords, duration: map.duration }
+}
+
+const srtTime = (t: number): string => { const ms = Math.round(t * 1000); const p = (n: number, l = 2): string => String(n).padStart(l, '0'); return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}` }
+export function buildSrt(words: CapWord[], perLine = 4): string {
+  let out = ''
+  for (let i = 0, n = 1; i < words.length; i += perLine, n++) {
+    const g = words.slice(i, i + perLine)
+    out += `${n}\n${srtTime(g[0].start)} --> ${srtTime(g[g.length - 1].end + 0.1)}\n${g.map((w) => w.w).join(' ')}\n\n`
+  }
+  return out
+}
+
+/** FFmpeg-Pfad in Filter-Optionen (Windows: Laufwerksdoppelpunkt und Backslashes escapen). */
+export const filterPath = (p: string): string => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'")
+
+export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transcript, signals: Signals, opts: ExportOptions): Promise<ExportResult> {
+  const report = opts.onProgress ?? (() => undefined)
+  const plan = planExport(clip, t, signals, opts.removePauses ?? true)
+  if (plan.pieces.length === 0) throw new Error('Clip enthält nichts zu exportieren')
+  await mkdir(opts.outDir, { recursive: true })
+  const preset: CaptionPreset = PRESETS.find((p) => p.id === opts.presetId) ?? PRESETS[0]
+
+  report(0.02, 'Lautheit messen …')
+  const stats = await measureLoudness(meta.sourcePath, clip.start, clip.end - clip.start, opts.signal)
+
+  const name = safeFileName(clip.title)
+  const finalPath = uniquePath(opts.outDir, name)
+  const work = join(opts.outDir, `.${name}.work`)
+  await mkdir(work, { recursive: true })
+  try {
+    const ass = buildAss(plan.words, { width: OUT_W, height: OUT_H, preset, hook: opts.hook === false ? null : { text: opts.hookText ?? clip.hookText, seconds: 3 } })
+    const assPath = join(work, 'captions.ass')
+    await writeFile(assPath, ass, 'utf8')
+    const filter = buildFilterGraph(plan.pieces, {
+      src: { width: meta.width, height: meta.height }, base: clip.start, audioFilter: loudnormFilter(stats), fadeOutSec: 0.25, duration: plan.duration,
+      videoPost: opts.captions === false ? undefined : `ass='${filterPath(assPath)}':fontsdir='${filterPath(fontsDir())}'`
+    })
+    const enc = await resolveEncoder(opts.encoder ?? 'auto')
+    const quality = opts.quality ?? 'standard'
+    const tmp = join(work, 'out.mp4')
+    report(0.1, 'Rendert …')
+    const scriptPath = join(work, 'graph.txt')
+    await writeFile(scriptPath, filter, 'utf8')
+    await runBinary(enc.bin, [
+      '-hide_banner', '-nostats', '-y',
+      '-ss', clip.start.toFixed(3), '-t', (clip.end - clip.start).toFixed(3), '-i', meta.sourcePath,
+      '-/filter_complex', scriptPath, '-map', '[v]', '-map', '[a]',
+      ...encoderArgs(enc.kind, quality), '-r', '30', ...audioArgs(quality), '-ar', '48000',
+      '-movflags', '+faststart', '-t', plan.duration.toFixed(3), tmp
+    ], { signal: opts.signal })
+    await mkdir(dirname(finalPath), { recursive: true })
+    await rm(finalPath, { force: true })
+    await rename(tmp, finalPath)
+    let srtPath: string | undefined
+    if (opts.srt) { srtPath = finalPath.replace(/\.mp4$/, '.srt'); await writeFile(srtPath, buildSrt(plan.words), 'utf8') }
+    report(1, 'Fertig')
+    return { path: finalPath, durationSec: plan.duration, srtPath, ass, wordsOut: plan.words, pieces: plan.pieces.length }
+  } finally {
+    await rm(work, { recursive: true, force: true })
+  }
+}
+
+export { FFMPEG_PATH }

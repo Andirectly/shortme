@@ -31,7 +31,7 @@ export function StudioScreen(): React.JSX.Element {
           </motion.button>
         ))}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Pill><Upload size={13} /> Import</Pill><Pill><Download size={13} /> Export</Pill>
+          <Pill onClick={() => void window.cutawan?.shortme?.presetImport().catch(() => undefined)}><Upload size={13} /> Import</Pill><Pill onClick={() => void window.cutawan?.shortme?.presetExport(presetId)}><Download size={13} /> Export</Pill>
         </div>
       </div>
       <div className="sm-glass" style={{ display: 'grid', placeItems: 'center', padding: 16 }}>

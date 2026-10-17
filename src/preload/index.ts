@@ -159,6 +159,9 @@ const api = {
     resume: (id: string): Promise<void> => ipcRenderer.invoke('shortme:resume', id),
     stop: (id: string): Promise<void> => ipcRenderer.invoke('shortme:stop', id),
     discard: (id: string): Promise<void> => ipcRenderer.invoke('shortme:discard', id),
+    exportClips: (hash: string, clipIds: string[], opts: { presetId?: string; srt?: boolean; captions?: boolean }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:export', hash, clipIds, opts),
+    presetExport: (id: string): Promise<boolean> => ipcRenderer.invoke('shortme:presetExport', id),
+    presetImport: (): Promise<unknown> => ipcRenderer.invoke('shortme:presetImport'),
     clips: (hash: string): Promise<ShortmeClips | null> => ipcRenderer.invoke('shortme:clips', hash),
     transcript: (hash: string): Promise<ShortmeTranscript | null> => ipcRenderer.invoke('shortme:transcript', hash),
     onJob: (cb: (j: ShortmeJob) => void): (() => void) => {

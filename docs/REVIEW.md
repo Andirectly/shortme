@@ -48,3 +48,10 @@
 - [ ] Wirken die fixed/fit-Abschnitte (Gesicht nicht erkannt, Handkamera) sinnvoll oder zu häufig? Ggf. Schwellen in plan.ts (PLAN_DEFAULTS) nachziehen
 - [ ] nofaces.mp4: nie ein leerer Ausschnitt (alle Shots fit), Gesichtsquote-Warnung und Abzug sichtbar
 - [ ] Split-Layout (zwei Personen übereinander) bei echtem Dialog angemessen?
+
+## M6
+- [ ] Export im echten Fenster auslösen (Editor/Clip-Übersicht → Exportieren): Datei landet in Videos\\Shortme\\<Projekt>, Ordner öffnet sich
+- [ ] Exportierte Clips ansehen: Untertitel synchron nach Pausenschnitten? Pausenschnitte (Zoom 1,0 ↔ 1,08) angenehm oder zu hektisch? Hook oben in den ersten 3 s lesbar?
+- [ ] Optik Export vs. Editor-Vorschau (5 Zeitpunkte): Schrift/Größe/Position weichen ab (libass vs. CSS) – ist das akzeptabel oder soll tscaps-Overlay Priorität bekommen?
+- [ ] Lautheit mit Fremdmessgerät/Player prüfen (ich: −14,03 / −14,09 LUFS nach FFmpeg-loudnorm)
+- [ ] Preset-Export/-Import: Datei lässt sich speichern und wieder laden (Import ändert noch nichts im Export)
