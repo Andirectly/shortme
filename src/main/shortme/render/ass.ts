@@ -1,30 +1,7 @@
+import { PRESETS, type CaptionPreset } from '@shared/captions'
 import type { ClipTagKind } from '@shared/shortme'
 
-export interface CaptionPreset {
-  id: string
-  name: string
-  font: string
-  /** Schriftgröße als Anteil der Videohöhe (em). */
-  size: number
-  weight: number
-  color: string
-  highlight: string
-  outline: string
-  outlineWidth: number
-  upper: boolean
-  box: boolean
-  wordsPerLine: number
-  /** Vertikale Mitte der Untertitel (0..1 der Höhe). */
-  y: number
-}
-
-export const PRESETS: CaptionPreset[] = [
-  { id: 'impact', name: 'Impact Gelb', font: 'Anton', size: 0.052, weight: 400, color: '#FFFFFF', highlight: '#FFD400', outline: '#000000', outlineWidth: 5, upper: true, box: false, wordsPerLine: 3, y: 0.68 },
-  { id: 'clean', name: 'Clean Weiß', font: 'Poppins', size: 0.04, weight: 700, color: '#FFFFFF', highlight: '#A855F7', outline: '#000000', outlineWidth: 4, upper: false, box: false, wordsPerLine: 4, y: 0.68 },
-  { id: 'box', name: 'Box Schwarz', font: 'Poppins', size: 0.04, weight: 700, color: '#FFFFFF', highlight: '#4ADE80', outline: '#000000', outlineWidth: 14, upper: false, box: true, wordsPerLine: 3, y: 0.68 },
-  { id: 'pop', name: 'Pop Pink', font: 'Poppins', size: 0.044, weight: 700, color: '#FFFFFF', highlight: '#FF5C8A', outline: '#000000', outlineWidth: 5, upper: true, box: false, wordsPerLine: 3, y: 0.68 },
-  { id: 'mono', name: 'Dezent', font: 'Poppins Medium', size: 0.034, weight: 500, color: '#E5E7EB', highlight: '#FFFFFF', outline: '#000000', outlineWidth: 3, upper: false, box: false, wordsPerLine: 5, y: 0.7 }
-]
+export { PRESETS, type CaptionPreset }
 
 export interface CapWord { w: string; start: number; end: number; tag?: ClipTagKind }
 

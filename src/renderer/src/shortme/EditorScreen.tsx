@@ -3,7 +3,8 @@ import { motion } from 'motion/react'
 import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Monitor, ShieldCheck, Check, Wand2 } from 'lucide-react'
 import { baseState, canRedo, canUndo, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
 import { useStore } from './store'
-import { IMG, PRESETS, TRANSCRIPT } from './data'
+import { IMG, TRANSCRIPT } from './data'
+import { PRESETS, captionCss, scopeCss } from '@shared/captions'
 import { useClipList } from './clipData'
 import { useProject } from './projectStore'
 import { Button, Pill, Segmented, Slider, Switch, Row } from './ui'
@@ -148,10 +149,13 @@ export function EditorScreen(): React.JSX.Element {
               <span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.5)' }}>Quelle 16:9 · Person anklicken</span>
             </div>
           )}
-          <div style={{ position: 'relative', height: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--edge-highlight)', backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+          <div style={{ position: 'relative', height: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--edge-highlight)', backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', containerType: 'size' }}>
             {t < st.hook.seconds && hook && <div style={{ position: 'absolute', top: '14%', left: 0, right: 0, textAlign: 'center', fontFamily: 'Poppins', fontWeight: 700, fontSize: 18, padding: '0 20px', textShadow: '0 2px 10px #000' }}>{hook}</div>}
-            <div style={{ position: 'absolute', left: 0, right: 0, top: `${pos}%`, textAlign: 'center', fontFamily: preset.font, fontWeight: preset.weight, fontSize: size / 3.2, textTransform: preset.upper ? 'uppercase' : 'none', color: preset.color, WebkitTextStroke: '0.6px #000', textShadow: '0 2px 8px rgba(0,0,0,0.6)', padding: '0 14px' }}>
-              {cap.filter((w) => !cut.includes(w.g)).map((w, i) => <span key={w.g} style={{ color: st.caption.highlight && w.hi ? preset.hi : w.g === words[curIdx]?.g ? preset.hi : preset.color, marginRight: 6, background: preset.box ? 'rgba(0,0,0,0.6)' : 'none' }}>{w.w}{i < 0 ? '' : ''}</span>)}
+            <style>{scopeCss(captionCss(preset, { scale: size / 60, highlight: st.caption.highlight }), '.sm-cap')}</style>
+            <div className="sm-cap" style={{ position: 'absolute', left: 0, right: 0, top: `${pos}%`, transform: 'translateY(-50%)', padding: '0 4%' }}>
+              <div className="segment"><div className="line">
+                {cap.filter((w) => !cut.includes(w.g)).map((w) => <span key={w.g} className={`word${w.g === words[curIdx]?.g ? ' word-being-narrated' : ''}${w.hi ? ' emphasis' : ''}`}>{w.w}</span>)}
+              </div></div>
             </div>
             {zn && <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${zn.top * 100}%`, background: 'rgba(239,68,68,0.28)' }} /><div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${zn.bottom * 100}%`, background: 'rgba(239,68,68,0.28)' }} /><div style={{ position: 'absolute', right: 0, top: `${zn.top * 100}%`, bottom: `${zn.bottom * 100}%`, width: `${zn.right * 100}%`, background: 'rgba(239,68,68,0.28)' }} /></div>}
           </div>

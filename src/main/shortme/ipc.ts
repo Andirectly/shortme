@@ -95,3 +95,24 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('shortme:discard', (_e, id: string) => jobs.discard(id))
   ipcMain.handle('shortme:transcript', (_e, hash: string) => loadTranscript(hash))
 }
+
+/** Abnahme im echten Electron-Prozess: `SHORTME_SELFTEST_EXPORT=<hash>:<clipId>[:ass]` exportiert einen Clip und beendet die App. */
+export async function runExportSelfTestIfRequested(): Promise<void> {
+  const spec = process.env.SHORTME_SELFTEST_EXPORT
+  if (!spec) return
+  const [hash, clipId, engine] = spec.split(':')
+  try {
+    const meta = await loadMeta(hash)
+    const file = await loadClips(hash)
+    const transcript = await loadTranscript(hash)
+    const clip = file?.clips.find((c) => c.id === clipId) ?? file?.clips[0]
+    if (!meta || !clip || !transcript) throw new Error('Projekt/Clip/Transkript fehlt')
+    const signals = await ensureSignals(meta)
+    const t0 = Date.now()
+    const r = await exportClip(meta, clip, transcript, signals, { outDir: join(process.cwd(), '.tmp', 'selftest-export'), engine: engine === 'ass' ? 'ass' : 'tscaps', hook: true })
+    console.log(`SELFTEST export engine=${r.captionEngine} path=${r.path} dur=${r.durationSec.toFixed(2)} took=${((Date.now() - t0) / 1000).toFixed(1)}s`)
+  } catch (e) {
+    console.log(`SELFTEST export error ${e instanceof Error ? e.message : e}`)
+  }
+  app.quit()
+}

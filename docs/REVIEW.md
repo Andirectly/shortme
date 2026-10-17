@@ -69,3 +69,8 @@
 - [ ] Task-Manager nach dem Schließen: keine Shortme-/llama-server-/node-Prozesse übrig
 - [ ] Installer-/Programm-Icon: Shortme-Symbol statt Electron (siehe winCodeSign/Entwicklermodus-Hinweis in PROGRESS)
 - [ ] Datenordner heißt weiter %APPDATA%\\cutawan (Altlast aus dem Fork); umbenennen? (würde bestehende Projekte/Modelle verschieben)
+
+## tscaps-Untertitel
+- [ ] Export im echten Fenster: Untertitel sehen aus wie in der Editor-Vorschau (Schrift, Größe, Kontur, gelbes aktives Wort)? Falls nicht: welches Preset weicht ab?
+- [ ] Bei Fehler im Untertitel-Renderer: Datei entsteht trotzdem (ASS-Fallback), Eintrag im Log (Einstellungen → Logs öffnen)
+- [ ] Hook-Karte (oben, erste 3 s) sieht anders aus als in der Vorschau (libass) – akzeptabel?

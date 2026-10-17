@@ -1,7 +1,7 @@
 import { app, BrowserWindow, nativeTheme, protocol, screen, shell } from 'electron'
 import { release } from 'node:os'
 import { registerEngineIpc, installEngineLifecycle, runSelfTestIfRequested } from './engines'
-import { registerShortmeIpc } from './shortme/ipc'
+import { registerShortmeIpc, runExportSelfTestIfRequested } from './shortme/ipc'
 import { initLog } from './log'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -327,6 +327,7 @@ app.whenReady().then(() => {
   registerShortmeIpc()
   installEngineLifecycle()
   runSelfTestIfRequested()
+  void runExportSelfTestIfRequested()
   applyAppIcon()
   createWindow()
 

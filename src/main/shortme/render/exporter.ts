@@ -1,5 +1,5 @@
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import type { ShortmeClip, ShortmeShot } from '@shared/shortme'
 import { FFMPEG_PATH, runBinary } from '../../pipeline/ffmpeg'
 import { fontsDir } from '../../pipeline/captions'
@@ -9,6 +9,7 @@ import type { ProjectMeta } from '../project'
 import type { Transcript } from '../transcription'
 import type { Signals } from '../clips/signals'
 import { buildFilterGraph, OUT_H, OUT_W } from './graph'
+import { captionPass } from './captionPass'
 import { buildAss, PRESETS, type CapWord, type CaptionPreset } from './ass'
 import { buildPieces, keepsFromCuts, planPauseCuts, TimeMap, type Interval } from './timeline'
 import { safeFileName, uniquePath, type QualityTier } from './profiles'
@@ -22,6 +23,8 @@ export interface ExportOptions {
   hook?: boolean
   hookText?: string
   removePauses?: boolean
+  /** Untertitel-Renderer: tscaps (Standard in der App, versteckte Fenster) oder ASS/libass (Fallback, Skripte). */
+  engine?: 'tscaps' | 'ass'
   /** Herausgeschnittene Wörter (Quellzeit), aus den Editor-Operationen. */
   extraCuts?: Interval[]
   /** Untertitel-Anpassungen aus dem Editor. */
@@ -33,7 +36,7 @@ export interface ExportOptions {
   onProgress?: (fraction: number, message: string) => void
 }
 
-export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number }
+export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number; captionEngine: 'tscaps' | 'ass' | 'none' }
 
 /** Reine Planung eines Clips: Pausenschnitte, Zeitachse, Stücke, Wörter auf der gekürzten Zeitleiste. */
 export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = []) {
@@ -89,33 +92,60 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
   await mkdir(work, { recursive: true })
   try {
     const capWords = opts.caption?.highlight === false ? plan.words.map((w) => ({ ...w, tag: undefined })) : plan.words
-    const ass = buildAss(capWords, { width: OUT_W, height: OUT_H, preset, hook: opts.hook === false ? null : { text: opts.hookText ?? clip.hookText, seconds: opts.hookSeconds ?? 3 } })
-    const assPath = join(work, 'captions.ass')
-    await writeFile(assPath, ass, 'utf8')
-    const filter = buildFilterGraph(plan.pieces, {
-      src: { width: meta.width, height: meta.height }, base: clip.start, audioFilter: loudnormFilter(stats), fadeOutSec: 0.25, duration: plan.duration,
-      videoPost: opts.captions === false ? undefined : `ass='${filterPath(assPath)}':fontsdir='${filterPath(fontsDir())}'`
-    })
+    const hook = opts.hook === false ? null : { text: opts.hookText ?? clip.hookText, seconds: opts.hookSeconds ?? 3 }
     const enc = await resolveEncoder(opts.encoder ?? 'auto')
     const quality = opts.quality ?? 'standard'
+    const src = { width: meta.width, height: meta.height }
+    const audioFilter = loudnormFilter(stats)
+
+    /** Ein FFmpeg-Lauf: Stücke → Zusammenschnitt (+ optional eingebrannte ASS-Datei). */
+    const render = async (dest: string, assText: string | null, q: typeof quality): Promise<void> => {
+      let post: string | undefined
+      if (assText) {
+        const assPath = join(work, `${basename(dest)}.ass`)
+        await writeFile(assPath, assText, 'utf8')
+        post = `ass='${filterPath(assPath)}':fontsdir='${filterPath(fontsDir())}'`
+      }
+      const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, videoPost: post })
+      const scriptPath = join(work, `${basename(dest)}.graph.txt`)
+      await writeFile(scriptPath, filter, 'utf8')
+      await runBinary(enc.bin, [
+        '-hide_banner', '-nostats', '-y',
+        '-ss', clip.start.toFixed(3), '-t', (clip.end - clip.start).toFixed(3), '-i', meta.sourcePath,
+        '-/filter_complex', scriptPath, '-map', '[v]', '-map', '[a]',
+        ...encoderArgs(enc.kind, q), '-r', '30', ...audioArgs(q), '-ar', '48000',
+        '-movflags', '+faststart', '-t', plan.duration.toFixed(3), dest
+      ], { signal: opts.signal })
+    }
+
+    const fullAss = buildAss(capWords, { width: OUT_W, height: OUT_H, preset, hook })
     const tmp = join(work, 'out.mp4')
+    const engine: 'tscaps' | 'ass' = opts.captions === false ? 'ass' : opts.engine ?? (process.versions.electron ? 'tscaps' : 'ass')
+    let used: 'tscaps' | 'ass' | 'none' = opts.captions === false ? 'none' : 'ass'
     report(0.1, 'Rendert …')
-    const scriptPath = join(work, 'graph.txt')
-    await writeFile(scriptPath, filter, 'utf8')
-    await runBinary(enc.bin, [
-      '-hide_banner', '-nostats', '-y',
-      '-ss', clip.start.toFixed(3), '-t', (clip.end - clip.start).toFixed(3), '-i', meta.sourcePath,
-      '-/filter_complex', scriptPath, '-map', '[v]', '-map', '[a]',
-      ...encoderArgs(enc.kind, quality), '-r', '30', ...audioArgs(quality), '-ar', '48000',
-      '-movflags', '+faststart', '-t', plan.duration.toFixed(3), tmp
-    ], { signal: opts.signal })
+    if (engine === 'tscaps') {
+      try {
+        // 1) Zwischenergebnis in hoher Qualität (Hook als ASS, ohne Untertitel), 2) @tscaps/engine brennt die Untertitel ein
+        const mid = join(work, 'mid.mp4')
+        await render(mid, hook ? buildAss([], { width: OUT_W, height: OUT_H, preset, hook }) : null, 'high')
+        report(0.5, 'Untertitel …')
+        await captionPass({ input: mid, output: tmp, words: capWords, preset: found, style: { scale: opts.caption?.scale, y: opts.caption?.y, highlight: opts.caption?.highlight }, width: OUT_W, height: OUT_H },
+          { signal: opts.signal, onProgress: (f) => report(0.5 + f * 0.5, 'Untertitel …') })
+        used = 'tscaps'
+      } catch (e) {
+        if (opts.signal?.aborted) throw e
+        console.error('tscaps-Untertitel fehlgeschlagen, Fallback ASS/libass:', e)
+        await rm(tmp, { force: true })
+      }
+    }
+    if (used !== 'tscaps') await render(tmp, opts.captions === false ? null : fullAss, quality)
     await mkdir(dirname(finalPath), { recursive: true })
     await rm(finalPath, { force: true })
     await rename(tmp, finalPath)
     let srtPath: string | undefined
     if (opts.srt) { srtPath = finalPath.replace(/\.mp4$/, '.srt'); await writeFile(srtPath, buildSrt(plan.words), 'utf8') }
     report(1, 'Fertig')
-    return { path: finalPath, durationSec: plan.duration, srtPath, ass, wordsOut: plan.words, pieces: plan.pieces.length }
+    return { path: finalPath, durationSec: plan.duration, srtPath, ass: fullAss, wordsOut: plan.words, pieces: plan.pieces.length, captionEngine: used }
   } finally {
     await rm(work, { recursive: true, force: true })
   }

@@ -150,6 +150,16 @@ const api = {
     }
   },
 
+  /** Verstecktes Untertitel-Renderfenster (@tscaps/engine, M6+). */
+  captions: {
+    ready: (): void => ipcRenderer.send('captions:ready'),
+    onRun: (cb: (job: unknown) => void): void => { ipcRenderer.on('captions:run', (_e, job) => cb(job)) },
+    progress: (fraction: number): void => ipcRenderer.send('captions:progress', fraction),
+    readFile: (path: string): Promise<ArrayBuffer> => ipcRenderer.invoke('captions:read', path),
+    writeFile: (path: string, data: ArrayBuffer): Promise<void> => ipcRenderer.invoke('captions:write', path, data),
+    done: (error?: string): void => ipcRenderer.send('captions:done', error ?? null)
+  },
+
   /** Shortme: Import, Transkription, Jobs (M3). */
   shortme: {
     importFile: (path: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importFile', path),
