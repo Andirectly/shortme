@@ -12,3 +12,13 @@
 - [ ] M5: nie ein leerer Ausschnitt – Fallback `fit` greift in jedem Shot ohne Gesicht
 - [ ] M5: Gesichtsquote-Warnung (< 60 %) erscheint, Ranking-Abzug sichtbar
 - [ ] M6: Export von `fit`-Layout (unscharfer Hintergrund) visuell prüfen
+
+## M1 (Oberfläche ansehen: `npm run dev`)
+- [ ] Mica/Titelleiste im echten Fenster (Windows 11): Mica sichtbar, native Fensterknöpfe rechts, Drag-Region ok (nur im Electron-Fenster prüfbar, ich habe die Seite im Browser-Pane getestet)
+- [ ] Gesamteindruck: Glas, Akzent nur bei KI-Bezug (Score, Navigation, KI-Button), Typografie
+- [ ] Feder-Gefühl: Sheet hochziehen/wegwerfen (Wurf mit Geschwindigkeit), Press-Feedback, Navigations-Glanz wandert
+- [ ] Zeitleisten-Griffe: heben sich beim Greifen, rasten an Wortgrenzen, folgen 1:1
+- [ ] Windows „Animationen aus“ (reduzierte Bewegung) einschalten → nur Überblenden, keine Federn
+- [ ] Windows „Transparenzeffekte aus“ → feste Flächen
+- [ ] Scrollen der Clip-Übersicht mit 100+ Karten flüssig (ich habe nur 10 Beispielkarten gemessen: 144 fps, p95 7,1 ms)
+- [ ] Hover-Vorschau der Karten (derzeit Zoom-Effekt als Platzhalter, echtes stummes Video folgt mit M6)

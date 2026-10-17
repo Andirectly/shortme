@@ -59,3 +59,6 @@ Für Suchen in Referenz-Repos einen Subagenten nutzen, der nur eine kurze Zusamm
 - M0: Qwen3-14B Q4_K_M gewählt (13,6 GB VRAM bei 16k); LLM ignoriert Längenvorgabe → Länge per Einrast-Logik erzwingen
 - M0: @tscaps/engine exportiert 60 s in 5,7 s (0,09×) → tscaps ist Standard, ASS nur Fallback
 - Umgebung: npm führt Install-Skripte nicht aus (`node node_modules/electron/install.js` nötig); `models/`, `spikes/out/` sind für Claude per Deny-Regel nicht lesbar → per Node-Skript prüfen
+- M1: Neue UI in `src/renderer/src/shortme/` (Tokens, Shell, Screens, Beispieldaten); `?legacy` startet die alte Cutawan-UI; Window: Mica + titleBarOverlay in main/index.ts
+- M1: React 19 hat kein globales `JSX` → `React.JSX.Element`; `.sm-root button {color:inherit}` schlägt Klassen → `:where()` nutzen
+- M1: Flex/Grid-Spalten mit `minmax(0,1fr)`; Inline-Wort-Spans brauchen `{' '}` sonst kein Umbruch

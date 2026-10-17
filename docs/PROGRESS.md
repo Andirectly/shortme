@@ -13,3 +13,8 @@ Plan:
 4. Tracking: Gesichter + LR-ASD (ONNX Runtime GPU), 20 Stichprobenmomente
 5. Untertitel-Export: @tscaps/engine in Electron, 60 s 1080×1920, Dauer < 1,5× Echtzeit
 Danach Stopp, Ergebnisse + Empfehlung.
+
+## M1 – UI-Prototyp (Status: FERTIG, wartet auf deine Ansicht)
+Plan: Tokens/Shell (Mica, Titelleiste, Navigation) → Screens mit Beispieldaten (Start, Erstellen-Sheet, Verarbeitung, Clips, Editor, Stil-Studio, Modelle, Einstellungen) → Prüfung im Browser-Pane.
+Geprüft: typecheck/lint grün; alle Screens klickbar; Sheet (Wurfgeste), Zeitleisten-Griffe (1:1, Einrasten), Undo/Redo, Autosave getestet; Scroll 144 fps. Offen für dich: docs/REVIEW.md (M1).
+Beispieldaten: 10 Thumbnails aus den Testvideos in `shortme/assets/` (klein, im Repo).

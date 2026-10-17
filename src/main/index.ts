@@ -1,4 +1,5 @@
 import { app, BrowserWindow, nativeTheme, protocol, screen, shell } from 'electron'
+import { release } from 'node:os'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { migrateLegacyCookiesDir } from './cookies'
@@ -212,6 +213,10 @@ function applyAppIcon(): void {
   }
 }
 
+function winSupportsMica(): boolean {
+  return process.platform === 'win32' && Number(release().split('.')[2]) >= 22000
+}
+
 function createWindow(): void {
   // A floating window with margin around it, never edge-to-edge (and never
   // larger than the work area on small laptop displays).
@@ -243,7 +248,16 @@ function createWindow(): void {
           titleBarStyle: 'hiddenInset' as const,
           trafficLightPosition: { x: 18, y: 20 }
         }
-      : { backgroundColor: '#09090b' }),
+      : process.platform === 'win32'
+        ? {
+            // Shortme: Mica on Windows 11 (build >= 22000), solid dark on Windows 10.
+            // Native caption buttons stay on the right via the title bar overlay.
+            backgroundColor: winSupportsMica() ? '#00000000' : '#0b0b10',
+            ...(winSupportsMica() ? { backgroundMaterial: 'mica' as const } : {}),
+            titleBarStyle: 'hidden' as const,
+            titleBarOverlay: { color: '#00000000', symbolColor: '#ffffffcc', height: 44 }
+          }
+        : { backgroundColor: '#09090b' }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
