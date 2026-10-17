@@ -55,3 +55,10 @@
 - [ ] Optik Export vs. Editor-Vorschau (5 Zeitpunkte): Schrift/Größe/Position weichen ab (libass vs. CSS) – ist das akzeptabel oder soll tscaps-Overlay Priorität bekommen?
 - [ ] Lautheit mit Fremdmessgerät/Player prüfen (ich: −14,03 / −14,09 LUFS nach FFmpeg-loudnorm)
 - [ ] Preset-Export/-Import: Datei lässt sich speichern und wieder laden (Import ändert noch nichts im Export)
+
+## M7
+- [ ] Editor im echten Fenster: Wörter herausschneiden, Griffe ziehen (lassen sich einrasten/folgen 1:1?), alle Änderungen mit Strg+Z/Strg+Y zurücknehmen
+- [ ] App schließen und neu starten → gleicher Bearbeitungsstand (Edit-Datei liegt unter projects/<hash>/edits/)
+- [ ] Person in der Quelle anklicken → Export zeigt ab dieser Stelle den gewählten Bildausschnitt
+- [ ] „Stil auf alle anwenden“: wirkt der Stil in den anderen Clips (Export prüfen)?
+- [ ] Echte Videovorschau im Editor fehlt noch (Standbild + simulierte Zeit) – Priorität?

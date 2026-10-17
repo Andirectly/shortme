@@ -21,6 +21,7 @@ import type {
 } from '@shared/types'
 import type { OpenRouterCatalog } from '@shared/openrouter'
 import type { AssetSpec, AssetStatus, CheckItem, HardwareInfo } from '@shared/engines'
+import type { CaptionPatch, EditLog } from '@shared/edits'
 import type { ShortmeClips, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
 const api = {
@@ -160,6 +161,9 @@ const api = {
     stop: (id: string): Promise<void> => ipcRenderer.invoke('shortme:stop', id),
     discard: (id: string): Promise<void> => ipcRenderer.invoke('shortme:discard', id),
     exportClips: (hash: string, clipIds: string[], opts: { presetId?: string; srt?: boolean; captions?: boolean }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:export', hash, clipIds, opts),
+    editsLoad: (hash: string, clipId: string): Promise<EditLog> => ipcRenderer.invoke('shortme:editsLoad', hash, clipId),
+    editsSave: (hash: string, log: EditLog): Promise<void> => ipcRenderer.invoke('shortme:editsSave', hash, log),
+    applyAll: (hash: string, clipIds: string[], patch: CaptionPatch): Promise<void> => ipcRenderer.invoke('shortme:applyAll', hash, clipIds, patch),
     presetExport: (id: string): Promise<boolean> => ipcRenderer.invoke('shortme:presetExport', id),
     presetImport: (): Promise<unknown> => ipcRenderer.invoke('shortme:presetImport'),
     clips: (hash: string): Promise<ShortmeClips | null> => ipcRenderer.invoke('shortme:clips', hash),

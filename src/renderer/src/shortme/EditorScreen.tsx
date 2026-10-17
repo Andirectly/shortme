@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Monitor, ShieldCheck, Check } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Monitor, ShieldCheck, Check, Wand2 } from 'lucide-react'
+import { baseState, canRedo, canUndo, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
 import { useStore } from './store'
 import { IMG, PRESETS, TRANSCRIPT } from './data'
 import { useClipList } from './clipData'
@@ -10,56 +11,76 @@ import { useSprings } from './motion'
 
 const WAVE = Array.from({ length: 160 }, (_, i) => 0.25 + 0.75 * Math.abs(Math.sin(i * 0.37) * Math.cos(i * 0.113 + 1.3)))
 const ZONES: Record<string, { top: number; bottom: number; right: number }> = { TikTok: { top: 0.12, bottom: 0.2, right: 0.14 }, Reels: { top: 0.1, bottom: 0.18, right: 0.1 }, Shorts: { top: 0.1, bottom: 0.22, right: 0.12 } }
+const LAYOUTS: Record<string, 'smart' | 'fit' | 'split' | 'fixed'> = { Smart: 'smart', 'Ganzes Bild': 'fit', Split: 'split', Fest: 'fixed' }
 
 export function EditorScreen(): React.JSX.Element {
   const clipId = useStore((s) => s.activeClip)
   const list = useClipList()
   const clip = list.find((c) => c.id === clipId) ?? list[0]
   const real = useProject((s) => s.clipsFile?.clips.find((c) => c.id === clipId))
+  const hash = useProject((s) => s.clipsFile?.hash)
+  const allReal = useProject((s) => s.clipsFile?.clips)
   const transcript = useProject((s) => s.transcript)
+  const hasApi = useProject((s) => s.hasApi)
   const exportClips = useProject((s) => s.exportClips)
   const exportJob = useProject((s) => s.exportJob)
-  const trim = useStore((s) => s.trim)
-  const hook = useStore((s) => s.hookText)
-  const presetId = useStore((s) => s.presetId)
   const go = useStore((s) => s.go)
-  const apply = useStore((s) => s.apply)
-  const undo = useStore((s) => s.undo)
-  const redo = useStore((s) => s.redo)
-  const canUndo = useStore((s) => s.undoStack.length > 0)
-  const canRedo = useStore((s) => s.redoStack.length > 0)
-  const setTrim = useStore((s) => s.setTrim)
-  const setHook = useStore((s) => s.setHook)
   const { base } = useSprings()
 
+  // Nicht-destruktive Bearbeitung: Operationslog (Undo/Redo = Cursor), Autosave auf Platte (Neustart stellt den Stand wieder her)
+  const origStart = real?.start ?? 0
+  const baseSt = useMemo(() => baseState({ start: origStart, end: real?.end ?? clip.duration, hookText: clip.hook }, useStore.getState().presetId), [origStart, real?.end, clip.duration, clip.hook])
+  const [log, setLog] = useState<EditLog>(emptyLog(clipId))
+  const [loaded, setLoaded] = useState(false)
+  const [saved, setSaved] = useState(true)
+  const st = useMemo(() => stateOf(baseSt, log), [baseSt, log])
+  const logRef = useRef(log)
+  logRef.current = log
+
+  useEffect(() => {
+    let alive = true
+    setLoaded(false)
+    const done = (l: EditLog): void => { if (alive) { setLog(l); setLoaded(true) } }
+    if (hasApi && hash) void window.cutawan.shortme.editsLoad(hash, clipId).then(done).catch(() => done(emptyLog(clipId)))
+    else { try { done(sanitizeLog(JSON.parse(localStorage.getItem(`sm.log.${clipId}`) ?? 'null'), clipId)) } catch { done(emptyLog(clipId)) } }
+    return () => { alive = false }
+  }, [clipId, hash, hasApi])
+
+  const persist = useCallback(async (l: EditLog): Promise<void> => {
+    if (hasApi && hash) await window.cutawan.shortme.editsSave(hash, l)
+    else { try { localStorage.setItem(`sm.log.${l.clipId}`, JSON.stringify(l)) } catch { /* ignore */ } }
+  }, [hasApi, hash])
+  useEffect(() => {
+    if (!loaded) return
+    setSaved(false)
+    const id = setTimeout(() => { void persist(log).then(() => setSaved(true)) }, 400)
+    return () => clearTimeout(id)
+  }, [log, loaded, persist])
+
+  const commit = useCallback((op: Op): void => setLog((l) => push(l, op)), [])
+  const undo = useCallback((): void => setLog((l) => undoLog(l)), [])
+  const redo = useCallback((): void => setLog((l) => redoLog(l)), [])
+
   const words = useMemo(() => (real && transcript
-    ? transcript.words.slice(real.firstWord, real.lastWord + 1).map((w, i) => ({ w: w.w, t: Math.max(0, w.start - real.start), hi: real.tags.some((g) => g.word === real.firstWord + i) }))
-    : TRANSCRIPT.map((w, i) => ({ ...w, t: (i * clip.duration) / TRANSCRIPT.length }))), [clip.duration, real, transcript])
-  const [cut, setCut] = useState<number[]>([])
+    ? transcript.words.slice(real.firstWord, real.lastWord + 1).map((w, i) => ({ w: w.w, t: Math.max(0, w.start - real.start), g: real.firstWord + i, hi: real.tags.some((x) => x.word === real.firstWord + i) }))
+    : TRANSCRIPT.map((w, i) => ({ ...w, g: i, t: (i * clip.duration) / TRANSCRIPT.length }))), [clip.duration, real, transcript])
   const [t, setT] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [tab, setTab] = useState('Untertitel')
   const [showSource, setShowSource] = useState(true)
   const [zone, setZone] = useState('Aus')
-  const [hl, setHl] = useState(true)
-  const [size, setSize] = useState(60)
-  const [pos, setPos] = useState(68)
-  const [layout, setLayout] = useState('Smart')
-  const [person, setPerson] = useState('Person links')
-  const [saved, setSaved] = useState(true)
-  const preset = PRESETS.find((p) => p.id === presetId)!
+  const [liveTrim, setLiveTrim] = useState<[number, number] | null>(null)
+  const [hookDraft, setHookDraft] = useState<string | null>(null)
+  const [sizeDraft, setSizeDraft] = useState<number | null>(null)
+  const [posDraft, setPosDraft] = useState<number | null>(null)
+  const preset = PRESETS.find((p) => p.id === st.caption.presetId) ?? PRESETS[0]
+  const committed: [number, number] = [st.start - origStart, st.end - origStart]
+  const trim = liveTrim ?? committed
+  const size = sizeDraft ?? Math.round(st.caption.scale * 60)
+  const pos = posDraft ?? Math.round(st.caption.y * 100)
+  const hook = hookDraft ?? st.hook.text
+  const cut = st.cutWords
 
-  // Autosave (lokal): Beschnitt, Schnitte, Hook
-  useEffect(() => {
-    setSaved(false)
-    const id = setTimeout(() => { try { localStorage.setItem(`sm.edit.${clipId}`, JSON.stringify({ trim, cut, hook })) } catch { /* ignore */ } setSaved(true) }, 600)
-    return () => clearTimeout(id)
-  }, [trim, cut, hook, clipId])
-  useEffect(() => {
-    try { const v = localStorage.getItem(`sm.edit.${clipId}`); if (v) { const d = JSON.parse(v); setCut(d.cut ?? []); setTrim(d.trim); setHook(d.hook) } } catch { /* ignore */ }
-  }, [clipId, setTrim, setHook])
-
-  // Wiedergabe-Simulation
   useEffect(() => {
     if (!playing) return
     let last = performance.now(); let raf = 0
@@ -72,7 +93,7 @@ export function EditorScreen(): React.JSX.Element {
     const k = (e: KeyboardEvent): void => {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo() }
+      if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
       else if (e.ctrlKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo() }
       else if (e.key === ' ') { e.preventDefault(); setPlaying((p) => !p) }
     }
@@ -80,13 +101,18 @@ export function EditorScreen(): React.JSX.Element {
     return () => window.removeEventListener('keydown', k)
   }, [undo, redo])
 
-  const toggleCut = (i: number): void => {
-    const was = cut.includes(i)
-    apply({ label: 'Zeile', undo: () => setCut((c) => (was ? [...c, i] : c.filter((x) => x !== i))), redo: () => setCut((c) => (was ? c.filter((x) => x !== i) : [...c, i])) })
-  }
+  const toggleCut = (g: number): void => commit({ t: 'cutWords', words: [g], cut: !cut.includes(g) })
+  const caption = (patch: CaptionPatch): void => commit({ t: 'caption', patch })
   const curIdx = Math.max(0, words.findLastIndex((w) => w.t <= t))
   const cap = words.slice(Math.floor(curIdx / 3) * 3, Math.floor(curIdx / 3) * 3 + 3)
   const zn = ZONES[zone]
+  const absT = origStart + t
+
+  const exportNow = async (): Promise<void> => { await persist(logRef.current); await exportClips([clipId], st.caption.presetId, false) }
+  const applyAll = async (): Promise<void> => {
+    const others = (allReal ?? []).map((c) => c.id).filter((id) => id !== clipId)
+    if (hasApi && hash) await window.cutawan.shortme.applyAll(hash, others, { presetId: st.caption.presetId, scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight })
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr 170px', gap: 12, height: 'calc(100vh - 60px)', paddingTop: 4 }}>
@@ -94,9 +120,9 @@ export function EditorScreen(): React.JSX.Element {
         <Button variant="ghost" aria-label="Zurück" onClick={() => go('clips')}><ArrowLeft size={18} /></Button>
         <h2 style={{ flex: 1 }}>{clip.title}</h2>
         <small style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{saved ? <><Check size={13} /> Gespeichert</> : 'Speichert …'}</small>
-        <Button variant="ghost" aria-label="Rückgängig (Strg+Z)" disabled={!canUndo} onClick={undo}><Undo2 size={16} /></Button>
-        <Button variant="ghost" aria-label="Wiederholen (Strg+Y)" disabled={!canRedo} onClick={redo}><Redo2 size={16} /></Button>
-        <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportClips([clipId], presetId, false)}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
+        <Button variant="ghost" aria-label="Rückgängig (Strg+Z)" disabled={!canUndo(log)} onClick={undo}><Undo2 size={16} /></Button>
+        <Button variant="ghost" aria-label="Wiederholen (Strg+Y)" disabled={!canRedo(log)} onClick={redo}><Redo2 size={16} /></Button>
+        <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportNow()}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr) 320px', gap: 14, minHeight: 0 }}>
@@ -105,22 +131,27 @@ export function EditorScreen(): React.JSX.Element {
           <h3 style={{ marginBottom: 10 }}>Transkript</h3>
           <div style={{ lineHeight: 1.9, fontSize: 14 }}>
             {words.map((w, i) => (
-              <Fragment key={i}>
-              <span onClick={(e) => { if (e.altKey) toggleCut(i); else setT(w.t) }} onDoubleClick={() => toggleCut(i)} title="Klick: springen · Doppelklick: herausschneiden"
-                style={{ cursor: 'default', padding: '1px 2px', borderRadius: 4, marginRight: 3, textDecoration: cut.includes(i) ? 'line-through' : 'none', opacity: cut.includes(i) ? 0.35 : 1, background: i === curIdx ? 'rgba(168,85,247,0.35)' : 'transparent' }}>{w.w}</span>{' '}
+              <Fragment key={w.g}>
+                <span onClick={(e) => { if (e.altKey) toggleCut(w.g); else setT(w.t) }} onDoubleClick={() => toggleCut(w.g)} title="Klick: springen · Doppelklick: herausschneiden"
+                  style={{ cursor: 'default', padding: '1px 2px', borderRadius: 4, marginRight: 3, textDecoration: cut.includes(w.g) ? 'line-through' : 'none', opacity: cut.includes(w.g) ? 0.35 : 1, background: i === curIdx ? 'rgba(168,85,247,0.35)' : 'transparent' }}>{w.w}</span>{' '}
               </Fragment>
             ))}
           </div>
-          <small style={{ display: 'block', marginTop: 12 }}>Doppelklick auf ein Wort schneidet es heraus.</small>
+          <small style={{ display: 'block', marginTop: 12 }}>Doppelklick auf ein Wort schneidet es heraus (im Export entfernt).</small>
         </div>
 
         {/* Vorschau */}
         <div style={{ display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'center', minHeight: 0 }}>
-          {showSource && <div style={{ position: 'relative', height: '56%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--edge)', backgroundImage: `url(${IMG.source})`, backgroundSize: 'cover', alignSelf: 'center', maxWidth: '38%' }}><span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.5)' }}>Quelle 16:9</span></div>}
+          {showSource && (
+            <div title="Klick auf eine Person: Kamera folgt ihr ab hier" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); commit({ t: 'follow', at: absT, cx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) }) }}
+              style={{ position: 'relative', height: '56%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--edge)', backgroundImage: `url(${IMG.source})`, backgroundSize: 'cover', alignSelf: 'center', maxWidth: '38%', cursor: 'crosshair' }}>
+              <span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.5)' }}>Quelle 16:9 · Person anklicken</span>
+            </div>
+          )}
           <div style={{ position: 'relative', height: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--edge-highlight)', backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
-            {t < 3 && hook && <div style={{ position: 'absolute', top: '14%', left: 0, right: 0, textAlign: 'center', fontFamily: 'Poppins', fontWeight: 700, fontSize: 18, padding: '0 20px', textShadow: '0 2px 10px #000' }}>{hook}</div>}
+            {t < st.hook.seconds && hook && <div style={{ position: 'absolute', top: '14%', left: 0, right: 0, textAlign: 'center', fontFamily: 'Poppins', fontWeight: 700, fontSize: 18, padding: '0 20px', textShadow: '0 2px 10px #000' }}>{hook}</div>}
             <div style={{ position: 'absolute', left: 0, right: 0, top: `${pos}%`, textAlign: 'center', fontFamily: preset.font, fontWeight: preset.weight, fontSize: size / 3.2, textTransform: preset.upper ? 'uppercase' : 'none', color: preset.color, WebkitTextStroke: '0.6px #000', textShadow: '0 2px 8px rgba(0,0,0,0.6)', padding: '0 14px' }}>
-              {cap.map((w, i) => <span key={i} style={{ color: hl && w.hi ? preset.hi : i + Math.floor(curIdx / 3) * 3 === curIdx ? preset.hi : preset.color, marginRight: 6, background: preset.box ? 'rgba(0,0,0,0.6)' : 'none' }}>{w.w}</span>)}
+              {cap.filter((w) => !cut.includes(w.g)).map((w, i) => <span key={w.g} style={{ color: st.caption.highlight && w.hi ? preset.hi : w.g === words[curIdx]?.g ? preset.hi : preset.color, marginRight: 6, background: preset.box ? 'rgba(0,0,0,0.6)' : 'none' }}>{w.w}{i < 0 ? '' : ''}</span>)}
             </div>
             {zn && <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${zn.top * 100}%`, background: 'rgba(239,68,68,0.28)' }} /><div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${zn.bottom * 100}%`, background: 'rgba(239,68,68,0.28)' }} /><div style={{ position: 'absolute', right: 0, top: `${zn.top * 100}%`, bottom: `${zn.bottom * 100}%`, width: `${zn.right * 100}%`, background: 'rgba(239,68,68,0.28)' }} /></div>}
           </div>
@@ -131,32 +162,33 @@ export function EditorScreen(): React.JSX.Element {
           <Segmented options={['Untertitel', 'Bildausschnitt', 'Hook']} value={tab} onChange={setTab} />
           {tab === 'Untertitel' && (
             <div>
-              <Row label="Stil"><Segmented options={PRESETS.map((p) => p.name)} value={preset.name} onChange={(n) => useStore.getState().setPreset(PRESETS.find((p) => p.name === n)!.id)} /></Row>
-              <Row label="Größe"><Slider label="Schrift" value={size} onChange={setSize} /></Row>
-              <Row label="Position" hint="Drag-Regler"><Slider label="Vertikal" value={pos} min={10} max={90} onChange={setPos} /></Row>
-              <Row label="Hervorhebung (KI-Tags)"><Switch on={hl} onChange={setHl} label="Hervorhebung" /></Row>
+              <Row label="Stil"><Segmented options={PRESETS.map((p) => p.name)} value={preset.name} onChange={(n) => caption({ presetId: PRESETS.find((p) => p.name === n)!.id })} /></Row>
+              <Row label="Größe"><Slider label="Schrift" value={size} onChange={setSizeDraft} onCommit={(v) => { setSizeDraft(null); caption({ scale: v / 60 }) }} /></Row>
+              <Row label="Position" hint="Drag-Regler"><Slider label="Vertikal" value={pos} min={10} max={90} onChange={setPosDraft} onCommit={(v) => { setPosDraft(null); caption({ y: v / 100 }) }} /></Row>
+              <Row label="Hervorhebung (KI-Tags)"><Switch on={st.caption.highlight} onChange={(b) => caption({ highlight: b })} label="Hervorhebung" /></Row>
               <Row label="Sicherheitszonen"><Segmented options={['Aus', 'TikTok', 'Reels', 'Shorts']} value={zone} onChange={setZone} /></Row>
+              <Row label="Alle Clips"><Button variant="secondary" disabled={!hasApi || (allReal?.length ?? 0) < 2} onClick={() => void applyAll()}><Wand2 size={15} /> Stil auf alle anwenden</Button></Row>
             </div>
           )}
           {tab === 'Bildausschnitt' && (
             <div>
-              <Row label="Layout (pro Shot)"><Segmented options={['Smart', 'Ganzes Bild', 'Split', 'Fest']} value={layout} onChange={setLayout} /></Row>
-              <Row label="Kamera folgt" hint="ab hier"><Segmented options={['Person links', 'Person rechts']} value={person} onChange={setPerson} /></Row>
+              <Row label="Layout" hint="ab Abspielposition"><Segmented options={Object.keys(LAYOUTS)} value="" onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} /></Row>
+              <Row label="Kamera folgt" hint="ab hier"><small>Auf eine Person in der Quelle (links) klicken – der Ausschnitt springt als fester Schnitt dorthin.</small></Row>
               <Row label="Quelle anzeigen"><Switch on={showSource} onChange={setShowSource} label="Quelle anzeigen" /></Row>
-              <small>Gesichtsquote {Math.round(clip.faceRatio * 100)} %</small>
+              <small>Gesichtsquote {Math.round(clip.faceRatio * 100)} % · {st.layoutOps.length} Änderung(en) am Ausschnitt</small>
             </div>
           )}
           {tab === 'Hook' && (
             <div>
-              <Row label="Text"><input className="sm-input" value={hook} onChange={(e) => setHook(e.target.value)} onFocus={(e) => { const prev = hook; e.currentTarget.dataset.prev = prev }} onBlur={(e) => { const prev = e.currentTarget.dataset.prev ?? ''; const next = hook; if (prev !== next) apply({ label: 'Hook', undo: () => setHook(prev), redo: () => setHook(next) }) }} /></Row>
-              <Row label="Dauer"><Slider label="Sekunden" value={3} min={1} max={6} onChange={() => undefined} /></Row>
+              <Row label="Text"><input className="sm-input" value={hook} onChange={(e) => setHookDraft(e.target.value)} onBlur={() => { if (hookDraft !== null && hookDraft !== st.hook.text) commit({ t: 'hook', text: hookDraft }); setHookDraft(null) }} /></Row>
+              <Row label="Dauer"><Slider label="Sekunden" value={st.hook.seconds} min={1} max={6} onChange={() => undefined} onCommit={(v) => commit({ t: 'hook', text: st.hook.text, seconds: v })} /></Row>
             </div>
           )}
         </div>
       </div>
 
       <Timeline duration={clip.duration} trim={trim} t={t} setT={setT} words={words} playing={playing} setPlaying={setPlaying}
-        onTrim={(next) => { const prev = useStore.getState().trim; apply({ label: 'Beschnitt', undo: () => setTrim(prev), redo: () => setTrim(next) }) }} onPreview={(next) => setTrim(next)} base={base}
+        onTrim={(next) => { setLiveTrim(null); if (next[0] !== committed[0] || next[1] !== committed[1]) commit({ t: 'trim', start: origStart + next[0], end: origStart + next[1] }) }} onPreview={setLiveTrim} base={base}
         onCheckEnd={() => { setT(Math.max(trim[0], trim[1] - 2.5)); setPlaying(true) }} />
     </div>
   )
@@ -168,7 +200,7 @@ function Timeline({ duration, trim, t, setT, words, playing, setPlaying, onTrim,
 }): React.JSX.Element {
   const track = useRef<HTMLDivElement>(null)
   const [grab, setGrab] = useState<'in' | 'out' | null>(null)
-  const start = useRef<[number, number]>(trim)
+  const live = useRef<[number, number]>(trim)
   const offset = useRef(0)
   const bounds = useMemo(() => words.flatMap((w, i) => [w.t, words[i + 1]?.t ?? duration]), [words, duration])
   const snap = useCallback((x: number) => bounds.reduce((b, c) => (Math.abs(c - x) < Math.abs(b - x) ? c : b), bounds[0]), [bounds])
@@ -177,7 +209,7 @@ function Timeline({ duration, trim, t, setT, words, playing, setPlaying, onTrim,
 
   const down = (which: 'in' | 'out') => (e: React.PointerEvent): void => {
     e.currentTarget.setPointerCapture(e.pointerId)
-    start.current = trim
+    live.current = trim
     offset.current = toTime(e.clientX) - trim[which === 'in' ? 0 : 1] // Grab-Offset: 1:1, kein Springen zur Mitte
     setGrab(which)
   }
@@ -185,14 +217,14 @@ function Timeline({ duration, trim, t, setT, words, playing, setPlaying, onTrim,
     if (!grab) return
     const x = toTime(e.clientX) - offset.current
     const v = Math.min(duration, Math.max(0, snap(x)))
-    onPreview(grab === 'in' ? [Math.min(v, trim[1] - 1), trim[1]] : [trim[0], Math.max(v, trim[0] + 1)])
+    const next: [number, number] = grab === 'in' ? [Math.min(v, live.current[1] - 1), live.current[1]] : [live.current[0], Math.max(v, live.current[0] + 1)]
+    live.current = next
+    onPreview(next)
   }
   const up = (): void => {
     if (!grab) return
-    const next = useStore.getState().trim
-    useStore.getState().setTrim(start.current)
-    if (next[0] !== start.current[0] || next[1] !== start.current[1]) onTrim(next)
     setGrab(null)
+    onTrim(live.current) // genau ein Undo-Schritt je Ziehen
   }
 
   return (

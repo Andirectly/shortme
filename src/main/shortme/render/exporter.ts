@@ -22,6 +22,11 @@ export interface ExportOptions {
   hook?: boolean
   hookText?: string
   removePauses?: boolean
+  /** Herausgeschnittene Wörter (Quellzeit), aus den Editor-Operationen. */
+  extraCuts?: Interval[]
+  /** Untertitel-Anpassungen aus dem Editor. */
+  caption?: { scale?: number; y?: number; highlight?: boolean }
+  hookSeconds?: number
   quality?: QualityTier
   encoder?: 'auto' | 'cpu' | 'gpu'
   signal?: AbortSignal
@@ -31,16 +36,27 @@ export interface ExportOptions {
 export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number }
 
 /** Reine Planung eines Clips: Pausenschnitte, Zeitachse, Stücke, Wörter auf der gekürzten Zeitleiste. */
-export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean) {
+export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = []) {
   const range: Interval = [clip.start, clip.end]
   const words = t.words.slice(clip.firstWord, clip.lastWord + 1)
-  const cuts = removePauses ? planPauseCuts(range, words, signals.silences, t.speech) : []
+  const cuts = mergeIntervals([...(removePauses ? planPauseCuts(range, words, signals.silences, t.speech) : []), ...extraCuts.filter((c) => c[1] > range[0] && c[0] < range[1])])
   const map = new TimeMap(keepsFromCuts(range, cuts))
   const fallback: ShortmeShot = { start: 0, end: clip.end - clip.start, layout: 'fixed', cx: 0.5, zoom: 1 }
   const pieces = buildPieces(map, clip.shots?.length ? clip.shots : [fallback], clip.start)
   const tagByWord = new Map(clip.tags.map((g) => [g.word, g.kind]))
   const capWords: CapWord[] = map.words(words.map((w, i) => ({ w: w.w, start: w.start, end: w.end, tag: tagByWord.get(clip.firstWord + i) })))
   return { map, pieces, cuts, words: capWords, duration: map.duration }
+}
+
+/** Überlappende/angrenzende Schnitte zusammenfassen (sortiert). */
+export function mergeIntervals(iv: Interval[]): Interval[] {
+  const out: Interval[] = []
+  for (const c of [...iv].sort((a, b) => a[0] - b[0])) {
+    const p = out[out.length - 1]
+    if (p && c[0] <= p[1] + 1e-6) p[1] = Math.max(p[1], c[1])
+    else out.push([c[0], c[1]])
+  }
+  return out
 }
 
 const srtTime = (t: number): string => { const ms = Math.round(t * 1000); const p = (n: number, l = 2): string => String(n).padStart(l, '0'); return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}` }
@@ -58,10 +74,11 @@ export const filterPath = (p: string): string => p.replace(/\\/g, '/').replace(/
 
 export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transcript, signals: Signals, opts: ExportOptions): Promise<ExportResult> {
   const report = opts.onProgress ?? (() => undefined)
-  const plan = planExport(clip, t, signals, opts.removePauses ?? true)
+  const plan = planExport(clip, t, signals, opts.removePauses ?? true, opts.extraCuts ?? [])
   if (plan.pieces.length === 0) throw new Error('Clip enthält nichts zu exportieren')
   await mkdir(opts.outDir, { recursive: true })
-  const preset: CaptionPreset = PRESETS.find((p) => p.id === opts.presetId) ?? PRESETS[0]
+  const found = PRESETS.find((p) => p.id === opts.presetId) ?? PRESETS[0]
+  const preset: CaptionPreset = { ...found, size: found.size * (opts.caption?.scale ?? 1), y: opts.caption?.y ?? found.y, highlight: opts.caption?.highlight === false ? found.color : found.highlight }
 
   report(0.02, 'Lautheit messen …')
   const stats = await measureLoudness(meta.sourcePath, clip.start, clip.end - clip.start, opts.signal)
@@ -71,7 +88,8 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
   const work = join(opts.outDir, `.${name}.work`)
   await mkdir(work, { recursive: true })
   try {
-    const ass = buildAss(plan.words, { width: OUT_W, height: OUT_H, preset, hook: opts.hook === false ? null : { text: opts.hookText ?? clip.hookText, seconds: 3 } })
+    const capWords = opts.caption?.highlight === false ? plan.words.map((w) => ({ ...w, tag: undefined })) : plan.words
+    const ass = buildAss(capWords, { width: OUT_W, height: OUT_H, preset, hook: opts.hook === false ? null : { text: opts.hookText ?? clip.hookText, seconds: opts.hookSeconds ?? 3 } })
     const assPath = join(work, 'captions.ass')
     await writeFile(assPath, ass, 'utf8')
     const filter = buildFilterGraph(plan.pieces, {

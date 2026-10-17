@@ -50,11 +50,12 @@ export function Row({ label, children, hint }: { label: string; children: ReactN
   )
 }
 
-export function Slider({ label, value, min = 0, max = 100, onChange }: { label: string; value: number; min?: number; max?: number; onChange: (n: number) => void }): React.JSX.Element {
+export function Slider({ label, value, min = 0, max = 100, onChange, onCommit }: { label: string; value: number; min?: number; max?: number; onChange: (n: number) => void; /** Beim Loslassen/Tastatur: genau ein Wert → ein Undo-Schritt. */ onCommit?: (n: number) => void }): React.JSX.Element {
   return (
     <label style={{ display: 'grid', gridTemplateColumns: '110px 1fr 34px', alignItems: 'center', gap: 12, fontSize: 13, color: 'var(--text-2)' }}>
       {label}
-      <input className="sm-range" type="range" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <input className="sm-range" type="range" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value))}
+        onPointerUp={(e) => onCommit?.(Number(e.currentTarget.value))} onKeyUp={(e) => onCommit?.(Number(e.currentTarget.value))} />
       <span style={{ textAlign: 'right' }}>{value}</span>
     </label>
   )

@@ -9,6 +9,8 @@ import { loadClips, runAnalysis } from './clips/analysis'
 import { thumbPath } from './clips/thumbs'
 import { ensureSignals } from './clips/analysis'
 import { exportClip } from './render/exporter'
+import { applyCaptionToAll, loadEdits, saveEdits } from './edits'
+import { baseState, effectiveClip, stateOf, type CaptionPatch, type EditLog } from '../../shared/edits'
 import { PRESETS, type CaptionPreset } from './render/ass'
 import { safeFileName } from './render/profiles'
 
@@ -56,7 +58,10 @@ export function registerShortmeIpc(): void {
     return jobs.enqueue(hash, `Export: ${meta.title}`, async ({ signal, report }) => {
       const signals = await ensureSignals(meta)
       for (let i = 0; i < clips.length; i++) {
-        await exportClip(meta, clips[i], transcript, signals, { outDir, presetId: opts?.presetId, srt: !!opts?.srt, captions: opts?.captions !== false, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+        // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
+        const st = stateOf(baseState(clips[i], opts?.presetId), await loadEdits(hash, clips[i].id))
+        const eff = effectiveClip(clips[i], transcript.words, st)
+        await exportClip(meta, eff, transcript, signals, { outDir, presetId: st.caption.presetId, srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, caption: { scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
       }
       void shell.openPath(outDir)
     })
@@ -78,6 +83,9 @@ export function registerShortmeIpc(): void {
     if (!ok) throw new Error('Keine gültige Preset-Datei')
     return p
   })
+  ipcMain.handle('shortme:editsLoad', (_e, hash: string, clipId: string) => loadEdits(hash, clipId))
+  ipcMain.handle('shortme:editsSave', (_e, hash: string, log: EditLog) => saveEdits(hash, log))
+  ipcMain.handle('shortme:applyAll', (_e, hash: string, clipIds: string[], patch: CaptionPatch) => applyCaptionToAll(hash, clipIds, patch))
   ipcMain.handle('shortme:jobs', () => jobs.list())
   ipcMain.handle('shortme:pause', (_e, id: string) => jobs.pause(id))
   ipcMain.handle('shortme:resume', (_e, id: string) => jobs.resume(id))

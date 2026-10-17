@@ -72,3 +72,4 @@ Für Suchen in Referenz-Repos einen Subagenten nutzen, der nur eine kurze Zusamm
 - M4: Bash-Heredocs mit Backticks/Apostrophen brechen ab → lange Dateien mit dem Write-Tool schreiben
 - M5: Planer rein/testbar (layout/plan.ts); Tracks fragmentieren nach Schnitten → Personen per Position (Δ < 0,15) gleichsetzen, kurze Shots (< 0,75 s) in Nachbarn aufnehmen, sonst Flackern
 - M6: ffmpeg 6.1 kennt kein `-filter_complex_script` mehr → `-/filter_complex <datei>`; Tests nie mit vorhandenen Dateinamen überschreiben (tests/render.test.ts war schon da → eigene Datei shortmeRender.test.ts); ASS-Endzeit des letzten Wortes an Folgegruppe kappen (sonst überlappende Zeilen)
+- M7: Alle Bearbeitungen = Operationen (shared/edits.ts), Zustand = Basis + Ops bis Cursor; Slider committen erst beim Loslassen (sonst Log-Flut); Browser-Pane drosselt Animationen im Hintergrund-Tab → tabs_select vor UI-Tests
