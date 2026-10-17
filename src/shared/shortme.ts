@@ -75,6 +75,22 @@ export interface ShortmeClip {
   snap: string[]
   /** Ende wurde im Schritt „Ende prüfen“ um n Sätze verlängert. */
   extended: number
+  /** Gesichtsquote 0..1 und Shots (feste Ausschnitte je Einstellung), nach M5. */
+  faceRatio?: number
+  shots?: ShortmeShot[]
+}
+
+/** Eine Einstellung: fester Ausschnitt, keine Kamerabewegung. Zeiten relativ zum Clipbeginn (Sekunden). */
+export interface ShortmeShot {
+  start: number
+  end: number
+  layout: 'smart' | 'split' | 'fit' | 'fixed'
+  /** Horizontale Mitte (0..1 der Quellbreite) des 9:16-Ausschnitts; bei split: obere Person. */
+  cx: number
+  /** split: untere Person. */
+  cx2?: number
+  zoom: number
+  track?: number
 }
 
 export interface ShortmeClips {

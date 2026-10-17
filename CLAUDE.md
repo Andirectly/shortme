@@ -70,3 +70,4 @@ Für Suchen in Referenz-Repos einen Subagenten nutzen, der nur eine kurze Zusamm
 - M3: Windows `rename` über vorhandene Datei: EPERM/EBUSY mit Wiederholung (atomic.ts, projects.ts)
 - M4: LLM wählt über Satznummern (nicht Zeiten); Einrasten = Wort → Satz → Stille → Kamerawechsel mit Nachbarwort-Schutz (ASR-Zeiten ±0,1 s); TransNetV2 läuft nur auf CPU (langsam)
 - M4: Bash-Heredocs mit Backticks/Apostrophen brechen ab → lange Dateien mit dem Write-Tool schreiben
+- M5: Planer rein/testbar (layout/plan.ts); Tracks fragmentieren nach Schnitten → Personen per Position (Δ < 0,15) gleichsetzen, kurze Shots (< 0,75 s) in Nachbarn aufnehmen, sonst Flackern

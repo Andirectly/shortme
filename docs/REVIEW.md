@@ -42,3 +42,9 @@
 - [ ] Stichprobe: ist jeder Clip ohne Vorwissen verständlich? (Podcast-Clip 3 beginnt mit „Flipo war zum Glück …“ – Kontext fehlt evtl.)
 - [ ] Sind 57–81 s lange Clips zu lang? Wunschlänge in den Einstellungen/Prompt anpassen
 - [ ] Scores plausibel (Ranking der Finalisten), Tags (Betonung) sinnvoll
+
+## M5
+- [ ] podcast-2p: Sprecherwechsel als harte Schnitte, kein Ping-Pong, richtige Person im Bild (scripts/test-layout.ts gibt je Clip die Shot-Listen aus; Render-Vorschau folgt in M6)
+- [ ] Wirken die fixed/fit-Abschnitte (Gesicht nicht erkannt, Handkamera) sinnvoll oder zu häufig? Ggf. Schwellen in plan.ts (PLAN_DEFAULTS) nachziehen
+- [ ] nofaces.mp4: nie ein leerer Ausschnitt (alle Shots fit), Gesichtsquote-Warnung und Abzug sichtbar
+- [ ] Split-Layout (zwei Personen übereinander) bei echtem Dialog angemessen?

@@ -10,6 +10,7 @@ import { signalsFromWav, type Signals } from './signals'
 import { detectShots } from './scenes'
 import { selectClips } from './select'
 import { makeThumbs } from './thumbs'
+import { layoutForClip } from '../layout/run'
 
 export interface AnalysisOptions {
   query?: string
@@ -70,6 +71,13 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
       clips = await selectClips(input, { ...sel, baseUrl: null })
     }
   }
+  // Tracking & Layouts (M5): Gesichtsquote fließt ins Ranking ein
+  for (let i = 0; i < clips.length; i++) {
+    report('layout', i / clips.length, `Bildausschnitt planen (${i + 1}/${clips.length}) …`)
+    const l = await layoutForClip(meta, clips[i], cuts, opts.signal)
+    clips[i] = { ...clips[i], shots: l.shots, faceRatio: l.faceRatio, score: Math.max(0, clips[i].score - l.penalty) }
+  }
+  clips.sort((x, y) => y.score - x.score)
   report('thumbs', 0, 'Vorschaubilder …')
   await makeThumbs(meta, clips, opts.signal).catch(() => undefined)
   const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, clips }
