@@ -1,0 +1,61 @@
+# Shortme
+
+Lokale Windows-Desktop-App: lange Videos → kurze, vertikale Clips mit animierten Untertiteln,
+Viralitäts-Ranking, Sprecher-Tracking und Editor. Ersatz für Opus Clip, komplett offline.
+Nutzung ausschließlich privat durch den Entwickler (zwei eigene Rechner). Keine Weitergabe.
+
+## Stack (fest)
+- Electron + TypeScript + React (Vite), Zustand für State, Tailwind nur für Layout-Utilities
+- Basis: Fork von **ClipForge** (JeremySNR/clip-forge, MIT). Pipeline liegt in `src/main/pipeline/`
+- Lokale Engines als mitgelieferte Binärdateien/Native-Module, kein Python zur Laufzeit:
+  - Transkription: sherpa-onnx (Parakeet TDT 0.6B v3 int8 oder Whisper large-v3-turbo int8), Muster wie HotClip
+  - LLM: llama.cpp `llama-server` (CUDA-Build) als Kindprozess, OpenAI-kompatible API auf localhost
+  - Vision: ONNX Runtime (UltraFace/SCRFD, LR-ASD, TransNetV2)
+  - Video: FFmpeg (gebündelt), yt-dlp (gebündelt, selbst-aktualisierend)
+  - Untertitel: `@tscaps/engine` (CSS, Export per WebCodecs), Fallback ASS/libass
+- Zielhardware: NVIDIA ≥ 12 GB VRAM. ASR und LLM nie gleichzeitig im VRAM (sequenziell laden/entladen)
+- Modelle werden in der App heruntergeladen (Modell-Manager), nie ins Repo
+
+## Getroffene Entscheidungen – NICHT neu diskutieren
+- Electron statt Tauri (Grund: Code aus ClipForge/HotClip/tscaps direkt übernehmbar)
+- Keine Cloud-APIs. Jeder OpenAI-Aufruf aus ClipForge wird auf lokale Engines umgestellt
+- Kamera: fester Ausschnitt pro Einstellung, harter Schnitt bei Sprecherwechsel (siehe PIPELINE.md)
+- Untertitel als reine Daten (Wörter + Zeit + Tags + Preset-ID); Renderer austauschbar
+- Vorschau = Export: Vorschau und Export nutzen denselben Planungs-/Render-Code
+- Bearbeitungen nicht-destruktiv als Operationen gespeichert (Undo/Redo trivial)
+- Design: dunkel, Glas-Ebenen, Mica, Apple-Bewegungsprinzipien (Skill `apple-design`)
+
+## Lizenzen
+Private Nutzung → Code aus MIT- UND AGPL-Projekten darf übernommen werden.
+Bei übernommenem Code Herkunft als Kommentar im Dateikopf vermerken (`// from: <repo>/<pfad>`).
+
+## Dokumente (nur lesen, wenn der Meilenstein sie braucht)
+- `docs/PIPELINE.md` – Ablauf, Algorithmen, Parameter
+- `docs/DESIGN.md` – Designsystem, Screens, Editor, Stil-Studio, Export
+- `docs/ROADMAP.md` – Meilensteine mit Abnahmekriterien und Referenzpfaden
+- `docs/PROMPTS.md` – nur für den Menschen, nicht lesen
+
+## Referenz-Repos
+Liegen in `reference/` (nicht im Git). Nur gezielt die in ROADMAP.md genannten Pfade lesen.
+Für Suchen in Referenz-Repos einen Subagenten nutzen, der nur eine kurze Zusammenfassung zurückgibt.
+
+## Token-Regeln
+- Skill `credit-saver` gilt immer: knapp antworten, nur Diffs, keine unveränderten Dateien ausgeben
+- Erst untersuchen, dann ändern. Keinen Code außerhalb der Aufgabe refaktorieren oder umformatieren
+- Terminal-Befehle laufen über RTK (Hook ist global installiert). Lange Logs nie komplett lesen:
+  nur Fehlerzeilen (`| rtk` bzw. tail/grep)
+- Keine Erkundung ohne Ziel: exakte Pfade nutzen. Keine großen Ordner lesen (siehe .claude/settings.json)
+- Tests/Skripte geben nur „PASS“ oder kurze Fehlerbeschreibung aus
+- Nach jedem Meilenstein: Erkenntnisse unten unter „Gelerntes“ ergänzen (max. 1 Zeile pro Punkt)
+
+## Befehle
+- `npm run dev` · `npm test` · `npm run typecheck` · `npm run lint` · `npm run package`
+- Testvideos: `test-videos/` (podcast-2p.mp4, solo.mp4, nofaces.mp4) – Abnahme jedes Meilensteins
+
+## Gelerntes
+<!-- Claude Code ergänzt hier knappe Erkenntnisse, z. B. Build-Eigenheiten, Pfade, Fallstricke -->
+- M0: Fork heißt intern „Cutawan 0.14“; ASD/YuNet/VAD/MFCC/Encoder-Erkennung existieren schon, ASR/LLM-Pfade sind Cloud/Python (openai.ts, resources/local-whisper)
+- M0: Parakeet v3 int8 via sherpa-onnx-node: RTF 0,04 (CPU), Wortzeiten nativ → gewählt; Whisper turbo RTF 0,23, keine Wortzeiten
+- M0: Qwen3-14B Q4_K_M gewählt (13,6 GB VRAM bei 16k); LLM ignoriert Längenvorgabe → Länge per Einrast-Logik erzwingen
+- M0: @tscaps/engine exportiert 60 s in 5,7 s (0,09×) → tscaps ist Standard, ASS nur Fallback
+- Umgebung: npm führt Install-Skripte nicht aus (`node node_modules/electron/install.js` nötig); `models/`, `spikes/out/` sind für Claude per Deny-Regel nicht lesbar → per Node-Skript prüfen

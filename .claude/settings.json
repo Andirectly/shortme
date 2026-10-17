@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./node_modules/**)",
+      "Read(./out/**)",
+      "Read(./dist/**)",
+      "Read(./release/**)",
+      "Read(./models/**)",
+      "Read(./test-videos/**)",
+      "Read(./spikes/out/**)",
+      "Read(./reference/**/node_modules/**)",
+      "Read(./reference/**/.git/**)",
+      "Read(./reference/**/dist/**)",
+      "Read(./reference/**/assets/**)",
+      "Read(./reference/**/fonts/**)",
+      "Read(**/*.onnx)",
+      "Read(**/*.gguf)",
+      "Read(**/*.mp4)",
+      "Read(**/*.mov)",
+      "Read(**/*.wav)",
+      "Read(**/package-lock.json)",
+      "Read(**/pnpm-lock.yaml)"
+    ]
+  }
+}

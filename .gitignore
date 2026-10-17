@@ -7,3 +7,10 @@ release/
 .env
 .tmp/
 *.tsbuildinfo
+reference/
+test-videos/
+spikes/out/
+/models/
+Test Videos/
+files/
+spikes/subs/bundle.js

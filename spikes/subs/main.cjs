@@ -1,0 +1,5 @@
+const { app, BrowserWindow, ipcMain } = require('electron'); const fs=require('fs'),path=require('path')
+app.commandLine.appendSwitch('enable-features','VaapiVideoEncoder'); app.commandLine.appendSwitch('disable-renderer-backgrounding')
+ipcMain.handle('save',(e,buf)=>{fs.writeFileSync(path.join(__dirname,'..','out','subs-out.mp4'),Buffer.from(buf));return true})
+ipcMain.on('log',(e,m)=>console.log(m)); ipcMain.on('done',()=>app.quit())
+app.whenReady().then(()=>{const w=new BrowserWindow({width:1080,height:1920,show:process.env.SHOW==='1',webPreferences:{nodeIntegration:true,contextIsolation:false,webSecurity:false,backgroundThrottling:false}});w.webContents.on('console-message',(e,l,m)=>console.log('R:',m));w.webContents.on('did-fail-load',(e,c,d)=>console.log('FAIL',c,d));w.webContents.on('render-process-gone',(e,d)=>console.log('GONE',JSON.stringify(d)));w.loadFile(path.join(__dirname,'index.html'))})
