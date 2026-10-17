@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence, useMotionValue, animate, type PanInfo } from 'motion/react'
-import { UploadCloud, Link2, Sparkles, ChevronDown, Clock } from 'lucide-react'
+import { UploadCloud, Link2, Sparkles, ChevronDown } from 'lucide-react'
 import { useStore } from './store'
 import { useProject } from './projectStore'
-import { IMG, PRESETS, PROJECTS } from './data'
+import { IMG, PRESETS } from './data'
 import { Button, Pill, Segmented, Switch, Row } from './ui'
+import { ProjectGrid } from './ProjectGrid'
 import { useSprings } from './motion'
 
 export function StartScreen(): React.JSX.Element {
   const openSheet = useStore((s) => s.openSheet)
-  const go = useStore((s) => s.go)
   const [over, setOver] = useState(false)
   const [link, setLink] = useState('')
   const hasApi = useProject((s) => s.hasApi)
@@ -61,17 +61,7 @@ export function StartScreen(): React.JSX.Element {
       </div>
       <section>
         <h3 style={{ marginBottom: 12 }}>Zuletzt geöffnet</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-          {PROJECTS.map((p) => (
-            <motion.button key={p.id} className="sm-card" whileTap={{ scale: 0.97 }} transition={base} onClick={() => go('clips')} style={{ padding: 0, overflow: 'hidden', textAlign: 'left' }}>
-              <div style={{ height: 120, backgroundImage: `url(${p.thumb})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-              <div style={{ padding: 14, display: 'grid', gap: 4 }}>
-                <h3>{p.name}</h3>
-                <small><Clock size={11} style={{ verticalAlign: -1 }} /> {p.duration} · {p.clips} Clips · {p.date}</small>
-              </div>
-            </motion.button>
-          ))}
-        </div>
+        <ProjectGrid limit={6} />
       </section>
       <CreateSheet />
     </div>

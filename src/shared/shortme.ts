@@ -102,4 +102,16 @@ export interface ShortmeClips {
   clips: ShortmeClip[]
   /** Vorschaubilder als Data-URL je Clip-ID. */
   thumbs: Record<string, string | null>
+  /** Quellvideo (für die Editor-Vorschau über media://). */
+  source: { path: string; width: number; height: number; title: string; durationSec: number } | null
+}
+
+/** Plan des Exports für die Editor-Vorschau (Zeiten in Quell-Sekunden; Shots clip-relativ zu `start`). */
+export interface PreviewPlan {
+  start: number
+  end: number
+  duration: number
+  cuts: Array<[number, number]>
+  shots: ShortmeShot[]
+  pieces: Array<{ src0: number; src1: number; out0: number; zoom: number; shot: ShortmeShot }>
 }

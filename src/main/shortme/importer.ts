@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
-import { mkdir, rename } from 'node:fs/promises'
-import { basename, extname, join } from 'node:path'
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { basename, extname, join, resolve } from 'node:path'
 import { freeDiskGb } from '../engines/hardware'
+import { allowMediaPath } from '../mediaAccess'
 import { dataRoot } from '../engines/paths'
 import { probeVideo, runFfmpeg } from '../pipeline/ffmpeg'
 import { downloadUrlVideo, ensureYtDlp, fetchUrlMeta } from '../pipeline/ytdlp'
@@ -19,7 +20,9 @@ export async function makeStills(meta: ProjectMeta): Promise<void> {
 }
 
 /** Datei importieren: Vorabprüfung, Projektordner (Hash), Standbilder. Gleiche Datei → bestehendes Projekt (Cache). */
-export async function importFile(path: string): Promise<ImportResult> {
+export async function importFile(input: string): Promise<ImportResult> {
+  const path = resolve(input) // absolut: Projekte und media://-Freigabe hängen nicht vom Arbeitsordner ab
+  allowMediaPath(path)
   const info = await probeVideo(path)
   const free = await freeDiskGb(dataRoot())
   const pf = preflight({ durationSec: info.durationSec, sizeBytes: info.sizeBytes, hasAudio: info.hasAudio }, free)
@@ -56,6 +59,18 @@ export async function importUrl(url: string, onProgress: (p: number, message: st
     await rename(part, target)
   }
   const res = await importFile(target)
+  // YouTube & Co.: das Anbieter-Thumbnail ist als Projektbild besser als ein zufälliger Screenshot
+  if (meta.thumbnail && !res.cached) {
+    try {
+      const r = await fetch(meta.thumbnail)
+      if (r.ok) {
+        const raw = projectFile(res.meta.hash, 'thumb-remote.bin')
+        await writeFile(raw, Buffer.from(await r.arrayBuffer()))
+        await runFfmpeg(['-y', '-i', raw, '-vf', 'scale=640:-2', '-q:v', '3', projectFile(res.meta.hash, 'poster.jpg')])
+        await rm(raw, { force: true })
+      }
+    } catch { /* Screenshot bleibt */ }
+  }
   if (!res.cached && res.meta.title === safe) { res.meta.title = meta.title; await saveMeta(res.meta) }
   return res
 }

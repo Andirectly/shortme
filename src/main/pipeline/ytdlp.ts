@@ -93,6 +93,8 @@ export interface UrlVideoMeta {
   title: string
   durationSec: number
   webpageUrl: string
+  /** Vorschaubild des Anbieters (z. B. YouTube-Thumbnail). */
+  thumbnail?: string
 }
 
 export interface CookieAuthOptions {
@@ -262,6 +264,7 @@ interface YtDlpJson {
   title?: string
   duration?: number
   webpage_url?: string
+  thumbnail?: string
   url?: string
   entries?: YtDlpJson[]
 }
@@ -304,7 +307,8 @@ export async function fetchUrlMeta(
     id: data.id ?? 'video',
     title: data.title ?? 'Imported video',
     durationSec: data.duration,
-    webpageUrl: data.webpage_url ?? data.url ?? url
+    webpageUrl: data.webpage_url ?? data.url ?? url,
+    thumbnail: data.thumbnail
   }
 }
 

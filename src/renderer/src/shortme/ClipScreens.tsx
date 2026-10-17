@@ -5,6 +5,7 @@ import { useStore } from './store'
 import { useProject } from './projectStore'
 import { CLIPS, PROJECTS, type Clip } from './data'
 import { useClipList } from './clipData'
+import { ProjectGrid } from './ProjectGrid'
 import { Button, Pill, Score } from './ui'
 import { useSprings } from './motion'
 
@@ -127,7 +128,7 @@ export function ClipsScreen(): React.JSX.Element {
   const exportClips = useProject((s) => s.exportClips)
   const exportJob = useProject((s) => s.exportJob)
   const presetId = useStore((s) => s.presetId)
-  const title = useProject((s) => s.imported?.meta.title ?? s.job?.title)
+  const title = useProject((s) => s.currentTitle ?? s.imported?.meta.title ?? s.job?.title)
   const sorted = [...list].sort((a, b) => b.score - a.score)
   return (
     <div style={{ display: 'grid', gap: 18, paddingTop: 12, paddingBottom: 90 }}>
@@ -169,16 +170,10 @@ export function ClipsScreen(): React.JSX.Element {
 }
 
 export function ProjectsScreen(): React.JSX.Element {
-  const go = useStore((s) => s.go)
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 18, paddingTop: 12 }}>
+    <div style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gap: 18, paddingTop: 12 }}>
       <h1>Projekte</h1>
-      {PROJECTS.map((p) => (
-        <motion.button key={p.id} className="sm-card" whileTap={{ scale: 0.99 }} onClick={() => go('clips')} style={{ display: 'grid', gridTemplateColumns: '160px 1fr auto', alignItems: 'center', gap: 16, padding: 10, textAlign: 'left' }}>
-          <div style={{ height: 90, borderRadius: 10, backgroundImage: `url(${p.thumb})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-          <div><h2 style={{ fontSize: 18 }}>{p.name}</h2><small>{p.duration} · {p.clips} Clips · {p.date}</small></div>
-        </motion.button>
-      ))}
+      <ProjectGrid />
     </div>
   )
 }

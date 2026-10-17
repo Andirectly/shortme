@@ -1,9 +1,13 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { importFile, importUrl, type ImportResult } from './importer'
 import { JobQueue } from './jobs'
-import { discardProject, loadMeta, projectFile } from './project'
+import { discardProject, loadMeta, projectFile, projectsRoot } from './project'
+import { allowMediaPath } from '../mediaAccess'
+import { editorAssets } from './editorAssets'
+import { planExport } from './render/exporter'
+import { sanitizeLog } from '../../shared/edits'
 import { loadTranscript, runTranscription } from './transcription'
 import { loadClips, runAnalysis } from './clips/analysis'
 import { thumbPath } from './clips/thumbs'
@@ -44,9 +48,11 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('shortme:clips', async (_e, hash: string) => {
     const file = await loadClips(hash)
     if (!file) return null
+    const m = await loadMeta(hash)
+    if (m) allowMediaPath(m.sourcePath)
     const thumbs: Record<string, string | null> = {}
     for (const c of file.clips) thumbs[c.id] = await dataUrl(thumbPath(hash, c.id))
-    return { ...file, thumbs }
+    return { ...file, thumbs, source: m ? { path: resolve(m.sourcePath), width: m.width, height: m.height, title: m.title, durationSec: m.durationSec } : null }
   })
   /** Export: ausgewählte Clips nacheinander rendern (Pausen entfernt, −14 LUFS, Untertitel eingebrannt). */
   ipcMain.handle('shortme:export', async (_e, hash: string, clipIds: string[], opts: { presetId?: string; srt?: boolean; captions?: boolean }) => {
@@ -88,6 +94,39 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('shortme:editsSave', (_e, hash: string, log: EditLog) => saveEdits(hash, log))
   ipcMain.handle('shortme:applyAll', (_e, hash: string, clipIds: string[], patch: CaptionPatch) => applyCaptionToAll(hash, clipIds, patch))
   ipcMain.handle('shortme:openLogs', () => shell.openPath(logDir()))
+  /** Projektliste: Titel, Dauer, Clip-Anzahl und 16:9-Vorschaubild (YouTube-Thumbnail bzw. Screenshot). */
+  ipcMain.handle('shortme:projects', async () => {
+    const out: Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null }> = []
+    for (const d of await readdir(projectsRoot()).catch(() => [] as string[])) {
+      const meta = await loadMeta(d)
+      if (!meta) continue
+      allowMediaPath(meta.sourcePath)
+      const clips = await loadClips(d)
+      out.push({ hash: meta.hash, title: meta.title, durationSec: meta.durationSec, clips: clips?.clips.length ?? 0, created: meta.created, poster: await dataUrl(projectFile(meta.hash, 'poster.jpg')) })
+    }
+    return out.sort((a, b) => b.created.localeCompare(a.created))
+  })
+  /** Editor: echte Wellenform und Filmstreifen des Clips. */
+  ipcMain.handle('shortme:editorAssets', async (_e, hash: string, clipId: string) => {
+    const meta = await loadMeta(hash)
+    const clip = (await loadClips(hash))?.clips.find((c) => c.id === clipId)
+    if (!meta || !clip) throw new Error('Clip nicht gefunden')
+    return editorAssets(meta, clip)
+  })
+  /** Editor: exakt der Plan, den der Export verwendet (Pausenschnitte, Stücke mit Ausschnitt/Zoom) → Vorschau = Export. */
+  ipcMain.handle('shortme:previewPlan', async (_e, hash: string, clipId: string, rawLog: unknown, presetId?: string) => {
+    const meta = await loadMeta(hash)
+    const file = await loadClips(hash)
+    const transcript = await loadTranscript(hash)
+    const clip = file?.clips.find((c) => c.id === clipId)
+    if (!meta || !clip || !transcript) throw new Error('Clip nicht gefunden')
+    allowMediaPath(meta.sourcePath)
+    const st = stateOf(baseState(clip, presetId), sanitizeLog(rawLog, clipId))
+    const eff = effectiveClip(clip, transcript.words, st)
+    const signals = await ensureSignals(meta)
+    const plan = planExport(eff, transcript, signals, true, eff.removed)
+    return { start: eff.start, end: eff.end, duration: plan.duration, cuts: plan.cuts, shots: eff.shots ?? [], pieces: plan.pieces.map((p) => ({ src0: p.src0, src1: p.src1, out0: p.out0, zoom: p.zoom, shot: p.shot })) }
+  })
   ipcMain.handle('shortme:jobs', () => jobs.list())
   ipcMain.handle('shortme:pause', (_e, id: string) => jobs.pause(id))
   ipcMain.handle('shortme:resume', (_e, id: string) => jobs.resume(id))

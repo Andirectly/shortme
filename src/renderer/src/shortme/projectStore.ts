@@ -14,6 +14,11 @@ interface ProjectState {
   transcript: ShortmeTranscript | null
   hasApi: boolean
   loadResults: (hash: string) => Promise<void>
+  projects: ProjectCard[]
+  loadProjects: () => Promise<void>
+  /** Titel des geöffneten Projekts (Clip-Übersicht). */
+  currentTitle: string | null
+  openProject: (hash: string) => Promise<boolean>
   init: () => void
   importPath: (path: string) => Promise<boolean>
   importUrl: (url: string) => Promise<boolean>
@@ -27,6 +32,8 @@ interface ProjectState {
   discard: () => Promise<void>
 }
 
+export interface ProjectCard { hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null }
+
 let unsub: Array<() => void> = []
 
 export const useProject = create<ProjectState>((set, get) => ({
@@ -39,6 +46,17 @@ export const useProject = create<ProjectState>((set, get) => ({
   transcript: null,
   exportJob: null,
   hasApi: false,
+  projects: [],
+  currentTitle: null,
+  loadProjects: async () => { const a = api(); if (a) set({ projects: await a.projects() }) },
+  openProject: async (hash) => {
+    const a = api()
+    if (!a) return false
+    await get().loadResults(hash)
+    const p = get().projects.find((x) => x.hash === hash)
+    set({ currentTitle: p?.title ?? null })
+    return !!get().clipsFile
+  },
   loadResults: async (hash) => {
     const a = api()
     if (!a) return

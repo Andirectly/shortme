@@ -74,3 +74,9 @@
 - [ ] Export im echten Fenster: Untertitel sehen aus wie in der Editor-Vorschau (Schrift, Größe, Kontur, gelbes aktives Wort)? Falls nicht: welches Preset weicht ab?
 - [ ] Bei Fehler im Untertitel-Renderer: Datei entsteht trotzdem (ASS-Fallback), Eintrag im Log (Einstellungen → Logs öffnen)
 - [ ] Hook-Karte (oben, erste 3 s) sieht anders aus als in der Vorschau (libass) – akzeptabel?
+
+## Nachbesserung Editor / Projekte
+- [ ] Editor: Abspielen mit Ton? Ton und Bild synchron, Pausenschnitte beim Abspielen hörbar übersprungen, Ende prüfen
+- [ ] Zeitleiste: Wellenform/Filmstreifen/Shot-Spur lesbar? Was fehlt noch zum „richtigen“ Editor (Wunschliste)?
+- [ ] Link-Import (YouTube): Projektbild = YouTube-Thumbnail?
+- [ ] Projektkarten: 16:9-Bild nicht mehr gezoomt
