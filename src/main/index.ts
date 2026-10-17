@@ -2,6 +2,7 @@ import { app, BrowserWindow, nativeTheme, protocol, screen, shell } from 'electr
 import { release } from 'node:os'
 import { registerEngineIpc, installEngineLifecycle, runSelfTestIfRequested } from './engines'
 import { registerShortmeIpc } from './shortme/ipc'
+import { initLog } from './log'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { migrateLegacyCookiesDir } from './cookies'
@@ -320,6 +321,7 @@ app.whenReady().then(() => {
     return serveMediaFile(filePath, request.headers.get('range'))
   })
 
+  initLog()
   registerIpcHandlers()
   registerEngineIpc()
   registerShortmeIpc()

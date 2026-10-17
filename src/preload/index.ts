@@ -164,6 +164,7 @@ const api = {
     editsLoad: (hash: string, clipId: string): Promise<EditLog> => ipcRenderer.invoke('shortme:editsLoad', hash, clipId),
     editsSave: (hash: string, log: EditLog): Promise<void> => ipcRenderer.invoke('shortme:editsSave', hash, log),
     applyAll: (hash: string, clipIds: string[], patch: CaptionPatch): Promise<void> => ipcRenderer.invoke('shortme:applyAll', hash, clipIds, patch),
+    openLogs: (): Promise<string> => ipcRenderer.invoke('shortme:openLogs'),
     presetExport: (id: string): Promise<boolean> => ipcRenderer.invoke('shortme:presetExport', id),
     presetImport: (): Promise<unknown> => ipcRenderer.invoke('shortme:presetImport'),
     clips: (hash: string): Promise<ShortmeClips | null> => ipcRenderer.invoke('shortme:clips', hash),

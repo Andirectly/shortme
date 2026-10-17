@@ -9,7 +9,9 @@ export interface AsrResult { segments: AsrSegment[]; loadMs: number; decodeMs: n
 
 const workerPath = (): string => {
   // Build: out/main/asrWorker.js (Code kann in out/main/chunks/ liegen); Entwicklung/Tests: worker.ts neben dieser Datei.
-  const compiled = [join(__dirname, 'asrWorker.js'), join(__dirname, '..', 'asrWorker.js')].find((p) => existsSync(p))
+  const candidates = [join(__dirname, 'asrWorker.js'), join(__dirname, '..', 'asrWorker.js')].map((p) => p.replace('app.asar', 'app.asar.unpacked'))
+  const compiled = candidates.find((p) => existsSync(p))
+  // Paketiert liegt der Worker in app.asar.unpacked (eine fremde Node-Laufzeit kann kein asar lesen).
   return compiled ?? join(__dirname, 'worker.ts')
 }
 

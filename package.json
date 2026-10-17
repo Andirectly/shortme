@@ -1,9 +1,9 @@
 {
   "name": "cutawan",
   "version": "0.14.0",
-  "description": "Open-source AI video clipper — turn long videos into viral short clips (an Opus Clip alternative)",
+  "description": "Shortme – lokale Windows-App: lange Videos zu kurzen vertikalen Clips",
   "main": "out/main/index.js",
-  "author": "Cutawan Contributors",
+  "author": "Shortme",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -53,18 +53,11 @@
     "zustand": "^5.0.3"
   },
   "build": {
-    "appId": "org.cutawan.app",
-    "productName": "Cutawan",
+    "appId": "local.shortme.app",
+    "productName": "Shortme",
     "icon": "build/icon.png",
-    "afterPack": "./scripts/adhoc-sign-mac.mjs",
     "directories": {
       "output": "release"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "JeremySNR",
-      "repo": "cutawan",
-      "releaseType": "draft"
     },
     "files": [
       "out/**"
@@ -72,13 +65,13 @@
     "asarUnpack": [
       "node_modules/ffmpeg-static/**",
       "node_modules/@ffprobe-installer/**",
-      "node_modules/onnxruntime-node/**"
+      "node_modules/onnxruntime-node/**",
+      "node_modules/sherpa-onnx-node/**",
+      "node_modules/sherpa-onnx-win-x64/**",
+      "out/main/asrWorker.js",
+      "out/main/chunks/**"
     ],
     "extraResources": [
-      {
-        "from": "resources/local-whisper",
-        "to": "local-whisper"
-      },
       {
         "from": "build/icon.png",
         "to": "icon.png"
@@ -100,23 +93,24 @@
         "to": "yt-dlp-plugins"
       }
     ],
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "category": "public.app-category.video",
-      "identity": null
-    },
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
     },
     "nsis": {
-      "artifactName": "${productName}-Setup-${version}.${ext}"
-    },
-    "linux": {
-      "target": "AppImage",
-      "category": "AudioVideo"
+      "artifactName": "Shortme-Setup-${version}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "deleteAppDataOnUninstall": false
     }
   }
 }

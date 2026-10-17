@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
+import { friendlyError } from './errors'
 
 export type JobState = 'queued' | 'running' | 'paused' | 'stopped' | 'done' | 'error'
 
@@ -69,7 +70,10 @@ export class JobQueue extends EventEmitter {
       if (reason === 'pause') this.set(e, { state: 'paused', message: 'Pausiert' })
       else if (reason === 'stop') this.set(e, { state: 'stopped', message: 'Gestoppt (Ergebnisse behalten)' })
       else if (reason === 'discard') this.set(e, { state: 'stopped', message: 'Verworfen' })
-      else this.set(e, { state: 'error', error: err instanceof Error ? err.message : String(err), message: 'Fehler' })
+      else {
+        console.error('Job fehlgeschlagen:', e.info.title, err)
+        this.set(e, { state: 'error', error: friendlyError(err), message: 'Fehler' })
+      }
     } finally { e.ac = null }
   }
 

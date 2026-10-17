@@ -62,3 +62,10 @@
 - [ ] Person in der Quelle anklicken → Export zeigt ab dieser Stelle den gewählten Bildausschnitt
 - [ ] „Stil auf alle anwenden“: wirkt der Stil in den anderen Clips (Export prüfen)?
 - [ ] Echte Videovorschau im Editor fehlt noch (Standbild + simulierte Zeit) – Priorität?
+
+## M8 (zweiter Rechner)
+- [ ] release\\Shortme-Setup-0.14.0.exe auf dem zweiten Rechner installieren (Pfad ohne Leerzeichen oder Standard), starten → Einrichtungs-Assistent → Modelle laden → Clips finden → exportieren, ohne Eingriff
+- [ ] Hat der zweite Rechner ≥ 12 GB VRAM? Dann Empfehlung „kompakt“/KV-Kompression prüfen (Modelle-Seite zeigt Profil)
+- [ ] Task-Manager nach dem Schließen: keine Shortme-/llama-server-/node-Prozesse übrig
+- [ ] Installer-/Programm-Icon: Shortme-Symbol statt Electron (siehe winCodeSign/Entwicklermodus-Hinweis in PROGRESS)
+- [ ] Datenordner heißt weiter %APPDATA%\\cutawan (Altlast aus dem Fork); umbenennen? (würde bestehende Projekte/Modelle verschieben)

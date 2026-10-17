@@ -9,6 +9,7 @@ import { loadClips, runAnalysis } from './clips/analysis'
 import { thumbPath } from './clips/thumbs'
 import { ensureSignals } from './clips/analysis'
 import { exportClip } from './render/exporter'
+import { logDir } from '../log'
 import { applyCaptionToAll, loadEdits, saveEdits } from './edits'
 import { baseState, effectiveClip, stateOf, type CaptionPatch, type EditLog } from '../../shared/edits'
 import { PRESETS, type CaptionPreset } from './render/ass'
@@ -86,6 +87,7 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('shortme:editsLoad', (_e, hash: string, clipId: string) => loadEdits(hash, clipId))
   ipcMain.handle('shortme:editsSave', (_e, hash: string, log: EditLog) => saveEdits(hash, log))
   ipcMain.handle('shortme:applyAll', (_e, hash: string, clipIds: string[], patch: CaptionPatch) => applyCaptionToAll(hash, clipIds, patch))
+  ipcMain.handle('shortme:openLogs', () => shell.openPath(logDir()))
   ipcMain.handle('shortme:jobs', () => jobs.list())
   ipcMain.handle('shortme:pause', (_e, id: string) => jobs.pause(id))
   ipcMain.handle('shortme:resume', (_e, id: string) => jobs.resume(id))

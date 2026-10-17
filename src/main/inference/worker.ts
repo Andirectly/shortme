@@ -17,14 +17,23 @@ async function run(request: InferenceRequest): Promise<InferenceResponse> {
   try {
     let session = sessions.get(request.modelPath)
     if (!session) {
-      session = await ort.InferenceSession.create(request.modelPath, {
+      const options: ort.InferenceSession.SessionOptions = {
         logSeverityLevel: 3,
         intraOpNumThreads: 2,
         interOpNumThreads: 1,
         executionMode: 'sequential',
         enableCpuMemArena: false,
         enableMemPattern: false
-      })
+      }
+      // TransNetV2 (Kamerawechsel) ist auf der CPU der Engpass (≈ 150 ms je Fenster): DirectML ist ≈ 25× schneller (6 ms);
+      // ohne passende GPU/Treiber fällt ORT automatisch auf die CPU zurück.
+      const gpu = request.modelPath.toLowerCase().endsWith('transnetv2.onnx') && process.platform === 'win32'
+      try {
+        session = await ort.InferenceSession.create(request.modelPath, gpu ? { ...options, executionProviders: ['dml', 'cpu'] } : options)
+      } catch (e) {
+        if (!gpu) throw e
+        session = await ort.InferenceSession.create(request.modelPath, options)
+      }
       sessions.set(request.modelPath, session)
     }
     if (request.vad) return { id: request.id, outputs: await runVad(session, request), peakRssBytes: process.resourceUsage().maxRSS * 1024 }
