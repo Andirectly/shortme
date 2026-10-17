@@ -36,3 +36,9 @@
 - [ ] Sprecher-Erkennung (Option „Sprecher unterscheiden“) bei Dialog-Videos: sinnvoll oder zu viele Sprecher? (bei mir 4 statt 2)
 - [ ] nofaces.mp4 (wenn vorhanden): Transkription ohne Sprache/Musik → keine erfundenen Wörter in Stille
 - [ ] URL-Import (YouTube-Link) einmal ausprobieren – von mir nicht automatisch getestet (kein Testlink)
+
+## M4
+- [ ] Alle Clips der Testvideos: beginnen/enden sie nie mitten im Wort oder Satz? (Berichte: .tmp/clips-report-*.md bzw. scripts/test-clips.ts erneut laufen lassen)
+- [ ] Stichprobe: ist jeder Clip ohne Vorwissen verständlich? (Podcast-Clip 3 beginnt mit „Flipo war zum Glück …“ – Kontext fehlt evtl.)
+- [ ] Sind 57–81 s lange Clips zu lang? Wunschlänge in den Einstellungen/Prompt anpassen
+- [ ] Scores plausibel (Ranking der Finalisten), Tags (Betonung) sinnvoll

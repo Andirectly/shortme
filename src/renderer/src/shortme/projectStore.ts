@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ShortmeImport, ShortmeJob } from '@shared/shortme'
+import type { ShortmeClips, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
 const api = (): Window['cutawan']['shortme'] | null => (typeof window !== 'undefined' && window.cutawan?.shortme ? window.cutawan.shortme : null)
 
@@ -10,12 +10,15 @@ interface ProjectState {
   importMessage: string
   importError: string
   job: ShortmeJob | null
+  clipsFile: ShortmeClips | null
+  transcript: ShortmeTranscript | null
   hasApi: boolean
+  loadResults: (hash: string) => Promise<void>
   init: () => void
   importPath: (path: string) => Promise<boolean>
   importUrl: (url: string) => Promise<boolean>
   clearImport: () => void
-  startTranscribe: (diarize: boolean) => Promise<boolean>
+  startTranscribe: (diarize: boolean, query?: string) => Promise<boolean>
   pause: () => Promise<void>
   resume: () => Promise<void>
   stop: () => Promise<void>
@@ -30,14 +33,25 @@ export const useProject = create<ProjectState>((set, get) => ({
   importMessage: '',
   importError: '',
   job: null,
+  clipsFile: null,
+  transcript: null,
   hasApi: false,
+  loadResults: async (hash) => {
+    const a = api()
+    if (!a) return
+    const [clipsFile, transcript] = await Promise.all([a.clips(hash), a.transcript(hash)])
+    set({ clipsFile, transcript })
+  },
   init: () => {
     const a = api()
     set({ hasApi: !!a })
     if (!a) return
     unsub.forEach((u) => u())
     unsub = [
-      a.onJob((j) => set((s) => (s.job && s.job.id !== j.id && s.job.state === 'running' ? s : { job: j }))),
+      a.onJob((j) => {
+        set((s) => (s.job && s.job.id !== j.id && s.job.state === 'running' ? s : { job: j }))
+        if (j.state === 'done') void get().loadResults(j.hash)
+      }),
       a.onImportProgress((p) => set({ importMessage: p.message }))
     ]
     void a.jobs().then((list) => { const live = list.find((j) => j.state === 'running' || j.state === 'queued' || j.state === 'paused'); if (live) set({ job: live }) })
@@ -69,12 +83,12 @@ export const useProject = create<ProjectState>((set, get) => ({
     }
   },
   clearImport: () => set({ imported: null, importError: '' }),
-  startTranscribe: async (diarize) => {
+  startTranscribe: async (diarize, query) => {
     const a = api()
     const imp = get().imported
     if (!a || !imp) return false
-    const job = await a.transcribe(imp.meta.hash, { diarize })
-    set({ job })
+    const job = await a.transcribe(imp.meta.hash, { diarize, query })
+    set({ job, clipsFile: null, transcript: null })
     return true
   },
   pause: async () => { const j = get().job; if (j) await api()?.pause(j.id) },

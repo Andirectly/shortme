@@ -4,6 +4,7 @@ import { Pause, Play, Square, Trash2, Check, Loader2, AlertTriangle, LayoutGrid,
 import { useStore } from './store'
 import { useProject } from './projectStore'
 import { CLIPS, PROJECTS, type Clip } from './data'
+import { useClipList } from './clipData'
 import { Button, Pill, Score } from './ui'
 import { useSprings } from './motion'
 
@@ -122,11 +123,13 @@ export function ClipsScreen(): React.JSX.Element {
   const toggle = useStore((s) => s.toggleSelect)
   const openClip = useStore((s) => s.openClip)
   const { base } = useSprings()
-  const sorted = [...CLIPS].sort((a, b) => b.score - a.score)
+  const list = useClipList()
+  const title = useProject((s) => s.imported?.meta.title ?? s.job?.title)
+  const sorted = [...list].sort((a, b) => b.score - a.score)
   return (
     <div style={{ display: 'grid', gap: 18, paddingTop: 12, paddingBottom: 90 }}>
       <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}>
-        <div><h1>{PROJECTS[0].name}</h1><small>{CLIPS.length} Clips · nach Score sortiert</small></div>
+        <div><h1>{title ?? PROJECTS[0].name}</h1><small>{list.length} Clips · nach Score sortiert</small></div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Pill pressed={view === 'grid'} onClick={() => setView('grid')}><LayoutGrid size={14} /> Raster</Pill>
           <Pill pressed={view === 'list'} onClick={() => setView('list')}><List size={14} /> Liste</Pill>
@@ -177,9 +180,15 @@ export function ProjectsScreen(): React.JSX.Element {
   )
 }
 
-const REAL_RANGES: Record<string, [number, number]> = { audio: [0, 0.05], asr: [0.05, 0.85], speakers: [0.85, 0.97], finalize: [0.97, 1] }
+const STAGE_RANGE: Record<string, [number, number, number]> = {
+  // [Zeile, von, bis] – Anteil an der Gesamtanzeige
+  audio: [0, 0, 0.03], asr: [0, 0.03, 0.45], speakers: [0, 0.45, 0.52], finalize: [0, 0.52, 0.55],
+  signals: [1, 0.55, 0.6], shots: [1, 0.6, 0.8], llm: [2, 0.8, 0.8], texttiling: [2, 0.8, 0.95], candidates: [2, 0.8, 0.85], rate: [2, 0.85, 0.93], compare: [2, 0.93, 0.95], snap: [2, 0.95, 0.97], thumbs: [2, 0.97, 1], done: [2, 1, 1]
+}
+const ROWS = ['Transkribieren', 'Analysieren', 'Clips finden']
+const ROW_SPAN: Array<[number, number]> = [[0, 0.55], [0.55, 0.8], [0.8, 1]]
 
-/** Echte Transkription (M3): Fortschritt aus dem Job; spätere Stufen sind noch nicht angebunden. */
+/** Echte Verarbeitung (M3/M4): Fortschritt aus dem Job; Rendern folgt in M6. */
 function RealProcessing(): React.JSX.Element {
   const job = useProject((s) => s.job)!
   const pause = useProject((s) => s.pause)
@@ -187,21 +196,28 @@ function RealProcessing(): React.JSX.Element {
   const stop = useProject((s) => s.stop)
   const discard = useProject((s) => s.discard)
   const go = useStore((s) => s.go)
-  const range = REAL_RANGES[job.stage] ?? [0, 1]
-  const total = job.state === 'done' ? 1 : range[0] + (range[1] - range[0]) * job.progress
+  const r = STAGE_RANGE[job.stage] ?? [0, 0, 0.03]
+  const total = job.state === 'done' ? 1 : r[1] + (r[2] - r[1]) * job.progress
   const busy = job.state === 'running' || job.state === 'queued'
-  const title = job.state === 'done' ? 'Transkript fertig' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : 'Transkribiert …'
-  const later = ['Analysieren', 'Clips finden', 'Rendern']
+  const title = job.state === 'done' ? 'Clips gefunden' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : 'Transkribiert …'
+  const later = ['Rendern']
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 24, paddingTop: 12 }}>
       <div><h1>{title}</h1><small>{job.title} · {job.message}</small></div>
       <div className="sm-glass" style={{ padding: 22, display: 'grid', gap: 18 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '28px 160px 1fr 48px', alignItems: 'center', gap: 12 }}>
-          {job.state === 'done' ? <Check size={18} color="var(--ok)" /> : busy ? <Loader2 size={18} className="sm-spin" /> : <span />}
-          <span>Transkribieren</span>
-          <div className="sm-bar"><i style={{ width: `${total * 100}%` }} /></div>
-          <small style={{ textAlign: 'right' }}>{Math.round(total * 100)} %</small>
-        </div>
+        {ROWS.map((label, i) => {
+          const [a, b] = ROW_SPAN[i]
+          const p = Math.max(0, Math.min(1, (total - a) / (b - a)))
+          const done = p >= 1 || job.state === 'done'
+          return (
+            <div key={label} style={{ display: 'grid', gridTemplateColumns: '28px 160px 1fr 48px', alignItems: 'center', gap: 12, opacity: p === 0 ? 0.5 : 1 }}>
+              {done ? <Check size={18} color="var(--ok)" /> : busy && p > 0 ? <Loader2 size={18} className="sm-spin" /> : <span />}
+              <span>{label}</span>
+              <div className="sm-bar"><i style={{ width: `${(done ? 1 : p) * 100}%` }} /></div>
+              <small style={{ textAlign: 'right' }}>{Math.round((done ? 1 : p) * 100)} %</small>
+            </div>
+          )
+        })}
         {later.map((l) => (
           <div key={l} style={{ display: 'grid', gridTemplateColumns: '28px 160px 1fr', alignItems: 'center', gap: 12, opacity: 0.4 }}>
             <span /><span>{l}</span><small>folgt in einem späteren Meilenstein</small>

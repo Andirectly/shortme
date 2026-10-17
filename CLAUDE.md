@@ -68,3 +68,5 @@ Für Suchen in Referenz-Repos einen Subagenten nutzen, der nur eine kurze Zusamm
 - M3: Projekte unter `<userData>/projects/<hash>/` (project.json, audio.wav, asr.jsonl = Checkpoint, transcript.json = Cache); Datei-Hash = Größe + 3×4 MB
 - M3: pyannote+WeSpeaker übersegmentiert Dialoge (4 statt 2 Sprecher) → Diarisierung optional/aus; Worker-Prozess nie selbst `process.exit` (Nachrichten gehen sonst verloren), Client beendet ihn
 - M3: Windows `rename` über vorhandene Datei: EPERM/EBUSY mit Wiederholung (atomic.ts, projects.ts)
+- M4: LLM wählt über Satznummern (nicht Zeiten); Einrasten = Wort → Satz → Stille → Kamerawechsel mit Nachbarwort-Schutz (ASR-Zeiten ±0,1 s); TransNetV2 läuft nur auf CPU (langsam)
+- M4: Bash-Heredocs mit Backticks/Apostrophen brechen ab → lange Dateien mit dem Write-Tool schreiben

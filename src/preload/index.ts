@@ -21,7 +21,7 @@ import type {
 } from '@shared/types'
 import type { OpenRouterCatalog } from '@shared/openrouter'
 import type { AssetSpec, AssetStatus, CheckItem, HardwareInfo } from '@shared/engines'
-import type { ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
+import type { ShortmeClips, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
 const api = {
   checkSubscriptionSetup: (): Promise<{ message: string; requestsToday: number }> => ipcRenderer.invoke('settings:checkSubscription'),
@@ -153,12 +153,13 @@ const api = {
   shortme: {
     importFile: (path: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importFile', path),
     importUrl: (url: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importUrl', url),
-    transcribe: (hash: string, opts: { diarize?: boolean }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
+    transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
     jobs: (): Promise<ShortmeJob[]> => ipcRenderer.invoke('shortme:jobs'),
     pause: (id: string): Promise<void> => ipcRenderer.invoke('shortme:pause', id),
     resume: (id: string): Promise<void> => ipcRenderer.invoke('shortme:resume', id),
     stop: (id: string): Promise<void> => ipcRenderer.invoke('shortme:stop', id),
     discard: (id: string): Promise<void> => ipcRenderer.invoke('shortme:discard', id),
+    clips: (hash: string): Promise<ShortmeClips | null> => ipcRenderer.invoke('shortme:clips', hash),
     transcript: (hash: string): Promise<ShortmeTranscript | null> => ipcRenderer.invoke('shortme:transcript', hash),
     onJob: (cb: (j: ShortmeJob) => void): (() => void) => {
       const l = (_e: Electron.IpcRendererEvent, j: ShortmeJob): void => cb(j)

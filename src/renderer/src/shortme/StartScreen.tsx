@@ -108,7 +108,7 @@ function CreateSheet(): React.JSX.Element {
     if (projected > 260 || info.velocity.y > 800) openSheet(false)
     else animate(y, 0, { type: 'spring', duration: 0.3, bounce: 0.2, velocity: info.velocity.y })
   }
-  const start = async (): Promise<void> => { if (hasApi && !(await startTranscribe(diarize))) return; openSheet(false); go('processing') }
+  const start = async (): Promise<void> => { if (hasApi && !(await startTranscribe(diarize, opts.query))) return; openSheet(false); go('processing') }
   const stop = { onPointerDownCapture: (e: React.PointerEvent) => e.stopPropagation() }
 
   return (

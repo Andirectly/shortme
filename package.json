@@ -88,6 +88,10 @@
         "to": "models"
       },
       {
+        "from": "resources/prompts",
+        "to": "prompts"
+      },
+      {
         "from": "resources/fonts",
         "to": "fonts"
       },

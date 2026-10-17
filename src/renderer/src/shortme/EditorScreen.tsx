@@ -2,7 +2,9 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { motion } from 'motion/react'
 import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Monitor, ShieldCheck, Check } from 'lucide-react'
 import { useStore } from './store'
-import { CLIPS, IMG, PRESETS, TRANSCRIPT } from './data'
+import { IMG, PRESETS, TRANSCRIPT } from './data'
+import { useClipList } from './clipData'
+import { useProject } from './projectStore'
 import { Button, Pill, Segmented, Slider, Switch, Row } from './ui'
 import { useSprings } from './motion'
 
@@ -11,7 +13,10 @@ const ZONES: Record<string, { top: number; bottom: number; right: number }> = { 
 
 export function EditorScreen(): React.JSX.Element {
   const clipId = useStore((s) => s.activeClip)
-  const clip = CLIPS.find((c) => c.id === clipId)!
+  const list = useClipList()
+  const clip = list.find((c) => c.id === clipId) ?? list[0]
+  const real = useProject((s) => s.clipsFile?.clips.find((c) => c.id === clipId))
+  const transcript = useProject((s) => s.transcript)
   const trim = useStore((s) => s.trim)
   const hook = useStore((s) => s.hookText)
   const presetId = useStore((s) => s.presetId)
@@ -25,7 +30,9 @@ export function EditorScreen(): React.JSX.Element {
   const setHook = useStore((s) => s.setHook)
   const { base } = useSprings()
 
-  const words = useMemo(() => TRANSCRIPT.map((w, i) => ({ ...w, t: (i * clip.duration) / TRANSCRIPT.length })), [clip.duration])
+  const words = useMemo(() => (real && transcript
+    ? transcript.words.slice(real.firstWord, real.lastWord + 1).map((w, i) => ({ w: w.w, t: Math.max(0, w.start - real.start), hi: real.tags.some((g) => g.word === real.firstWord + i) }))
+    : TRANSCRIPT.map((w, i) => ({ ...w, t: (i * clip.duration) / TRANSCRIPT.length }))), [clip.duration, real, transcript])
   const [cut, setCut] = useState<number[]>([])
   const [t, setT] = useState(0)
   const [playing, setPlaying] = useState(false)

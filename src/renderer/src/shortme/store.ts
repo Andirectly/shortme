@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { CLIPS } from './data'
+import { allClips } from './clipData'
 
 export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'settings' | 'processing' | 'clips' | 'editor'
 export type NavId = 'start' | 'projects' | 'studio' | 'models' | 'settings'
@@ -63,7 +64,7 @@ export const useStore = create<State>((set, get) => ({
   openSheet: (sheetOpen) => set({ sheetOpen }),
   setProgress: (progress) => set({ progress }),
   setPaused: (paused) => set({ paused }),
-  openClip: (id) => { const c = CLIPS.find((x) => x.id === id)!; set({ activeClip: id, screen: 'editor', trim: [0, c.duration], hookText: c.hook, undoStack: [], redoStack: [] }) },
+  openClip: (id) => { const c = allClips().find((x) => x.id === id) ?? CLIPS[0]; set({ activeClip: id, screen: 'editor', trim: [0, c.duration], hookText: c.hook, undoStack: [], redoStack: [] }) },
   apply: (op) => { op.redo(); set((s) => ({ undoStack: [...s.undoStack, op], redoStack: [] })) },
   undo: () => { const { undoStack } = get(); const op = undoStack[undoStack.length - 1]; if (!op) return; op.undo(); set((s) => ({ undoStack: s.undoStack.slice(0, -1), redoStack: [...s.redoStack, op] })) },
   redo: () => { const { redoStack } = get(); const op = redoStack[redoStack.length - 1]; if (!op) return; op.redo(); set((s) => ({ redoStack: s.redoStack.slice(0, -1), undoStack: [...s.undoStack, op] })) },
