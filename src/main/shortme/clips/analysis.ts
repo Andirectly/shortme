@@ -11,6 +11,7 @@ import { detectShots } from './scenes'
 import { selectClips } from './select'
 import { makeThumbs } from './thumbs'
 import { layoutForClip } from '../layout/run'
+import type { PlanInput } from '../../../shared/layoutPlan'
 
 export interface AnalysisOptions {
   query?: string
@@ -19,6 +20,35 @@ export interface AnalysisOptions {
   /** Erzwingt den Fallback ohne LLM (Tests / kein Modell). */
   noLlm?: boolean
   onProgress?: (stage: string, fraction: number, message: string) => void
+}
+
+export const layoutFile = (hash: string, clipId: string): string => projectFile(hash, `layout/${clipId.replace(/[^\w.-]/g, '_')}.json`)
+
+/** Gespeicherte Tracks/Schnitte eines Clips (für „Person anklicken“); fehlt bei älteren Projekten. */
+export async function loadLayoutInput(hash: string, clipId: string): Promise<PlanInput | null> {
+  try { return JSON.parse(await readFile(layoutFile(hash, clipId), 'utf8')) as PlanInput } catch { return null }
+}
+
+const pending = new Map<string, Promise<PlanInput | null>>()
+
+/** Ältere Projekte ohne gespeicherte Tracks: einmalig nachberechnen (≈ 0,5× Echtzeit des Clips) und ablegen. */
+export function ensureLayoutInput(meta: ProjectMeta, clip: ShortmeClip): Promise<PlanInput | null> {
+  const key = `${meta.hash}/${clip.id}`
+  let p = pending.get(key)
+  if (!p) {
+    p = (async () => {
+      const have = await loadLayoutInput(meta.hash, clip.id)
+      if (have) return have
+      try {
+        const cuts = await ensureShots(meta)
+        const l = await layoutForClip(meta, clip, cuts)
+        await writeFileAtomic(layoutFile(meta.hash, clip.id), JSON.stringify(l.input))
+        return l.input
+      } catch (e) { console.error('Layout-Nachberechnung fehlgeschlagen:', e); return null }
+    })().finally(() => pending.delete(key))
+    pending.set(key, p)
+  }
+  return p
 }
 
 export interface ClipsFile { version: 1; hash: string; query: string; createdAt: string; mode: 'llm' | 'texttiling'; clips: ShortmeClip[] }
@@ -75,11 +105,12 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   for (let i = 0; i < clips.length; i++) {
     report('layout', i / clips.length, `Bildausschnitt planen (${i + 1}/${clips.length}) …`)
     const l = await layoutForClip(meta, clips[i], cuts, opts.signal)
+    await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(l.input))
     clips[i] = { ...clips[i], shots: l.shots, faceRatio: l.faceRatio, score: Math.max(0, clips[i].score - l.penalty) }
   }
   clips.sort((x, y) => y.score - x.score)
   report('thumbs', 0, 'Vorschaubilder …')
-  await makeThumbs(meta, clips, opts.signal).catch(() => undefined)
+  await makeThumbs(meta, clips, opts.signal)
   const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, clips }
   await writeFileAtomic(projectFile(meta.hash, 'clips.json'), JSON.stringify(file, null, 1))
   await markStage(meta.hash, 'clips', true)

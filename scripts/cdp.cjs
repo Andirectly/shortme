@@ -12,6 +12,7 @@ const [port, cmd, arg] = process.argv.slice(2)
   const pending = new Map()
   ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id) } }
   const send = (method, params = {}) => new Promise((res) => { const i = ++id; pending.set(i, res); ws.send(JSON.stringify({ id: i, method, params })) })
+  await send('Page.bringToFront'); await send('Emulation.setFocusEmulationEnabled', { enabled: true })
   if (cmd === 'eval') {
     const r = await send('Runtime.evaluate', { expression: `(async()=>{${arg}})()`, awaitPromise: true, returnByValue: true })
     console.log(JSON.stringify(r.result.exceptionDetails ? { error: r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text } : r.result.result.value))

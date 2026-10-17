@@ -39,7 +39,7 @@ export function StudioScreen(): React.JSX.Element {
           <motion.div key={preset.id} initial={{ opacity: 0, scale: 0.9, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={base} style={{ position: 'absolute', left: 0, right: 0, top: '66%', textAlign: 'center', fontFamily: preset.font, fontWeight: preset.weight, fontSize: size / 3, textTransform: upper ? 'uppercase' : 'none', WebkitTextStroke: `${stroke / 60}px #000`, textShadow: '0 2px 8px rgba(0,0,0,0.6)', color: preset.color }}>
             {Array.from({ length: words }, (_, i) => <span key={i} style={{ marginRight: 6, color: i === 1 ? preset.hi : preset.color, background: preset.box ? 'rgba(0,0,0,0.6)' : 'none' }}>{['Das', 'sieht', 'crazy', 'aus', 'finde', 'ich'][i]}</span>)}
           </motion.div>
-          <div style={{ position: 'absolute', top: 14, right: 14, width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#6366f1)', opacity: logoOp / 100 }} />
+          <div style={{ position: 'absolute', top: 14, right: 14, width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#ffffff,#8a8a8a)', opacity: logoOp / 100 }} />
         </div>
       </div>
       <div className="sm-glass" style={{ padding: 16, overflowY: 'auto' }}>

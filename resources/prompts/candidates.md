@@ -9,7 +9,8 @@ Eine gute Mikro-Geschichte hat
 Regeln
 - Wähle Bereiche über Satznummern (S12 = Satz 12). „start“ und „end“ sind Satznummern, beide inklusive.
 - Ein Clip dauert {{minSec}}–{{maxSec}} Sekunden. Die Zeit steht am Zeilenanfang (in Sekunden). Rechne selbst nach.
-- Beginne bei einem Satz, der ohne Vorwissen verständlich ist (kein „und deshalb…“, kein „das“ ohne Bezug).
+- Beginne bei einem Satz, der ohne Vorwissen verständlich ist (kein „und deshalb…“, kein „das“ ohne Bezug). Ist der erste Satz die ANTWORT auf eine Frage, nimm die Frage davor mit.
+- Der erste Satz muss in den ersten Sekunden fesseln: Frage, Behauptung, Überraschung oder Konflikt – kein Warm-up, kein Smalltalk.
 - Ende erst, wenn der Gedanke abgeschlossen ist – nie mitten in einer Erklärung.
 - Bereiche dürfen sich nicht überlappen.
 - Markierungen wie (laut) oder (Lachen?) zeigen auffällige Stellen im Ton; sie sind nur ein Hinweis.

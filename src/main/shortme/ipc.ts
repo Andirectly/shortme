@@ -10,8 +10,9 @@ import { planExport } from './render/exporter'
 import { sanitizeLog } from '../../shared/edits'
 import { loadTranscript, runTranscription } from './transcription'
 import { loadClips, runAnalysis } from './clips/analysis'
-import { thumbPath } from './clips/thumbs'
-import { ensureSignals } from './clips/analysis'
+import { makeThumbs, thumbPath } from './clips/thumbs'
+import { existsSync } from 'node:fs'
+import { ensureLayoutInput, ensureSignals, loadLayoutInput } from './clips/analysis'
 import { exportClip } from './render/exporter'
 import { logDir } from '../log'
 import { applyCaptionToAll, loadEdits, saveEdits } from './edits'
@@ -50,6 +51,11 @@ export function registerShortmeIpc(): void {
     if (!file) return null
     const m = await loadMeta(hash)
     if (m) allowMediaPath(m.sourcePath)
+    // Fehlende Vorschaubilder (ältere Projekte, früherer Fehler) beim Öffnen nachholen
+    if (m) {
+      const missing = file.clips.filter((c) => !existsSync(thumbPath(hash, c.id)))
+      if (missing.length) await makeThumbs(m, missing).catch((e) => console.error('Vorschaubilder:', e))
+    }
     const thumbs: Record<string, string | null> = {}
     for (const c of file.clips) thumbs[c.id] = await dataUrl(thumbPath(hash, c.id))
     return { ...file, thumbs, source: m ? { path: resolve(m.sourcePath), width: m.width, height: m.height, title: m.title, durationSec: m.durationSec } : null }
@@ -67,8 +73,8 @@ export function registerShortmeIpc(): void {
       for (let i = 0; i < clips.length; i++) {
         // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
         const st = stateOf(baseState(clips[i], opts?.presetId), await loadEdits(hash, clips[i].id))
-        const eff = effectiveClip(clips[i], transcript.words, st)
-        await exportClip(meta, eff, transcript, signals, { outDir, presetId: st.caption.presetId, srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, caption: { scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+        const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
+        await exportClip(meta, eff, transcript, signals, { outDir, presetId: st.caption.presetId, srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, caption: { scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
       }
       void shell.openPath(outDir)
     })
@@ -122,7 +128,7 @@ export function registerShortmeIpc(): void {
     if (!meta || !clip || !transcript) throw new Error('Clip nicht gefunden')
     allowMediaPath(meta.sourcePath)
     const st = stateOf(baseState(clip, presetId), sanitizeLog(rawLog, clipId))
-    const eff = effectiveClip(clip, transcript.words, st)
+    const eff = effectiveClip(clip, transcript.words, st, (await loadLayoutInput(hash, clipId)) ?? (await ensureLayoutInput(meta, clip)))
     const signals = await ensureSignals(meta)
     const plan = planExport(eff, transcript, signals, true, eff.removed)
     return { start: eff.start, end: eff.end, duration: plan.duration, cuts: plan.cuts, shots: eff.shots ?? [], pieces: plan.pieces.map((p) => ({ src0: p.src0, src1: p.src1, out0: p.out0, zoom: p.zoom, shot: p.shot })) }

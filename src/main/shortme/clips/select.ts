@@ -106,22 +106,57 @@ const overlaps = (a: Cand, b: Cand): number => {
   return (hi - lo + 1) / Math.min(a.last - a.first + 1, b.last - b.first + 1)
 }
 
-const CRIT_SCHEMA = { type: 'integer', minimum: 0, maximum: 20 }
+const NOTE = { type: 'integer', minimum: 0, maximum: 4 }
 const RATE_SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['hook', 'payoff', 'quotable', 'standalone', 'density', 'title', 'hook_text', 'reason', 'tags'],
+  required: ['hook_quote', 'payoff_quote', 'missing_context', 'hook', 'payoff', 'quotable', 'standalone', 'emotion', 'title', 'hook_text', 'reason', 'tags'],
   properties: {
-    hook: CRIT_SCHEMA, payoff: CRIT_SCHEMA, quotable: CRIT_SCHEMA, standalone: CRIT_SCHEMA, density: CRIT_SCHEMA,
+    hook_quote: { type: 'string' }, payoff_quote: { type: 'string' }, missing_context: { type: 'array', maxItems: 5, items: { type: 'string' } },
+    hook: NOTE, payoff: NOTE, quotable: NOTE, standalone: NOTE, emotion: NOTE,
     title: { type: 'string' }, hook_text: { type: 'string' }, reason: { type: 'string' },
     tags: { type: 'array', maxItems: 8, items: { type: 'object', additionalProperties: false, required: ['sentence', 'word', 'kind'], properties: { sentence: { type: 'integer' }, word: { type: 'string' }, kind: { type: 'string', enum: ['emphasis', 'entity', 'hook'] } } } }
   }
 }
 
-function validateRate(x: unknown): Omit<Rated, 'first' | 'last' | 'extended' | 'rank' | 'sum'> {
+interface RateRaw { notes: { hook: number; payoff: number; quotable: number; standalone: number; emotion: number }; hookQuote: string; payoffQuote: string; missing: string[]; title: string; hookText: string; reason: string; tags: Rated['tags'] }
+
+function validateRate(x: unknown): RateRaw {
   if (!isObj(x)) throw new Error('Objekt erwartet')
-  const criteria = { hook: int(x.hook, 0, 20, 'hook'), payoff: int(x.payoff, 0, 20, 'payoff'), quotable: int(x.quotable, 0, 20, 'quotable'), standalone: int(x.standalone, 0, 20, 'standalone'), density: int(x.density, 0, 20, 'density') }
+  const notes = { hook: int(x.hook, 0, 4, 'hook'), payoff: int(x.payoff, 0, 4, 'payoff'), quotable: int(x.quotable, 0, 4, 'quotable'), standalone: int(x.standalone, 0, 4, 'standalone'), emotion: int(x.emotion, 0, 4, 'emotion') }
   const tags = Array.isArray(x.tags) ? x.tags.filter(isObj).map((t) => ({ sentence: int(t.sentence, 0, 1e9, 'sentence'), word: String(t.word ?? ''), kind: (['emphasis', 'entity', 'hook'].includes(String(t.kind)) ? t.kind : 'emphasis') as ClipTagKind })) : []
-  return { criteria, title: str(x.title, 80, 'title'), hookText: str(x.hook_text, 80, 'hook_text'), reason: str(x.reason, 240, 'reason'), tags }
+  return { notes, hookQuote: String(x.hook_quote ?? ''), payoffQuote: String(x.payoff_quote ?? ''), missing: Array.isArray(x.missing_context) ? x.missing_context.map(String).filter(Boolean) : [], title: str(x.title, 80, 'title'), hookText: str(x.hook_text, 80, 'hook_text'), reason: str(x.reason, 240, 'reason'), tags }
+}
+
+const squash = (t: string): string => t.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+
+/** Beleg-Prüfung: Zitat muss wörtlich im Clip stehen, sonst gilt die zugehörige Note als unzuverlässig (−1). */
+export const quoteOk = (quote: string, clip: string): boolean => { const q = squash(quote); return q.length >= 4 && squash(clip).includes(q) }
+
+/** Mehrere Proben zusammenführen: Median je Note (0–4), Belege prüfen, auf die 0–20-Skala des Rasters skalieren. */
+export function mergeRatings(samples: RateRaw[], clip: string): { criteria: ShortmeClip['criteria']; missing: string[]; meta: RateRaw } {
+  const med = (vals: number[]): number => { const v = [...vals].sort((x, y) => x - y); return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2 }
+  const pick = (k: keyof RateRaw['notes']): number => med(samples.map((r) => r.notes[k]))
+  const hookBad = samples.every((r) => !quoteOk(r.hookQuote, clip))
+  const payoffBad = samples.every((r) => !quoteOk(r.payoffQuote, clip))
+  const at20 = (n: number): number => Math.round(Math.max(0, Math.min(4, n)) * 5)
+  const criteria = {
+    hook: at20(pick('hook') - (hookBad ? 1 : 0)), payoff: at20(pick('payoff') - (payoffBad ? 1 : 0)), quotable: at20(pick('quotable')),
+    standalone: at20(pick('standalone')), density: at20(pick('emotion'))
+  }
+  return { criteria, missing: samples[0].missing, meta: samples[0] }
+}
+
+/** Satzanfänge, die fast immer Fortsetzung eines früheren Gedankens sind (Hinweis für die Anfangsprüfung). */
+export const CONNECTIVE_START = /^(und|aber|also|dann|deswegen|deshalb|genau|ja|nee|nein|doch|weil|denn|sondern|oder|außerdem|trotzdem|jedenfalls|na ja)\b|^(er|sie|es|das|dies|dieser|diese|dieses|der|die|dem|den)\s+(ist|war|hat|hatte|sind|waren|wird|wurde|kann|muss|hab|habe)\b/i
+
+/** Weiche Längenvorgabe (Shorts-Sweetspot 22–50 s); Abzug in Punkten. */
+export function lengthPenalty(sec: number): number {
+  if (sec < 15) return 6
+  if (sec < 22) return 3
+  if (sec <= 50) return 0
+  if (sec <= 65) return 2
+  if (sec <= 80) return 5
+  return 8
 }
 
 export const critSum = (c: ShortmeClip['criteria']): number => c.hook + c.payoff + c.quotable + c.standalone + c.density
@@ -150,7 +185,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   // A: Kandidaten je Fenster (Satznummern)
   const windows = buildWindows(sentences)
   let cands: Cand[] = []
-  const maxCands = Math.max(6, Math.ceil(wanted * 2.5))
+  const maxCands = Math.max(8, Math.ceil(wanted * 3.5))
   for (let w = 0; w < windows.length; w++) {
     report('candidates', w / windows.length, `Kandidaten suchen (${w + 1}/${windows.length}) …`)
     const win = windows[w]
@@ -168,49 +203,88 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   cands = cands.slice(0, maxCands)
   if (cands.length === 0) return fallbackClips(input, sentences, wanted, minSec, maxSec, cuts, report)
 
-  // B: Bewertungsraster (je Kandidat) + C: Ende prüfen
+  // B: Anfang prüfen (Kontext davor) → C: Bewertung (2 Proben, Belege) → D: Ende prüfen
   const rated: Rated[] = []
+  const BEFORE = 2
   for (let i = 0; i < cands.length; i++) {
     report('rate', i / cands.length, `Bewerten (${i + 1}/${cands.length}) …`)
-    const first = cands[i].first
+    let first = cands[i].first
     let last = cands[i].last
-    const rp = await loadPrompt('rate', { query: queryLine(opts.query), clip: clipText(sentences, first, last) })
-    const r = await chatJson(url, rp, { signal, schema: RATE_SCHEMA, validate: validateRate, maxTokens: 700 })
+    // B: beginnt der Clip mitten im Gedanken? (Anapher/Konnektiv oder LLM-Urteil) → Anfang bis zu 2 Sätze nach vorn, höchstens 2 Runden
+    let startExt = 0
+    for (let round = 0; round < 2 && first > 0; round++) {
+      const flagged = CONNECTIVE_START.test(sentences[first].text.trim())
+      const prev = clipText(sentences, Math.max(0, first - BEFORE), first - 1)
+      const sp = await loadPrompt('standalone', { before: prev, clip: clipText(sentences, first, Math.min(last, first + 2)) })
+      const v = await chatJson(url, sp, {
+        signal, maxTokens: 100, temperature: 0.1,
+        schema: { type: 'object', additionalProperties: false, required: ['ok', 'extend_start'], properties: { ok: { type: 'boolean' }, extend_start: { type: 'integer', minimum: 0, maximum: 2 } } },
+        validate: (x) => { if (!isObj(x)) throw new Error('Objekt erwartet'); return { ok: !!x.ok, ext: x.ok ? 0 : int(x.extend_start, 0, 2, 'extend_start') } }
+      })
+      const ext = v.ok && !flagged ? 0 : Math.max(v.ext, flagged && !v.ok ? 1 : 0)
+      if (ext === 0 || dur(sentences, Math.max(0, first - ext), last) > MAX_CLIP_SEC) break
+      first = Math.max(0, first - ext)
+      startExt += ext
+    }
+    const textNow = (): string => clipText(sentences, first, last)
+    const ctx = (): string => `[Kontext] ${first > 0 ? sentences[first - 1].text : '–'}\n${textNow()}\n[Kontext] ${last < sentences.length - 1 ? sentences[last + 1].text : '–'}`
+    // C: zwei Proben (Median), Belege prüfen
+    const samples: RateRaw[] = []
+    for (const temperature of [0.2, 0.5]) {
+      const rp = await loadPrompt('rate', { query: queryLine(opts.query), clip: ctx() })
+      samples.push(await chatJson(url, rp, { signal, schema: RATE_SCHEMA, validate: validateRate, maxTokens: 800, temperature }))
+    }
+    let merged = mergeRatings(samples, textNow())
+    // D: Ende prüfen; bei Verlängerung nicht neu bewerten, Beleg-Prüfung bleibt
     let extended = 0
     if (last < sentences.length - 1) {
-      const ep = await loadPrompt('endcheck', { clip: clipText(sentences, first, last), after: clipText(sentences, last + 1, Math.min(sentences.length - 1, last + 3)) })
+      const ep = await loadPrompt('endcheck', { clip: textNow(), after: clipText(sentences, last + 1, Math.min(sentences.length - 1, last + 3)) })
       const e = await chatJson(url, ep, {
         signal, maxTokens: 120, temperature: 0.1,
         schema: { type: 'object', additionalProperties: false, required: ['complete', 'extra'], properties: { complete: { type: 'boolean' }, extra: { type: 'integer', minimum: 0, maximum: 3 } } },
         validate: (x) => { if (!isObj(x)) throw new Error('Objekt erwartet'); return { complete: !!x.complete, extra: x.complete ? 0 : int(x.extra, 0, 3, 'extra') } }
       })
       while (extended < e.extra && last < sentences.length - 1 && dur(sentences, first, last + 1) <= MAX_CLIP_SEC) { last++; extended++ }
+      if (extended > 0) merged = { ...merged, criteria: { ...merged.criteria, payoff: Math.max(merged.criteria.payoff, 10) } }
     }
-    rated.push({ first, last, ...r, sum: critSum(r.criteria), extended, rank: 0 })
+    const m = merged.meta
+    rated.push({ first, last, criteria: merged.criteria, title: m.title, hookText: m.hookText, reason: m.reason, tags: m.tags, sum: critSum(merged.criteria), extended: extended + startExt, rank: 0 })
   }
 
-  // D: Finalisten in EINEM Aufruf direkt vergleichen
+  // E1: Finalisten paarweise vergleichen (beide Reihenfolgen; Uneinigkeit = Unentschieden) – weniger Positions-Bias als eine Gesamt-Rangliste
   rated.sort((a, b) => b.sum - a.sum)
   const finalists = rated.slice(0, Math.min(rated.length, Math.max(wanted + 2, Math.ceil(wanted * 1.6)), 12))
   if (finalists.length > 1) {
-    report('compare', 0.5, 'Finalisten vergleichen …')
-    const cp = await loadPrompt('compare', {
-      query: queryLine(opts.query),
-      finalists: finalists.map((f, i) => `Clip ${i + 1} (${Math.round(dur(sentences, f.first, f.last))} s) – ${f.title}\n${clipText(sentences, f.first, f.last).slice(0, 900)}`).join('\n\n')
-    })
-    const order = await chatJson(url, cp, {
-      signal, maxTokens: 200, temperature: 0.2,
-      schema: { type: 'object', additionalProperties: false, required: ['ranking'], properties: { ranking: { type: 'array', items: { type: 'integer' } } } },
-      validate: (x) => { if (!isObj(x) || !Array.isArray(x.ranking)) throw new Error('ranking fehlt'); return x.ranking.map((n) => Number(n) - 1).filter((n) => Number.isInteger(n) && n >= 0 && n < finalists.length) }
-    })
-    const seen = new Set<number>()
-    const full = [...order.filter((n) => (seen.has(n) ? false : (seen.add(n), true))), ...finalists.map((_, i) => i).filter((i) => !seen.has(i))]
-    full.forEach((idx, rank) => { finalists[idx].rank = rank })
+    const K = Math.min(finalists.length, 6)
+    const wins = new Array<number>(finalists.length).fill(0)
+    const total = (K * (K - 1)) / 2
+    let done = 0
+    const textOf = (f: Rated): string => clipText(sentences, f.first, f.last).slice(0, 1100)
+    const ask = async (x: Rated, y: Rated): Promise<'A' | 'B'> => {
+      const pp = await loadPrompt('pair', { query: queryLine(opts.query), a: textOf(x), b: textOf(y) })
+      return chatJson(url, pp, {
+        signal, maxTokens: 40, temperature: 0,
+        schema: { type: 'object', additionalProperties: false, required: ['winner'], properties: { winner: { type: 'string', enum: ['A', 'B'] } } },
+        validate: (v) => { if (!isObj(v) || (v.winner !== 'A' && v.winner !== 'B')) throw new Error('winner fehlt'); return v.winner }
+      })
+    }
+    for (let i = 0; i < K; i++) for (let j = i + 1; j < K; j++) {
+      report('compare', 0.3 + 0.6 * (done++ / total), `Finalisten vergleichen (${done}/${total}) …`)
+      const w1 = await ask(finalists[i], finalists[j])
+      const w2 = await ask(finalists[j], finalists[i])
+      const iWins = (w1 === 'A' ? 1 : 0) + (w2 === 'B' ? 1 : 0) // i gewinnt in Reihenfolge 1 als A, in Reihenfolge 2 als B
+      wins[i] += iWins / 2
+      wins[j] += (2 - iWins) / 2
+    }
+    const order = finalists.map((_, i) => i).sort((p, q) => (q < K && p < K ? wins[q] - wins[p] || finalists[q].sum - finalists[p].sum : q < K ? 1 : p < K ? -1 : finalists[q].sum - finalists[p].sum))
+    order.forEach((idx, rank) => { finalists[idx].rank = rank })
   }
 
   // E: nach Score wählen, Grenzen einrasten (Nachbarn verbieten Überlappung)
-  const scored = finalists.map((f) => ({ f, score: finalScore(f.sum, f.rank, finalists.length, (secOf(signals.loudness, sentences[f.first].start, sentences[f.last].end) + secOf(signals.burst, sentences[f.first].start, sentences[f.last].end)) / 2) }))
-  scored.sort((a, b) => b.score - a.score)
+  const scored = finalists.map((f) => ({ f, score: Math.max(0, finalScore(f.sum, f.rank, finalists.length, (secOf(signals.loudness, sentences[f.first].start, sentences[f.last].end) + secOf(signals.burst, sentences[f.first].start, sentences[f.last].end)) / 2) - lengthPenalty(dur(sentences, f.first, f.last))) }))
+  // Qualitätsschwelle: Clips mit schwachem Hook UND/ODER nicht eigenständigem Anfang erst nehmen, wenn zu wenige gute da sind
+  const solid = (f: Rated): boolean => f.criteria.standalone >= 8 && f.criteria.hook >= 8
+  scored.sort((a, b) => Number(solid(b.f)) - Number(solid(a.f)) || b.score - a.score)
   report('snap', 0.9, 'Grenzen einrasten …')
   const taken: Range[] = []
   const out: ShortmeClip[] = []

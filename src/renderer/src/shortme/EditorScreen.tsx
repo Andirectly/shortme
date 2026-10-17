@@ -15,7 +15,7 @@ import { drawLayout, sourceRects } from '@shared/previewDraw'
 const ZONES: Record<string, { top: number; bottom: number; right: number }> = { TikTok: { top: 0.12, bottom: 0.2, right: 0.14 }, Reels: { top: 0.1, bottom: 0.18, right: 0.1 }, Shorts: { top: 0.1, bottom: 0.22, right: 0.12 } }
 const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', 'Ganzes Bild': 'fit', Split: 'split', Fest: 'fixed' }
 const LAYOUT_LABEL: Record<ShortmeShot['layout'], string> = { smart: 'Smart', fit: 'Ganzes Bild', split: 'Split', fixed: 'Fest' }
-const LAYOUT_COLOR: Record<ShortmeShot['layout'], string> = { smart: 'rgba(168,85,247,0.55)', fit: 'rgba(56,189,248,0.5)', split: 'rgba(74,222,128,0.5)', fixed: 'rgba(251,191,36,0.5)' }
+const LAYOUT_COLOR: Record<ShortmeShot['layout'], string> = { smart: 'rgba(255,255,255,0.55)', fit: 'rgba(255,255,255,0.32)', split: 'rgba(255,255,255,0.62)', fixed: 'rgba(255,255,255,0.18)' }
 const CANVAS_W = 540
 const CANVAS_H = 960
 const fmt = (s: number): string => `${Math.floor(Math.max(0, s) / 60)}:${(Math.max(0, s) % 60).toFixed(1).padStart(4, '0')}`
@@ -71,15 +71,19 @@ export function EditorScreen(): React.JSX.Element {
   const redo = useCallback((): void => setLog((l) => redoLog(l)), [])
 
   // ---------- Wörter, Zustand ----------
-  const words = useMemo(() => (real && transcript
+  const rawWords = useMemo(() => (real && transcript
     ? transcript.words.slice(real.firstWord, real.lastWord + 1).map((w, i) => ({ w: w.w, t: Math.max(0, w.start - real.start), e: Math.max(0, w.end - real.start), g: real.firstWord + i, hi: real.tags.some((x) => x.word === real.firstWord + i) }))
     : TRANSCRIPT.map((w, i) => ({ ...w, g: i, t: (i * clip.duration) / TRANSCRIPT.length, e: ((i + 0.8) * clip.duration) / TRANSCRIPT.length }))), [clip.duration, real, transcript])
+  const words = useMemo(() => rawWords.map((w) => ({ ...w, w: st.wordEdits[w.g] ?? w.w, edited: st.wordEdits[w.g] !== undefined })), [rawWords, st.wordEdits])
   const [t, setT] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
   const [tab, setTab] = useState('Untertitel')
   const [showSource, setShowSource] = useState(true)
   const [zone, setZone] = useState('Aus')
+  const [sel, setSel] = useState<number | null>(null)
+  const [editing, setEditing] = useState<number | null>(null)
+  const [draft, setDraft] = useState('')
   const [liveTrim, setLiveTrim] = useState<[number, number] | null>(null)
   const [hookDraft, setHookDraft] = useState<string | null>(null)
   const [sizeDraft, setSizeDraft] = useState<number | null>(null)
@@ -183,6 +187,9 @@ export function EditorScreen(): React.JSX.Element {
   }, [srcUrl, origStart, clipId])
   useEffect(() => { if (videoRef.current) videoRef.current.muted = muted }, [muted])
 
+  const selRef = useRef<number | null>(null)
+  selRef.current = sel
+  const toggleCutRef = useRef<(g: number) => void>(() => undefined)
   const togglePlay = useCallback((): void => {
     const v = videoRef.current
     if (!v || !srcUrl) { setPlaying((p) => !p); return }
@@ -209,6 +216,7 @@ export function EditorScreen(): React.JSX.Element {
       if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
       else if (e.ctrlKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo() }
       else if (e.key === ' ') { e.preventDefault(); togglePlay() }
+      else if ((e.key === 'Delete' || e.key === 'Backspace') && selRef.current !== null) { e.preventDefault(); toggleCutRef.current(selRef.current) }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(tRef.current - (e.shiftKey ? 5 : 1)) }
       else if (e.key === 'ArrowRight') { e.preventDefault(); seek(tRef.current + (e.shiftKey ? 5 : 1)) }
     }
@@ -217,6 +225,18 @@ export function EditorScreen(): React.JSX.Element {
   }, [undo, redo, togglePlay, seek])
 
   const toggleCut = (g: number): void => commit({ t: 'cutWords', words: [g], cut: !cut.includes(g) })
+  toggleCutRef.current = toggleCut
+  const startEdit = (g: number, text: string): void => { setSel(g); setEditing(g); setDraft(text) }
+  const finishEdit = (save: boolean): void => {
+    const g = editing
+    setEditing(null)
+    if (g === null || !save) return
+    const orig = rawWords.find((w) => w.g === g)?.w ?? ''
+    const next = draft.trim()
+    const current = st.wordEdits[g] ?? orig
+    if (next === current) return
+    commit({ t: 'editWord', word: g, text: next === orig ? '' : next }) // leer = Änderung zurücknehmen
+  }
   const caption = (patch: CaptionPatch): void => commit({ t: 'caption', patch })
   const curIdx = Math.max(0, words.findLastIndex((w) => w.t <= t))
   const cap = words.slice(Math.floor(curIdx / preset.wordsPerLine) * preset.wordsPerLine, Math.floor(curIdx / preset.wordsPerLine) * preset.wordsPerLine + preset.wordsPerLine)
@@ -251,12 +271,19 @@ export function EditorScreen(): React.JSX.Element {
           <div style={{ lineHeight: 1.9, fontSize: 14 }}>
             {words.map((w, i) => (
               <Fragment key={w.g}>
-                <span ref={i === curIdx ? wordRef : undefined} onClick={(e) => { if (e.altKey) toggleCut(w.g); else seek(w.t) }} onDoubleClick={() => toggleCut(w.g)} title="Klick: springen · Doppelklick: herausschneiden"
-                  style={{ cursor: 'pointer', padding: '1px 2px', borderRadius: 4, marginRight: 3, textDecoration: cut.includes(w.g) ? 'line-through' : 'none', opacity: cut.includes(w.g) ? 0.35 : w.t < trim[0] - 0.01 || w.e > trim[1] + 0.05 ? 0.4 : 1, background: i === curIdx ? 'rgba(168,85,247,0.4)' : 'transparent', color: cut.includes(w.g) ? '#f87171' : undefined }}>{w.w}</span>{' '}
+                {editing === w.g
+                  ? <input autoFocus value={draft} size={Math.max(3, draft.length + 1)} onChange={(ev) => setDraft(ev.target.value)} onBlur={() => finishEdit(true)} onKeyDown={(ev) => { if (ev.key === 'Enter') finishEdit(true); else if (ev.key === 'Escape') finishEdit(false) }}
+                      style={{ font: 'inherit', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: 4, color: '#fff', padding: '0 3px', outline: 'none' }} />
+                  : <span ref={i === curIdx ? wordRef : undefined} onClick={(ev) => { setSel(w.g); if (ev.altKey) toggleCut(w.g); else seek(w.t) }} onDoubleClick={() => startEdit(w.g, w.w)} title="Klick: springen/auswählen · Doppelklick: Text ändern · Entf: herausschneiden"
+                      style={{ cursor: 'pointer', padding: '1px 2px', borderRadius: 4, marginRight: 3, textDecoration: cut.includes(w.g) ? 'line-through' : w.edited ? 'underline dotted rgba(255,255,255,0.6)' : 'none', opacity: cut.includes(w.g) ? 0.35 : w.t < trim[0] - 0.01 || w.e > trim[1] + 0.05 ? 0.4 : 1, background: i === curIdx ? 'rgba(255,255,255,0.22)' : 'transparent', outline: sel === w.g ? '1px solid rgba(255,255,255,0.55)' : 'none', color: cut.includes(w.g) ? 'rgba(255,255,255,0.45)' : undefined }}>{w.w}</span>}{' '}
               </Fragment>
             ))}
           </div>
-          <small style={{ display: 'block', marginTop: 12 }}>Klick springt · Doppelklick schneidet ein Wort heraus (im Export entfernt, auch beim Abspielen übersprungen).</small>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+            <Pill onClick={() => { const w = words.find((x) => x.g === sel); if (w) startEdit(w.g, w.w) }}>Text ändern</Pill>
+            <Pill onClick={() => { if (sel !== null) toggleCut(sel) }}>{sel !== null && cut.includes(sel) ? 'Wieder einfügen' : 'Herausschneiden'}</Pill>
+          </div>
+          <small style={{ display: 'block', marginTop: 10 }}>Wort anklicken = auswählen und springen · Doppelklick oder „Text ändern“ = Untertitel-Text korrigieren (Enter bestätigt) · Entf = herausschneiden (im Export entfernt, beim Abspielen übersprungen).</small>
         </div>
 
         {/* Bühne: Quellmonitor + vertikale Vorschau */}
@@ -267,23 +294,23 @@ export function EditorScreen(): React.JSX.Element {
               {srcUrl
                 ? <video ref={videoRef} src={srcUrl} preload="auto" playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
                 : <div style={{ width: '100%', height: '100%', backgroundImage: `url(${IMG.source})`, backgroundSize: 'cover' }} />}
-              {rects.map((r, i) => <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${r.x * 100}%`, width: `${r.w * 100}%`, border: '2px solid var(--accent)', background: 'rgba(168,85,247,0.12)', pointerEvents: 'none', boxShadow: 'var(--accent-glow)' }} />)}
+              {rects.map((r, i) => <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${r.x * 100}%`, width: `${r.w * 100}%`, border: '2px solid var(--accent)', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none', boxShadow: 'var(--accent-glow)' }} />)}
               <span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)' }}>Quelle · Person anklicken</span>
             </div>
-            <small>Violetter Rahmen = aktueller Ausschnitt im Export</small>
+            <small>Heller Rahmen = aktueller Ausschnitt im Export</small>
           </div>
           <div style={{ position: 'relative', height: '100%', maxHeight: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--edge-highlight)', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', containerType: 'size' }}>
             {srcUrl
               ? <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
               : <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover' }} />}
-            {t < st.hook.seconds && hook && <div style={{ position: 'absolute', top: '8%', left: 0, right: 0, textAlign: 'center', fontFamily: 'Poppins', fontWeight: 700, fontSize: '3.4cqh', padding: '0 7%', textShadow: '0 2px 10px #000' }}><span style={{ background: 'rgba(0,0,0,0.5)', padding: '0.2em 0.5em', borderRadius: '0.4em', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' }}>{hook}</span></div>}
+            {st.hook.enabled && t < st.hook.seconds && hook && <div style={{ position: 'absolute', top: '8%', left: 0, right: 0, textAlign: 'center', fontFamily: 'Poppins', fontWeight: 700, fontSize: '3.4cqh', padding: '0 7%', textShadow: '0 2px 10px #000' }}><span style={{ background: 'rgba(0,0,0,0.5)', padding: '0.2em 0.5em', borderRadius: '0.4em', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' }}>{hook}</span></div>}
             <style>{scopeCss(captionCss(preset, { scale: size / 60, highlight: st.caption.highlight }), '.sm-cap')}</style>
             <div className="sm-cap" style={{ position: 'absolute', left: 0, right: 0, top: `${pos}%`, transform: 'translateY(-50%)', padding: '0 4%' }}>
               <div className="segment"><div className="line">
                 {cap.filter((w) => !cut.includes(w.g)).map((w) => <span key={w.g} className={`word${w.g === words[curIdx]?.g ? ' word-being-narrated' : ''}${w.hi ? ' emphasis' : ''}`}>{w.w}</span>)}
               </div></div>
             </div>
-            {zn && <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${zn.top * 100}%`, background: 'rgba(239,68,68,0.28)' }} /><div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${zn.bottom * 100}%`, background: 'rgba(239,68,68,0.28)' }} /><div style={{ position: 'absolute', right: 0, top: `${zn.top * 100}%`, bottom: `${zn.bottom * 100}%`, width: `${zn.right * 100}%`, background: 'rgba(239,68,68,0.28)' }} /></div>}
+            {zn && <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${zn.top * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${zn.bottom * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', right: 0, top: `${zn.top * 100}%`, bottom: `${zn.bottom * 100}%`, width: `${zn.right * 100}%`, background: 'rgba(255,255,255,0.16)' }} /></div>}
           </div>
         </div>
 
@@ -311,6 +338,7 @@ export function EditorScreen(): React.JSX.Element {
           )}
           {tab === 'Hook' && (
             <div>
+              <Row label="Hook-Titel einblenden" hint="standardmäßig aus"><Switch on={st.hook.enabled} onChange={(b) => commit({ t: 'hook', enabled: b })} label="Hook-Titel einblenden" /></Row>
               <Row label="Text"><input className="sm-input" value={hook} onChange={(e) => setHookDraft(e.target.value)} onBlur={() => { if (hookDraft !== null && hookDraft !== st.hook.text) commit({ t: 'hook', text: hookDraft }); setHookDraft(null) }} /></Row>
               <Row label="Dauer"><Slider label="Sekunden" value={st.hook.seconds} min={1} max={6} onChange={() => undefined} onCommit={(v) => commit({ t: 'hook', text: st.hook.text, seconds: v })} /></Row>
             </div>
@@ -401,7 +429,7 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
           <svg viewBox={`0 0 ${wave.n} 100`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
             <path d={wave.d} fill="rgba(255,255,255,0.55)" />
           </svg>
-          {cuts.map((c, i) => <div key={i} title="Wird im Export entfernt" style={{ position: 'absolute', top: 0, bottom: 0, left: pct(c[0]), width: `calc(${pct(c[1])} - ${pct(c[0])})`, background: 'repeating-linear-gradient(135deg, rgba(248,113,113,0.5) 0 4px, rgba(248,113,113,0.2) 4px 8px)', borderLeft: '1px solid #f87171', borderRight: '1px solid #f87171' }} />)}
+          {cuts.map((c, i) => <div key={i} title="Wird im Export entfernt" style={{ position: 'absolute', top: 0, bottom: 0, left: pct(c[0]), width: `calc(${pct(c[1])} - ${pct(c[0])})`, background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.38) 0 4px, rgba(255,255,255,0.1) 4px 8px)', borderLeft: '1px solid rgba(255,255,255,0.8)', borderRight: '1px solid rgba(255,255,255,0.8)' }} />)}
         </div>
         {/* Shots */}
         <div style={{ position: 'relative', borderRadius: 6, background: 'rgba(255,255,255,0.04)' }}>

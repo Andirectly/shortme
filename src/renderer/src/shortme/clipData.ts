@@ -2,7 +2,7 @@ import type { ShortmeClip, ShortmeClips } from '@shared/shortme'
 import { CLIPS, type Clip } from './data'
 import { useProject } from './projectStore'
 
-const LABELS: Array<[keyof ShortmeClip['criteria'], string]> = [['hook', 'Hook-Stärke'], ['payoff', 'Emotionaler Payoff'], ['quotable', 'Zitierbarkeit'], ['standalone', 'Eigenständigkeit'], ['density', 'Dichte']]
+const LABELS: Array<[keyof ShortmeClip['criteria'], string]> = [['hook', 'Hook-Stärke'], ['payoff', 'Emotionaler Payoff'], ['quotable', 'Zitierbarkeit'], ['standalone', 'Eigenständigkeit'], ['density', 'Emotion / Spannung']]
 const TAG_LABEL: Record<string, string> = { hook: 'Hook', entity: 'Name/Zahl', emphasis: 'Betont' }
 
 /** Echte Clips (M4) → Kartenmodell der Oberfläche. */

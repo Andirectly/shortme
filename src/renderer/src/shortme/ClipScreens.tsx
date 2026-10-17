@@ -92,7 +92,6 @@ function ClipCard({ c, selected, onSelect, onOpen }: { c: Clip; selected: boolea
       <div onClick={onOpen} style={{ aspectRatio: '9/16', borderRadius: 'var(--r-card) var(--r-card) 0 0', overflow: 'hidden', position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover', transform: hover && !reduced ? 'scale(1.08)' : 'scale(1)', transition: 'transform 2.4s linear' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.3), transparent 30%, transparent 60%, rgba(0,0,0,0.7))' }} />
-        <div style={{ position: 'absolute', left: 10, right: 10, bottom: 10, fontWeight: 800, textAlign: 'center', fontSize: 15, textTransform: 'uppercase', WebkitTextStroke: '0.5px #000', textShadow: '0 2px 8px #000' }}>{c.hook}</div>
       </div>
       <button className="sm-score" style={{ position: 'absolute', top: 10, left: 10, border: 0 }} aria-label={`Score ${c.score}, Details`} onClick={(e) => { e.stopPropagation(); setPop(!pop) }}>{c.score}</button>
       <button aria-label="Auswählen" aria-pressed={selected} onClick={onSelect} style={{ position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: '50%', border: '1.5px solid #fff', background: selected ? 'var(--accent)' : 'rgba(0,0,0,0.35)', display: 'grid', placeItems: 'center' }}>{selected && <Check size={14} />}</button>

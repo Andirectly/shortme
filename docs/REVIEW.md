@@ -80,3 +80,11 @@
 - [ ] Zeitleiste: Wellenform/Filmstreifen/Shot-Spur lesbar? Was fehlt noch zum „richtigen“ Editor (Wunschliste)?
 - [ ] Link-Import (YouTube): Projektbild = YouTube-Thumbnail?
 - [ ] Projektkarten: 16:9-Bild nicht mehr gezoomt
+
+## M9
+- [ ] Clip-Übersicht: Vorschaubilder sichtbar und passend
+- [ ] Hook-Titel aus; im Tab „Hook“ einschaltbar; Export nur mit Hook, wenn eingeschaltet
+- [ ] Person anklicken in einem Dialog-Clip: davor und danach bleibt der Ausschnitt bei der gewählten Person (kein Springen)
+- [ ] Untertitel-Text im Editor ändern: Vorschau und Export zeigen den neuen Text
+- [ ] Clip-Auswahl: sind die neuen Clips besser (Anfang verständlich, Hook, Pointe)? Welche Videos laufen noch schlecht?
+- [ ] UI: keine Farbtupfer mehr außer Untertitel-Presets

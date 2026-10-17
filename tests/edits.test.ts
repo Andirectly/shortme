@@ -100,3 +100,46 @@ describe('Layout-Überschreibungen', () => {
     expect(applyLayoutOps([], [], 0, 10)).toEqual([{ start: 0, end: 10, layout: 'fixed', cx: 0.5, zoom: 1 }])
   })
 })
+
+describe('Person anklicken: szenenweise konsistent', () => {
+  // 40 s, 5 Ticks/s, Kamerawechsel bei 20 s. A (links) und B (rechts) wechseln sich im Sprechen ab.
+  const dt = 0.2
+  const n = 200
+  const mk = (id: number, cx: number, speak: (i: number) => number): import('../src/shared/layoutPlan').PlanTrack => ({ id, start: 0, centres: Array(n).fill(cx), areas: Array(n).fill(0.1), scores: Array.from({ length: n }, (_, i) => speak(i)) })
+  const A = mk(1, 0.3, (i) => (Math.floor(i / 40) % 2 === 0 ? 4 : -4))
+  const B = mk(2, 0.7, (i) => (Math.floor(i / 40) % 2 === 1 ? 4 : -4))
+  const input = { tracks: [A, B], ticks: n, dt, cuts: [100], sourceAspect: 16 / 9 }
+  const auto = planShotsForTest()
+  function planShotsForTest(): ShortmeShot[] {
+    return [{ start: 0, end: 8, layout: 'smart', cx: 0.3, zoom: 1 }, { start: 8, end: 16, layout: 'smart', cx: 0.7, zoom: 1 }, { start: 16, end: 20, layout: 'smart', cx: 0.3, zoom: 1 }, { start: 20, end: 40, layout: 'smart', cx: 0.7, zoom: 1 }]
+  }
+
+  it('wählt die Person nächst der Klickposition und gilt für die GANZE Einstellung davor und danach', () => {
+    const r = applyLayoutOps(auto, [{ t: 'follow', at: 5, cx: 0.7 }], 0, 40, { input, clipStart: 0 })
+    const inScene = r.filter((s) => s.end <= 20 + 1e-6)
+    expect(inScene.length).toBeGreaterThanOrEqual(1)
+    for (const s of inScene) expect(s.cx).toBeCloseTo(0.7, 1) // nie zurück zu Person A
+    expect(r[0].start).toBe(0)
+    // nach dem Schnitt (20 s) unverändert
+    expect(r.filter((s) => s.start >= 20 - 1e-6).map((s) => [s.start, s.end, s.cx])).toEqual([[20, 40, 0.7]])
+    for (let i = 1; i < r.length; i++) expect(r[i].start).toBeCloseTo(r[i - 1].end, 6)
+  })
+
+  it('Klick ins Leere (zu weit von jeder Person) fällt auf das alte Verhalten zurück', () => {
+    const r = applyLayoutOps(auto, [{ t: 'follow', at: 5, cx: 0.5 }], 0, 40, { input, clipStart: 0 })
+    expect(r.some((s) => s.start === 5)).toBe(true)
+  })
+
+  it('Layout-Wechsel gilt ebenfalls für die ganze Kameraeinstellung', () => {
+    const r = applyLayoutOps(auto, [{ t: 'layout', at: 12, layout: 'fit' }], 0, 40, { input, clipStart: 0 })
+    expect(r.filter((s) => s.end <= 20 + 1e-6).every((s) => s.layout === 'fit')).toBe(true)
+    expect(r.filter((s) => s.start >= 20 - 1e-6).every((s) => s.layout === 'smart')).toBe(true)
+  })
+
+  it('Lücken der Erkennung werden mit der letzten Position überbrückt (kein fit/Mitte)', () => {
+    const gappy = { ...B, start: 0, centres: B.centres.map((c, i) => (i >= 20 && i < 60 ? NaN : c)) }
+    const sc = { tracks: [A, { ...gappy, centres: gappy.centres.map((c) => (Number.isNaN(c) ? 0.7 : c)) }], ticks: n, dt, cuts: [100], sourceAspect: 16 / 9 }
+    const r = applyLayoutOps(auto, [{ t: 'follow', at: 2, cx: 0.7 }], 0, 40, { input: sc, clipStart: 0 })
+    expect(r.filter((s) => s.end <= 20 + 1e-6).every((s) => s.layout === 'smart')).toBe(true)
+  })
+})

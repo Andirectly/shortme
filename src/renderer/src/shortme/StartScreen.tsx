@@ -37,7 +37,7 @@ export function StartScreen(): React.JSX.Element {
         role="button"
         tabIndex={0}
         aria-label="Video hierher ziehen oder auswählen"
-        animate={{ scale: over ? 1.015 : 1, borderColor: over ? 'rgba(168,85,247,0.8)' : 'rgba(255,255,255,0.08)' }}
+        animate={{ scale: over ? 1.015 : 1, borderColor: over ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.08)' }}
         transition={base}
         onDragOver={(e) => { e.preventDefault(); setOver(true) }}
         onDragLeave={() => setOver(false)}

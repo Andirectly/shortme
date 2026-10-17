@@ -23,6 +23,8 @@ export interface ExportOptions {
   hook?: boolean
   hookText?: string
   removePauses?: boolean
+  /** Geänderte Untertitel-Texte (globaler Wortindex → Text). */
+  wordEdits?: Record<number, string>
   /** Untertitel-Renderer: tscaps (Standard in der App, versteckte Fenster) oder ASS/libass (Fallback, Skripte). */
   engine?: 'tscaps' | 'ass'
   /** Herausgeschnittene Wörter (Quellzeit), aus den Editor-Operationen. */
@@ -39,7 +41,7 @@ export interface ExportOptions {
 export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number; captionEngine: 'tscaps' | 'ass' | 'none' }
 
 /** Reine Planung eines Clips: Pausenschnitte, Zeitachse, Stücke, Wörter auf der gekürzten Zeitleiste. */
-export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = []) {
+export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = [], wordEdits: Record<number, string> = {}) {
   const range: Interval = [clip.start, clip.end]
   const words = t.words.slice(clip.firstWord, clip.lastWord + 1)
   const cuts = mergeIntervals([...(removePauses ? planPauseCuts(range, words, signals.silences, t.speech) : []), ...extraCuts.filter((c) => c[1] > range[0] && c[0] < range[1])])
@@ -47,7 +49,7 @@ export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signa
   const fallback: ShortmeShot = { start: 0, end: clip.end - clip.start, layout: 'fixed', cx: 0.5, zoom: 1 }
   const pieces = buildPieces(map, clip.shots?.length ? clip.shots : [fallback], clip.start)
   const tagByWord = new Map(clip.tags.map((g) => [g.word, g.kind]))
-  const capWords: CapWord[] = map.words(words.map((w, i) => ({ w: w.w, start: w.start, end: w.end, tag: tagByWord.get(clip.firstWord + i) })))
+  const capWords: CapWord[] = map.words(words.map((w, i) => ({ w: wordEdits[clip.firstWord + i] ?? w.w, start: w.start, end: w.end, tag: tagByWord.get(clip.firstWord + i) })))
   return { map, pieces, cuts, words: capWords, duration: map.duration }
 }
 
@@ -77,7 +79,7 @@ export const filterPath = (p: string): string => p.replace(/\\/g, '/').replace(/
 
 export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transcript, signals: Signals, opts: ExportOptions): Promise<ExportResult> {
   const report = opts.onProgress ?? (() => undefined)
-  const plan = planExport(clip, t, signals, opts.removePauses ?? true, opts.extraCuts ?? [])
+  const plan = planExport(clip, t, signals, opts.removePauses ?? true, opts.extraCuts ?? [], opts.wordEdits ?? {})
   if (plan.pieces.length === 0) throw new Error('Clip enthält nichts zu exportieren')
   await mkdir(opts.outDir, { recursive: true })
   const found = PRESETS.find((p) => p.id === opts.presetId) ?? PRESETS[0]

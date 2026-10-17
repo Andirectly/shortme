@@ -2,6 +2,7 @@
 // Reine Funktionen – von Main (Export, Persistenz) und Renderer (Editor) gemeinsam genutzt.
 
 import type { ShortmeClip, ShortmeShot } from './shortme'
+import { planShots, type PlanInput, type PlanTrack } from './layoutPlan'
 
 export interface CaptionPatch {
   presetId?: string
@@ -18,7 +19,9 @@ export type Op =
   | { t: 'trim'; start: number; end: number }
   /** Wörter (globale Wortindizes) herausschneiden (cut=true) oder wiederherstellen (cut=false). */
   | { t: 'cutWords'; words: number[]; cut: boolean }
-  | { t: 'hook'; text: string; seconds?: number }
+  | { t: 'hook'; text?: string; seconds?: number; enabled?: boolean }
+  /** Untertitel-Text eines Wortes ändern (Tippfehler der Erkennung); Transkript bleibt unverändert. */
+  | { t: 'editWord'; word: number; text: string }
   | { t: 'caption'; patch: CaptionPatch }
   /** Layout ab Quellzeit `at` bis zum Ende der Einstellung. */
   | { t: 'layout'; at: number; layout: ShortmeShot['layout']; cx?: number }
@@ -31,7 +34,9 @@ export interface EditState {
   start: number
   end: number
   cutWords: number[]
-  hook: { text: string; seconds: number }
+  hook: { text: string; seconds: number; enabled: boolean }
+  /** Globaler Wortindex → geänderter Untertitel-Text. */
+  wordEdits: Record<number, string>
   caption: Required<Pick<CaptionPatch, 'presetId' | 'scale' | 'y' | 'highlight' | 'zone'>> & { presetId: string }
   layoutOps: Array<Extract<Op, { t: 'layout' | 'follow' }>>
 }
@@ -39,12 +44,12 @@ export interface EditState {
 export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops: [], cursor: 0 })
 
 export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'>, presetId = 'impact'): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3 }, caption: { presetId, scale: 1, y: 0.68, highlight: true, zone: 'Aus' }, layoutOps: [] }
+  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: false }, wordEdits: {}, caption: { presetId, scale: 1, y: 0.68, highlight: true, zone: 'Aus' }, layoutOps: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */
 export function reduce(base: EditState, ops: Op[]): EditState {
-  const s: EditState = { ...base, cutWords: [...base.cutWords], hook: { ...base.hook }, caption: { ...base.caption }, layoutOps: [...base.layoutOps] }
+  const s: EditState = { ...base, cutWords: [...base.cutWords], hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption }, layoutOps: [...base.layoutOps] }
   for (const op of ops) {
     switch (op.t) {
       case 'trim': s.start = Math.min(op.start, op.end - 0.5); s.end = op.end; break
@@ -54,7 +59,8 @@ export function reduce(base: EditState, ops: Op[]): EditState {
         s.cutWords = [...set].sort((a, b) => a - b)
         break
       }
-      case 'hook': s.hook = { text: op.text, seconds: op.seconds ?? s.hook.seconds }; break
+      case 'hook': s.hook = { text: op.text ?? s.hook.text, seconds: op.seconds ?? s.hook.seconds, enabled: op.enabled ?? s.hook.enabled }; break
+      case 'editWord': if (op.text.trim()) s.wordEdits[op.word] = op.text.trim(); else delete s.wordEdits[op.word]; break
       case 'caption': s.caption = { ...s.caption, ...Object.fromEntries(Object.entries(op.patch).filter(([, v]) => v !== undefined)) } as EditState['caption']; break
       case 'layout':
       case 'follow': s.layoutOps.push(op); break
@@ -86,7 +92,7 @@ export function sanitizeLog(x: unknown, clipId: string): EditLog {
 export interface WordT { start: number; end: number }
 
 /** Wirksamer Clip nach den Edits: neue Wortgrenzen, Shots auf den neuen Beginn bezogen und mit Layout-/Follow-Überschreibungen. */
-export function effectiveClip<C extends Pick<ShortmeClip, 'start' | 'end' | 'firstWord' | 'lastWord' | 'shots' | 'hookText'>>(clip: C, words: WordT[], st: EditState): C & { removed: Array<[number, number]> } {
+export function effectiveClip<C extends Pick<ShortmeClip, 'start' | 'end' | 'firstWord' | 'lastWord' | 'shots' | 'hookText'>>(clip: C, words: WordT[], st: EditState, layout?: PlanInput | null): C & { removed: Array<[number, number]>; wordEdits: Record<number, string> } {
   let first = clip.firstWord
   let last = clip.lastWord
   // Wörter, die vollständig im Bereich liegen
@@ -100,15 +106,77 @@ export function effectiveClip<C extends Pick<ShortmeClip, 'start' | 'end' | 'fir
   const removed: Array<[number, number]> = st.cutWords.filter((i) => i >= first && i <= last && words[i]).map((i) => [words[i].start, words[i].end] as [number, number])
   // Shots auf absolute Zeit, dann Überschreibungen, dann auf neuen Beginn beziehen
   const abs = (clip.shots ?? []).map((s) => ({ ...s, start: clip.start + s.start, end: clip.start + s.end }))
-  const shots = applyLayoutOps(abs, st.layoutOps, st.start, st.end).map((s) => ({ ...s, start: s.start - st.start, end: s.end - st.start }))
-  return { ...clip, start: st.start, end: st.end, firstWord: first, lastWord: last, shots, hookText: st.hook.text, removed }
+  const shots = applyLayoutOps(abs, st.layoutOps, st.start, st.end, layout ? { input: layout, clipStart: clip.start } : undefined).map((s) => ({ ...s, start: s.start - st.start, end: s.end - st.start }))
+  return { ...clip, start: st.start, end: st.end, firstWord: first, lastWord: last, shots, hookText: st.hook.text, removed, wordEdits: st.wordEdits }
 }
 
 /** Layout-/Follow-Operationen auf absolute Shots anwenden und auf [from,to] beschneiden. Reihenfolge der Operationen zählt (letzte gewinnt). */
-export function applyLayoutOps(shots: ShortmeShot[], ops: EditState['layoutOps'], from: number, to: number): ShortmeShot[] {
+/** Kamera-Einstellung (zwischen zwei Schnitten) um die Tick-Position `tick`: [Beginn, Ende) in Ticks. */
+export function sceneRange(input: PlanInput, tick: number): [number, number] {
+  const cuts = [0, ...input.cuts.filter((c) => c > 0 && c < input.ticks), input.ticks]
+  for (let i = 0; i < cuts.length - 1; i++) if (tick >= cuts[i] && tick < cuts[i + 1]) return [cuts[i], cuts[i + 1]]
+  return [0, input.ticks]
+}
+
+/**
+ * „Person anklicken“, szenenweise konsistent: die gewählte Person (Track nächster zur Klickposition) bestimmt den Ausschnitt in der
+ * GANZEN Kameraeinstellung – davor und danach. Lücken der Erkennung werden mit der letzten bekannten Position überbrückt; wandert die
+ * Person > 12 %, entsteht ein weiterer fester Ausschnitt (kein Schwenk, kein Springen zwischen Personen).
+ */
+export function followScene(input: PlanInput, clipStart: number, at: number, cx: number): ShortmeShot[] | null {
+  const tick = Math.max(0, Math.min(input.ticks - 1, Math.round((at - clipStart) / input.dt)))
+  const [a, b] = sceneRange(input, tick)
+  const present = (t: PlanTrack, i: number): boolean => i >= t.start && i < t.start + t.centres.length
+  let best: { t: PlanTrack; d: number } | null = null
+  for (const t of input.tracks) {
+    // Position im Klickmoment, sonst die nächstliegende innerhalb der Einstellung
+    let at2 = -1
+    for (let k = 0; k <= b - a; k++) for (const i of [tick - k, tick + k]) if (at2 < 0 && i >= a && i < b && present(t, i)) at2 = i
+    if (at2 < 0) continue
+    const d = Math.abs(t.centres[at2 - t.start] - cx)
+    if (!best || d < best.d) best = { t, d }
+  }
+  if (!best || best.d > 0.18) return null
+  const t = best.t
+  const n = b - a
+  const centres: number[] = []
+  const areas: number[] = []
+  let lastC = -1
+  let lastA = 0.1
+  for (let i = a; i < b; i++) if (present(t, i)) { lastC = t.centres[i - t.start]; lastA = t.areas[i - t.start]; break }
+  for (let i = a; i < b; i++) {
+    if (present(t, i)) { lastC = t.centres[i - t.start]; lastA = t.areas[i - t.start] }
+    centres.push(lastC)
+    areas.push(lastA)
+  }
+  const forced: PlanTrack = { id: t.id, start: 0, centres, areas, scores: new Array<number>(n).fill(1) }
+  const planned = planShots({ tracks: [forced], ticks: n, dt: input.dt, cuts: [], sourceAspect: input.sourceAspect })
+  return planned.map((p) => ({ ...p, start: clipStart + a * input.dt + p.start, end: clipStart + a * input.dt + p.end }))
+}
+
+export function applyLayoutOps(shots: ShortmeShot[], ops: EditState['layoutOps'], from: number, to: number, scene?: { input: PlanInput; clipStart: number }): ShortmeShot[] {
   let cur = shots.map((s) => ({ ...s }))
   if (cur.length === 0) cur = [{ start: from, end: to, layout: 'fixed', cx: 0.5, zoom: 1 }]
   for (const op of ops) {
+    if (scene) {
+      // szenenweise: gilt für die ganze Kameraeinstellung um `at` (kein Springen zwischen Personen davor/danach)
+      const tick = Math.round((op.at - scene.clipStart) / scene.input.dt)
+      const [ta, tb] = sceneRange(scene.input, Math.max(0, Math.min(scene.input.ticks - 1, tick)))
+      const s0 = scene.clipStart + ta * scene.input.dt
+      const s1 = scene.clipStart + tb * scene.input.dt
+      const repl = op.t === 'follow' ? followScene(scene.input, scene.clipStart, op.at, op.cx) : [{ start: s0, end: s1, layout: op.layout, cx: op.cx ?? cur.find((x) => op.at >= x.start && op.at < x.end)?.cx ?? 0.5, zoom: 1 } as ShortmeShot]
+      if (repl) {
+        const out: ShortmeShot[] = []
+        for (const s of cur) {
+          if (s.end <= s0 + 1e-6 || s.start >= s1 - 1e-6) { out.push(s); continue }
+          if (s.start < s0 - 1e-6) out.push({ ...s, end: s0 })
+          if (s.end > s1 + 1e-6) out.push({ ...s, start: s1 })
+        }
+        out.push(...repl)
+        cur = out.sort((x, y) => x.start - y.start)
+        continue
+      }
+    }
     const out: ShortmeShot[] = []
     for (const s of cur) {
       if (op.at <= s.start - 1e-6 || op.at >= s.end - 1e-6) { out.push(s); continue }

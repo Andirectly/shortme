@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AsrWord } from '../src/main/engines/asr/protocol'
 import { splitSentences } from '../src/main/shortme/clips/sentences'
-import { buildWindows, defaultWanted, finalScore, fitLength, formatSentence, resolveTags } from '../src/main/shortme/clips/select'
+import { CONNECTIVE_START, buildWindows, defaultWanted, finalScore, fitLength, formatSentence, lengthPenalty, mergeRatings, quoteOk, resolveTags } from '../src/main/shortme/clips/select'
 import { topicBoundaries, topicClips, tokens } from '../src/main/shortme/clips/texttiling'
 import type { Signals } from '../src/main/shortme/clips/signals'
 
@@ -96,5 +96,35 @@ describe('TextTiling', () => {
   it('liefert bei zu wenigen Blöcken nichts', () => {
     expect(topicBoundaries([['a'], ['b']])).toEqual([])
     expect(topicClips(splitSentences(words('alpha beta. gamma delta.')))).toEqual([])
+  })
+})
+
+describe('Auswahl-Qualität (Beleg-Prüfung, Proben, Anfang, Länge)', () => {
+  const clip = 'Warum ist das so? Weil niemand zuhört. Das ändert alles.'
+  const sample = (hook: number, payoff: number, hq: string, pq: string) => ({ notes: { hook, payoff, quotable: 2, standalone: 3, emotion: 1 }, hookQuote: hq, payoffQuote: pq, missing: [], title: 't', hookText: 'h', reason: 'r', tags: [] })
+  it('Zitate müssen wörtlich im Clip stehen (Satzzeichen/Schreibweise egal)', () => {
+    expect(quoteOk('warum ist das so', clip)).toBe(true)
+    expect(quoteOk('Das ändert alles', clip)).toBe(true)
+    expect(quoteOk('Das verändert nichts', clip)).toBe(false)
+    expect(quoteOk('ja', clip)).toBe(false)
+  })
+  it('Median über Proben, Skala 0–4 → 0–20, erfundene Zitate kosten einen Punkt', () => {
+    const ok = mergeRatings([sample(4, 2, 'Warum ist das so?', 'Das ändert alles.'), sample(2, 2, 'Warum ist das so?', 'Das ändert alles.')], clip)
+    expect(ok.criteria.hook).toBe(15) // Median 3 → 15
+    expect(ok.criteria.payoff).toBe(10)
+    expect(ok.criteria.density).toBe(5)
+    const fake = mergeRatings([sample(4, 4, 'erfunden hier', 'auch erfunden'), sample(4, 4, 'noch erfunden', 'ebenso erfunden')], clip)
+    expect(fake.criteria.hook).toBe(15)
+    expect(fake.criteria.payoff).toBe(15)
+  })
+  it('Konnektiv-Anfänge werden erkannt', () => {
+    expect(CONNECTIVE_START.test('Und deswegen machen wir das.')).toBe(true)
+    expect(CONNECTIVE_START.test('Aber das stimmt nicht.')).toBe(true)
+    expect(CONNECTIVE_START.test('Er ist gestern gegangen.')).toBe(true)
+    expect(CONNECTIVE_START.test('Warum hören Leute nicht zu?')).toBe(false)
+    expect(CONNECTIVE_START.test('Ich habe heute etwas Verrücktes erlebt.')).toBe(false)
+  })
+  it('weiche Längenvorgabe: Sweetspot 22–50 s ohne Abzug', () => {
+    expect([10, 18, 30, 50, 60, 75, 90].map(lengthPenalty)).toEqual([6, 3, 0, 0, 2, 5, 8])
   })
 })
