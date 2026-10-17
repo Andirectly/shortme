@@ -20,6 +20,7 @@ import type {
   UpdateDownloadState
 } from '@shared/types'
 import type { OpenRouterCatalog } from '@shared/openrouter'
+import type { AssetSpec, AssetStatus, CheckItem, HardwareInfo } from '@shared/engines'
 
 const api = {
   checkSubscriptionSetup: (): Promise<{ message: string; requestsToday: number }> => ipcRenderer.invoke('settings:checkSubscription'),
@@ -126,6 +127,25 @@ const api = {
     const listener = (_e: Electron.IpcRendererEvent, p: ImportProgress): void => cb(p)
     ipcRenderer.on('import:progress', listener)
     return () => ipcRenderer.removeListener('import:progress', listener)
+  },
+
+  /** Shortme: Engines & Modell-Manager (M2). */
+  engines: {
+    catalog: (): Promise<AssetSpec[]> => ipcRenderer.invoke('engines:catalog'),
+    hardware: (refresh = false): Promise<HardwareInfo> => ipcRenderer.invoke('engines:hardware', refresh),
+    list: (): Promise<AssetStatus[]> => ipcRenderer.invoke('engines:list'),
+    install: (id: string): Promise<void> => ipcRenderer.invoke('engines:install', id),
+    pause: (id: string): Promise<void> => ipcRenderer.invoke('engines:pause', id),
+    cancel: (id: string): Promise<void> => ipcRenderer.invoke('engines:cancel', id),
+    check: (): Promise<CheckItem[]> => ipcRenderer.invoke('engines:check'),
+    installYtDlp: (): Promise<void> => ipcRenderer.invoke('engines:ytdlp'),
+    importFolder: (): Promise<{ imported: string[]; skipped: string[] } | null> => ipcRenderer.invoke('engines:importFolder'),
+    installRecommended: (): Promise<AssetStatus[]> => ipcRenderer.invoke('engines:installRecommended'),
+    onStatus: (cb: (s: AssetStatus) => void): (() => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, s: AssetStatus): void => cb(s)
+      ipcRenderer.on('engines:status', listener)
+      return () => ipcRenderer.removeListener('engines:status', listener)
+    }
   },
 
   /** Build a media:// URL the renderer can use in <video>/<img> tags. */

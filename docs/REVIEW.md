@@ -22,3 +22,9 @@
 - [ ] Windows „Transparenzeffekte aus“ → feste Flächen
 - [ ] Scrollen der Clip-Übersicht mit 100+ Karten flüssig (ich habe nur 10 Beispielkarten gemessen: 144 fps, p95 7,1 ms)
 - [ ] Hover-Vorschau der Karten (derzeit Zoom-Effekt als Platzhalter, echtes stummes Video folgt mit M6)
+
+## M2
+- [ ] Einrichtungs-Assistent im echten Fenster: frischen Datenordner testen (`SHORTME_DATA=C:\temp\fresh npm run dev`) → Assistent erscheint, „Alles installieren“, Fortschrittsbalken, Pausieren/Fortsetzen in „Modelle“
+- [ ] Ordner-Import (USB): Ordner mit den Modelldateien (z. B. `Qwen3-14B-Q4_K_M.gguf`) wählen → wird erkannt und geprüft
+- [ ] Zweiter Rechner (12-GB-Karte?): Profil „kompakt“/KV-Cache-Kompression wird empfohlen und läuft (nicht von mir getestet)
+- [ ] Task-Manager nach dem Schließen: kein `llama-server.exe`/`node.exe` (Laufzeit) bleibt zurück

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { Download, CheckCircle2, XCircle, FolderInput, Upload, Cpu, Pause } from 'lucide-react'
+import { Download, CheckCircle2, XCircle, Upload, RefreshCw } from 'lucide-react'
 import { useStore } from './store'
-import { CLIPS, MODELS, PRESETS, SYSTEM_CHECK } from './data'
+import { CLIPS, PRESETS } from './data'
+import { useEngines } from './engines'
 import { Button, Pill, Row, Segmented, Slider, Switch } from './ui'
 import { useSprings } from './motion'
 
@@ -55,43 +56,15 @@ export function StudioScreen(): React.JSX.Element {
   )
 }
 
-export function ModelsScreen(): React.JSX.Element {
-  const { base } = useSprings()
-  return (
-    <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 18, paddingTop: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
-        <div><h1>Modelle</h1><small>Werden in der App geladen, nie ins Repo.</small></div>
-        <Button variant="secondary"><FolderInput size={15} /> Ordner importieren (USB)</Button>
-      </div>
-      <div className="sm-card" style={{ padding: 14, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <Cpu size={20} color="var(--accent)" />
-        <div><h3>Empfehlung für diese Hardware</h3><small>RTX 5090 · 32 GB VRAM erkannt → Parakeet v3 + Qwen3-14B (Q4_K_M)</small></div>
-      </div>
-      <div style={{ display: 'grid', gap: 10 }}>
-        {MODELS.map((m) => (
-          <div key={m.id} className="sm-card" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 14, alignItems: 'center', padding: 14 }}>
-            <div style={{ display: 'grid', gap: 4 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><h3>{m.name}</h3><span className="sm-tag">{m.kind}</span>{m.recommended && <span className="sm-tag" style={{ color: 'var(--accent)' }}>Empfohlen</span>}</div>
-              <small>{m.size} · {m.note}</small>
-              {m.state === 'downloading' && <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><div className="sm-bar" style={{ flex: 1 }}><motion.i initial={{ width: '5%' }} animate={{ width: '62%' }} transition={{ duration: 3, ease: 'easeOut' }} /></div><small>62 % · SHA-256 wird geprüft …</small></div>}
-            </div>
-            {m.state === 'installed' && <span style={{ color: 'var(--ok)', display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><CheckCircle2 size={16} /> Installiert</span>}
-            {m.state === 'missing' && <Button variant="secondary"><Download size={15} /> Laden</Button>}
-            {m.state === 'downloading' && <Button variant="secondary"><Pause size={15} /> Pausieren</Button>}
-          </div>
-        ))}
-      </div>
-      <motion.small transition={base}>Downloads lassen sich fortsetzen; jede Datei wird per SHA-256 geprüft.</motion.small>
-    </div>
-  )
-}
-
 export function SettingsScreen(): React.JSX.Element {
   const [profile, setProfile] = useState('TikTok')
   const [quality, setQuality] = useState('Hoch')
   const [encoder, setEncoder] = useState('Auto')
   const [subs, setSubs] = useState('Eingebrannt')
   const [names, setNames] = useState(true)
+  const check = useEngines((s) => s.check)
+  const checking = useEngines((s) => s.checking)
+  const refreshCheck = useEngines((s) => s.refreshCheck)
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gap: 8, paddingTop: 12 }}>
       <h1>Einstellungen</h1>
@@ -104,9 +77,9 @@ export function SettingsScreen(): React.JSX.Element {
         <Row label="Zielordner"><div style={{ display: 'flex', gap: 10 }}><input className="sm-input" defaultValue="C:\Users\Andirectly\Videos\Shortme" aria-label="Zielordner" /><Button variant="secondary">Ändern</Button></div></Row>
       </div>
       <div className="sm-glass" style={{ padding: '14px 22px', display: 'grid', gap: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}><h3>Systemcheck</h3><Pill>Logs öffnen</Pill></div>
-        {SYSTEM_CHECK.map((c) => (
-          <div key={c.name} style={{ display: 'grid', gridTemplateColumns: '24px 190px 1fr', alignItems: 'center', gap: 8, fontSize: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}><h3>Systemcheck</h3><div style={{ display: 'flex', gap: 8 }}><Pill onClick={() => void refreshCheck()}><RefreshCw size={13} className={checking ? 'sm-spin' : ''} /> Neu prüfen</Pill><Pill>Logs öffnen</Pill></div></div>
+        {check.map((c) => (
+          <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '24px 210px 1fr', alignItems: 'center', gap: 8, fontSize: 14 }}>
             {c.ok ? <CheckCircle2 size={17} color="var(--ok)" /> : <XCircle size={17} color="var(--warn)" />}<span>{c.name}</span><small>{c.detail}</small>
           </div>
         ))}

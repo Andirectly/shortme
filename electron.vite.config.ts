@@ -10,7 +10,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
-          inferenceWorker: resolve(__dirname, 'src/main/inference/worker.ts')
+          inferenceWorker: resolve(__dirname, 'src/main/inference/worker.ts'),
+          asrWorker: resolve(__dirname, 'src/main/engines/asr/worker.ts')
         }
       }
     },

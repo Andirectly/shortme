@@ -18,3 +18,10 @@ Danach Stopp, Ergebnisse + Empfehlung.
 Plan: Tokens/Shell (Mica, Titelleiste, Navigation) → Screens mit Beispieldaten (Start, Erstellen-Sheet, Verarbeitung, Clips, Editor, Stil-Studio, Modelle, Einstellungen) → Prüfung im Browser-Pane.
 Geprüft: typecheck/lint grün; alle Screens klickbar; Sheet (Wurfgeste), Zeitleisten-Griffe (1:1, Einrasten), Undo/Redo, Autosave getestet; Scroll 144 fps. Offen für dich: docs/REVIEW.md (M1).
 Beispieldaten: 10 Thumbnails aus den Testvideos in `shortme/assets/` (klein, im Repo).
+
+## M2 – Engines & Modell-Manager (Status: FERTIG)
+Plan: Katalog mit Prüfsummen → Downloader (Range-Fortsetzen, SHA-256) → Manager (Status, Pause, Import) → Hardware-Erkennung → Sidecars (llama-server, ASR-Worker, Aufräumen) → VRAM-Sequenzierung → Systemcheck → IPC/UI (Modelle, Einstellungen, Assistent).
+Ergebnis (scripts/test-engines.ts, frischer Datenordner, 5090): Installation von Silero, TransNetV2, llama.cpp, Node-Laufzeit, Parakeet, Qwen3-14B in 357 s (≈ 10 GB); zweiter Lauf 0 s (nichts erneut geladen); Systemcheck 8/8 grün; ASR 60 s in 2,6 s; LLM antwortet; nach Beenden 0 Sidecars.
+Im echten Electron-Prozess (`SHORTME_SELFTEST`): ASR 54 Wörter, llama-server läuft, `before-quit` beendet ihn in 85 ms; Prozess verschwindet in < 1 s (Handle des Elternprozesses).
+Unit-Tests: tests/engines.test.ts (11, grün). `npm test`: 733/734 (bekannter Windows-EPERM-Test aus M0).
+Wichtige Funde: sherpa-onnx-node läuft NICHT in Electron („External buffers are not allowed“) → ASR als Kindprozess mit eigener Node-22-Laufzeit (Asset `node-runtime`). Sidecars werden in `run/sidecars.json` protokolliert; verwaiste Prozesse werden beim nächsten Start beendet.

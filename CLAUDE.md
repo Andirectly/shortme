@@ -62,3 +62,6 @@ Für Suchen in Referenz-Repos einen Subagenten nutzen, der nur eine kurze Zusamm
 - M1: Neue UI in `src/renderer/src/shortme/` (Tokens, Shell, Screens, Beispieldaten); `?legacy` startet die alte Cutawan-UI; Window: Mica + titleBarOverlay in main/index.ts
 - M1: React 19 hat kein globales `JSX` → `React.JSX.Element`; `.sm-root button {color:inherit}` schlägt Klassen → `:where()` nutzen
 - M1: Flex/Grid-Spalten mit `minmax(0,1fr)`; Inline-Wort-Spans brauchen `{' '}` sonst kein Umbruch
+- M2: sherpa-onnx-node crasht in Electron (External buffers) → ASR läuft als Kindprozess in eigener Node-22-Laufzeit (Asset `node-runtime`); `src/main/engines/` enthält Katalog, Downloader, Manager, Sidecars, VRAM-Sequenzierung, Systemcheck
+- M2: llama-server schreibt `--version` auf stderr; Windows-Prozess bleibt nach Kill kurz sichtbar, solange der Elternprozess das Handle hält
+- M2: Abnahme-Skript `scripts/test-engines.ts` (frischer Ordner via `SHORTME_DATA`), Electron-Selbsttest via `SHORTME_SELFTEST=<wav> npx electron .` nach `electron-vite build`
