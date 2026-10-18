@@ -2,17 +2,19 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { dataRoot } from '../engines/paths'
 import { writeFileAtomic } from './atomic'
-import type { EditState } from '../../shared/edits'
+import type { StyleDefaults } from '../../shared/edits'
 
-/** Globaler Standard-Untertitelstil (Stil-Studio → „Als Standard setzen“): gilt für jeden Clip ohne eigene Bearbeitung. */
-export type StyleDefaults = Partial<EditState['caption']>
 const file = (): string => join(dataRoot(), 'style.json')
 
+/** Globaler Standard (Stil-Studio → „Als Standard festlegen“, Erstellen-Dialog): Preset, Änderungen daran, Titel an/aus. Alte Dateien (vor Preset-Format 2) werden ignoriert. */
 export async function loadStyle(): Promise<StyleDefaults> {
-  try { const s = JSON.parse(await readFile(file(), 'utf8')) as StyleDefaults; return typeof s === 'object' && s ? s : {} } catch { return {} }
+  try {
+    const s = JSON.parse(await readFile(file(), 'utf8')) as Record<string, unknown>
+    return { presetId: typeof s.presetId === 'string' ? s.presetId : undefined, style: typeof s.style === 'object' && s.style ? (s.style as StyleDefaults['style']) : undefined, titleEnabled: typeof s.titleEnabled === 'boolean' ? s.titleEnabled : undefined }
+  } catch { return {} }
 }
 export async function saveStyle(s: StyleDefaults): Promise<StyleDefaults> {
-  const clean = Object.fromEntries(Object.entries(s).filter(([k, v]) => v !== undefined && v !== '' && ['presetId', 'scale', 'y', 'highlight', 'font', 'outline', 'upper', 'maxWords', 'anim'].includes(k)))
+  const clean: StyleDefaults = { ...(s.presetId ? { presetId: s.presetId } : {}), ...(s.style ? { style: s.style } : {}), ...(typeof s.titleEnabled === 'boolean' ? { titleEnabled: s.titleEnabled } : {}) }
   await writeFileAtomic(file(), JSON.stringify(clean, null, 1))
   return clean
 }

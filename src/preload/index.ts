@@ -22,6 +22,8 @@ import type {
 import type { OpenRouterCatalog } from '@shared/openrouter'
 import type { AssetSpec, AssetStatus, CheckItem, HardwareInfo } from '@shared/engines'
 import type { CaptionPatch, EditLog } from '@shared/edits'
+import type { StylePreset } from '@shared/preset'
+import type { StyleDefaults } from '@shared/edits'
 import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
 import type { PersonsPatch, PreviewPlan, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
@@ -177,12 +179,15 @@ const api = {
     applyAll: (hash: string, clipIds: string[], patch: CaptionPatch): Promise<void> => ipcRenderer.invoke('shortme:applyAll', hash, clipIds, patch),
     openLogs: (): Promise<string> => ipcRenderer.invoke('shortme:openLogs'),
     presetExport: (id: string): Promise<boolean> => ipcRenderer.invoke('shortme:presetExport', id),
-    presetImport: (): Promise<unknown> => ipcRenderer.invoke('shortme:presetImport'),
+    presetImport: (): Promise<StylePreset[] | null> => ipcRenderer.invoke('shortme:presetImport'),
+    presets: (): Promise<StylePreset[]> => ipcRenderer.invoke('shortme:presets'),
+    presetSave: (p: StylePreset, mode: 'new' | 'overwrite'): Promise<{ saved: StylePreset; all: StylePreset[] }> => ipcRenderer.invoke('shortme:presetSave', p, mode),
+    presetDelete: (id: string): Promise<StylePreset[]> => ipcRenderer.invoke('shortme:presetDelete', id),
     projects: (): Promise<Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null }>> => ipcRenderer.invoke('shortme:projects'),
     editorAssets: (hash: string, clipId: string): Promise<{ peaks: number[]; step: number; strip: string[] }> => ipcRenderer.invoke('shortme:editorAssets', hash, clipId),
     previewPlan: (hash: string, clipId: string, log: EditLog, presetId?: string): Promise<PreviewPlan> => ipcRenderer.invoke('shortme:previewPlan', hash, clipId, log, presetId),
-    styleGet: (): Promise<Record<string, unknown>> => ipcRenderer.invoke('shortme:styleGet'),
-    styleSet: (style: Record<string, unknown>): Promise<Record<string, unknown>> => ipcRenderer.invoke('shortme:styleSet', style),
+    styleGet: (): Promise<StyleDefaults> => ipcRenderer.invoke('shortme:styleGet'),
+    styleSet: (style: StyleDefaults): Promise<StyleDefaults> => ipcRenderer.invoke('shortme:styleSet', style),
     feedback: (hash: string): Promise<Record<string, -1 | 0 | 1>> => ipcRenderer.invoke('shortme:feedback', hash),
     feedbackSet: (hash: string, clipId: string, vote: -1 | 0 | 1): Promise<Record<string, -1 | 0 | 1>> => ipcRenderer.invoke('shortme:feedbackSet', hash, clipId, vote),
     testlab: {

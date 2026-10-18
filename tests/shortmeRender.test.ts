@@ -3,7 +3,8 @@ import type { AsrWord } from '../src/main/engines/asr/protocol'
 import type { ShortmeShot } from '../src/shared/shortme'
 import { buildPieces, JUMP_ZOOM, keepsFromCuts, planPauseCuts, TimeMap } from '../src/main/shortme/render/timeline'
 import { buildFilterGraph, cropBox } from '../src/main/shortme/render/graph'
-import { assColor, assOverride, assTime, buildAss, PRESETS } from '../src/main/shortme/render/ass'
+import { assColor, assOverride, assTime, buildAss } from '../src/main/shortme/render/ass'
+import { BUILTIN_PRESETS } from '../src/shared/preset'
 import { safeFileName, uniquePath } from '../src/main/shortme/render/profiles'
 import { buildSrt, filterPath, planExport } from '../src/main/shortme/render/exporter'
 import type { ShortmeClip } from '../src/shared/shortme'
@@ -102,17 +103,27 @@ describe('ASS-Untertitel', () => {
     expect(assColor('#FFD400')).toBe('&H0000D4FF')
     expect(assOverride('#FFD400')).toBe('&H00D4FF&')
   })
-  it('ein Dialogue je Wortzustand, Zeiten aus der gekürzten Zeitleiste, Hook oben', () => {
+  it('ein Dialogue je Wortzustand (plus Schatten-Ebene), Zeiten aus der gekürzten Zeitleiste', () => {
     const words = [{ w: 'Hallo', start: 0.5, end: 0.9 }, { w: 'du', start: 1, end: 1.2 }, { w: 'da', start: 1.3, end: 1.6, tag: 'emphasis' as const }, { w: 'Welt', start: 2.0, end: 2.4 }]
-    const ass = buildAss(words, { width: 1080, height: 1920, preset: PRESETS[0], hook: { text: 'Mein Hook', seconds: 3 } })
+    const style = { ...BUILTIN_PRESETS.find((p) => p.id === 'impact')!.caption, glow: { enabled: false, strength: 0, color: 'white' as const, activeBoost: false } }
+    const ass = buildAss(words, { width: 1080, height: 1920, style })
     const ev = ass.split('\n').filter((l) => l.startsWith('Dialogue'))
-    expect(ev).toHaveLength(1 + 4)
-    expect(ev[0]).toContain('Hook')
-    expect(ev[1]).toContain('0:00:00.50,0:00:01.00')
-    expect(ev[1]).toContain('HALLO')
-    expect(ev[3]).toContain('0:00:01.30,0:00:02.00')
-    expect(ev[4]).toContain('WELT')
+    const text = ev.filter((l) => l.startsWith('Dialogue: 2'))
+    expect(text).toHaveLength(4)
+    expect(ev.filter((l) => l.startsWith('Dialogue: 0'))).toHaveLength(4) // Schatten
+    expect(text[0]).toContain('0:00:00.50,0:00:01.00')
+    expect(text[0]).toContain('HALLO')
+    expect(text[2]).toContain('0:00:01.30,0:00:01.85')
+    expect(text[3]).toContain('WELT')
     expect(ass).toContain('PlayResX: 1080')
+  })
+  it('Glow Karaoke: Glow-Ebene (weichgezeichnete Kontur) nur wenn eingeschaltet', () => {
+    const words = [{ w: 'Hallo', start: 0.5, end: 0.9 }, { w: 'du', start: 1, end: 1.2 }]
+    const on = buildAss(words, { width: 1080, height: 1920, style: BUILTIN_PRESETS.find((p) => p.id === 'glow-karaoke')!.caption })
+    expect(on.split('\n').filter((l) => l.startsWith('Dialogue: 1')).length).toBeGreaterThan(0)
+    expect(on).toContain('\\blur')
+    const off = buildAss(words, { width: 1080, height: 1920, style: { ...BUILTIN_PRESETS.find((p) => p.id === 'glow-karaoke')!.caption, glow: { enabled: false, strength: 50, color: 'white', activeBoost: false } } })
+    expect(off.split('\n').filter((l) => l.startsWith('Dialogue: 1')).length).toBe(0)
   })
 })
 

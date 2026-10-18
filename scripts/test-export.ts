@@ -32,7 +32,7 @@ async function main(): Promise<void> {
   for (const clip of file.clips.slice(0, maxClips)) {
     const plan = planExport(clip, t, signals, true)
     const t0 = Date.now()
-    const res = await exportClip(imp.meta, clip, t, signals, { outDir: out, srt: true, presetId: 'impact' })
+    const res = await exportClip(imp.meta, clip, t, signals, { outDir: out, srt: true })
     const sec = (Date.now() - t0) / 1000
     const info = await probeVideo(res.path)
     console.log(`EXPORT ${clip.id}: ${res.path} ${info.width}×${info.height} ${info.durationSec.toFixed(2)} s (geplant ${plan.duration.toFixed(2)} s, Quelle ${(clip.end - clip.start).toFixed(1)} s, ${plan.cuts.length} Pausen, ${res.pieces} Stücke) in ${sec.toFixed(0)} s = ${(sec / info.durationSec).toFixed(2)}× Echtzeit`)

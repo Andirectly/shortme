@@ -29,7 +29,7 @@ describe('Operationslog', () => {
 
   it('Eigenschaft: jede Operationsfolge ist vollständig rückgängig machbar', () => {
     const ops: Op[] = [
-      { t: 'trim', start: 102, end: 118 }, { t: 'cutWords', words: [12, 13], cut: true }, { t: 'hook', text: 'X' }, { t: 'caption', patch: { presetId: 'pop', scale: 1.2, y: 0.5 } },
+      { t: 'trim', start: 102, end: 118 }, { t: 'cutWords', words: [12, 13], cut: true }, { t: 'hook', text: 'X' }, { t: 'caption', patch: { presetId: 'pop', style: { caption: { sizePx: 110, y: 0.5 } } } },
       { t: 'follow', at: 105, cx: 0.4 }, { t: 'layout', at: 112, layout: 'fit' }, { t: 'cutWords', words: [12], cut: false }
     ]
     let log: EditLog = emptyLog('c')
@@ -37,7 +37,7 @@ describe('Operationslog', () => {
     const full = stateOf(base, log)
     expect(full.start).toBe(102)
     expect(full.cutWords).toEqual([13])
-    expect(full.caption).toMatchObject({ presetId: 'pop', scale: 1.2, y: 0.5, highlight: true })
+    expect(full.caption).toMatchObject({ presetId: 'pop', style: { caption: { sizePx: 110, y: 0.5 } }, highlight: true })
     for (let i = ops.length; i > 0; i--) { log = undo(log); expect(log.cursor).toBe(i - 1) }
     expect(stateOf(base, log)).toEqual(base)
     for (let i = 0; i < ops.length; i++) log = redo(log)
@@ -55,10 +55,12 @@ describe('Operationslog', () => {
     expect(sanitizeLog({ version: 1, ops: [{ t: 'hook', text: 'ok' }, 5, null], cursor: 99 }, 'c')).toMatchObject({ ops: [{ t: 'hook', text: 'ok' }], cursor: 1 })
   })
 
-  it('Caption-Patch ignoriert undefined-Felder', () => {
-    const s = reduce(base, [{ t: 'caption', patch: { scale: 1.5, y: undefined } }])
-    expect(s.caption.y).toBe(0.68)
-    expect(s.caption.scale).toBe(1.5)
+  it('Caption-Patch: Preset-Änderungen werden tief zusammengeführt, resetStyle verwirft sie', () => {
+    const s1 = reduce(base, [{ t: 'caption', patch: { style: { caption: { sizePx: 110 } } } }, { t: 'caption', patch: { style: { caption: { y: 0.5 }, title: { y: 0.1 } } } }])
+    expect(s1.caption.style).toEqual({ caption: { sizePx: 110, y: 0.5 }, title: { y: 0.1 } })
+    const s2 = reduce(base, [{ t: 'caption', patch: { style: { caption: { sizePx: 110 } } } }, { t: 'caption', patch: { presetId: 'pop', resetStyle: true, style: {} } }])
+    expect(s2.caption.presetId).toBe('pop')
+    expect(s2.caption.style).toEqual({})
   })
 })
 

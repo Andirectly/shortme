@@ -1,18 +1,18 @@
 import { readFile, writeFile } from 'node:fs/promises'
-import { DEFAULT_CAPTION_SCALE } from '../../../shared/edits'
 import { fontsDir } from '../../pipeline/captions'
 import { listCustomFonts } from '../../fonts'
 import { join } from 'node:path'
 import { BrowserWindow, ipcMain } from 'electron'
-import { buildVtt, captionCss, groupWords, tagWordlists, type CaptionPreset, type CaptionStyleOptions, type CaptionWord } from '@shared/captions'
+import { buildVtt, captionCss, groupWords, tagWordlists, type CaptionWord } from '@shared/captions'
+import type { CaptionStyle } from '@shared/preset'
 
-const FONT_FILES: Record<string, [string, number]> = { Anton: ['Anton-Regular.ttf', 400], Poppins: ['Poppins-Bold.ttf', 700], 'Poppins Medium': ['Poppins-Medium.ttf', 500] }
+const FONT_FILES: Record<string, [string, number]> = { Anton: ['Anton-Regular.ttf', 400], Poppins: ['Poppins-Bold.ttf', 700], 'Poppins Medium': ['Poppins-Medium.ttf', 500], 'TikTok Sans': ['TikTokSans-Bold.ttf', 700], Montserrat: ['Montserrat-ExtraBold.ttf', 800], Inter: ['Inter-Bold.ttf', 700] }
 
 /** @font-face mit eingebetteten Daten: die Engine rastert über SVG-foreignObject und sieht Seiten-Schriften nicht. */
-export async function embeddedFontCss(preset: CaptionPreset): Promise<string> {
+export async function embeddedFontCss(style: CaptionStyle): Promise<string> {
   const out: string[] = []
   const custom = await listCustomFonts().catch(() => [])
-  for (const family of new Set([preset.font, 'Poppins'])) {
+  for (const family of new Set([style.font.family, 'Poppins'])) {
     const own = custom.find((c) => c.family === family)
     if (own) {
       const data = (await readFile(own.path)).toString('base64')
@@ -31,8 +31,10 @@ export interface CaptionJob {
   input: string
   output: string
   words: CaptionWord[]
-  preset: CaptionPreset
-  style: CaptionStyleOptions
+  style: CaptionStyle
+  /** Zusätzliches CSS aus dem Preset (nur tscaps) */
+  css?: string
+  highlight?: boolean
   width: number
   height: number
 }
@@ -62,8 +64,8 @@ export function registerCaptionIpc(): void {
 /** Brennt die Untertitel mit @tscaps/engine in `input` → `output`. Wirft bei jedem Fehler (Aufrufer fällt auf ASS zurück). */
 export async function captionPass(job: CaptionJob, opts: { onProgress?: (f: number) => void; signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
   registerCaptionIpc()
-  const preset = job.preset
-  const fontCss = await embeddedFontCss(preset)
+  const style = job.style
+  const fontCss = await embeddedFontCss(style)
   if (active) throw new Error('Untertitel-Renderer ist belegt')
   const win = new BrowserWindow({ show: false, width: 1080, height: 1920, webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
   try {
@@ -78,9 +80,9 @@ export async function captionPass(job: CaptionJob, opts: { onProgress?: (f: numb
         resolve: () => { clearTimeout(timeout); resolve() }, reject: (e) => { clearTimeout(timeout); reject(e) },
         ready: () => {
           win.webContents.send('captions:run', {
-            input: job.input, output: job.output, vtt: buildVtt(groupWords(job.words, preset, job.style.scale ?? DEFAULT_CAPTION_SCALE)), css: `${fontCss}
-${captionCss(preset, { ...job.style, scale: job.style.scale ?? DEFAULT_CAPTION_SCALE })}`,
-            y: job.style.y ?? job.preset.y, perLine: 12, width: job.width, height: job.height, taggers: tagWordlists(job.words)
+            input: job.input, output: job.output, vtt: buildVtt(groupWords(job.words, style)), css: `${fontCss}
+${captionCss(style, { highlight: job.highlight, css: job.css })}`,
+            y: style.y, perLine: 12, width: job.width, height: job.height, taggers: tagWordlists(job.words)
           })
         }
       }

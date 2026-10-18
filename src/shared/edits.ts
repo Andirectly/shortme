@@ -2,15 +2,17 @@
 // Reine Funktionen – von Main (Export, Persistenz) und Renderer (Editor) gemeinsam genutzt.
 
 import type { ShortmeClip, ShortmeShot } from './shortme'
-import type { CaptionOverrides } from './captions'
+import { deepMerge, type PresetPatch } from './preset'
 import { planShots, type PlanInput, type PlanTrack } from './layoutPlan'
 
-export interface CaptionPatch extends CaptionOverrides {
+/** Änderung am Untertitel-/Titelstil: anderes Preset und/oder Änderungen am Preset (tief zusammengeführt). */
+export interface CaptionPatch {
   presetId?: string
-  /** Schriftgröße-Faktor (1 = Preset). */
-  scale?: number
-  /** Vertikale Mitte 0..1. */
-  y?: number
+  /** Änderungen relativ zum Preset (Untertitel + Titel), siehe shared/preset.ts */
+  style?: PresetPatch
+  /** Vorherige Änderungen verwerfen (beim Wechsel des Presets). */
+  resetStyle?: boolean
+  /** KI-Hervorhebung (betonte Wörter) an/aus */
   highlight?: boolean
   /** Sicherheitszone (nur Anzeige im Editor). */
   zone?: 'Aus' | 'TikTok' | 'Reels' | 'Shorts'
@@ -40,22 +42,22 @@ export interface EditState {
   hook: { text: string; seconds: number; enabled: boolean }
   /** Globaler Wortindex → geänderter Untertitel-Text. */
   wordEdits: Record<number, string>
-  caption: Required<Pick<CaptionPatch, 'presetId' | 'scale' | 'y' | 'highlight' | 'zone'>> & { presetId: string } & CaptionOverrides
+  caption: { presetId: string; highlight: boolean; zone: NonNullable<CaptionPatch['zone']>; style: PresetPatch }
   layoutOps: Array<Extract<Op, { t: 'layout' | 'follow' | 'layoutClip' }>>
 }
 
 export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops: [], cursor: 0 })
 
-/** Standard-Schriftgröße der Untertitel: Regler-Wert 25 (Regler = Skalierung × 60). */
-export const DEFAULT_CAPTION_SCALE = 25 / 60
+/** Globale Standardwerte (Stil-Studio → „Als Standard festlegen“, Erstellen-Dialog): Preset, Änderungen daran, Titel an/aus. */
+export interface StyleDefaults { presetId?: string; style?: PresetPatch; titleEnabled?: boolean }
 
-export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string> }, presetId = 'impact', style: Partial<EditState['caption']> = {}): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: false }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId, scale: DEFAULT_CAPTION_SCALE, y: 0.68, highlight: true, zone: 'Aus', ...Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined)) } as EditState['caption'], layoutOps: [] }
+export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string> }, presetId = 'glow-karaoke', defaults: StyleDefaults = {}): EditState {
+  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */
 export function reduce(base: EditState, ops: Op[]): EditState {
-  const s: EditState = { ...base, cutWords: [...base.cutWords], hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption }, layoutOps: [...base.layoutOps] }
+  const s: EditState = { ...base, cutWords: [...base.cutWords], hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption, style: { ...base.caption.style } }, layoutOps: [...base.layoutOps] }
   for (const op of ops) {
     switch (op.t) {
       case 'trim': s.start = Math.min(op.start, op.end - 0.5); s.end = op.end; break
@@ -67,7 +69,11 @@ export function reduce(base: EditState, ops: Op[]): EditState {
       }
       case 'hook': s.hook = { text: op.text ?? s.hook.text, seconds: op.seconds ?? s.hook.seconds, enabled: op.enabled ?? s.hook.enabled }; break
       case 'editWord': if (op.text.trim()) s.wordEdits[op.word] = op.text.trim(); else delete s.wordEdits[op.word]; break
-      case 'caption': s.caption = { ...s.caption, ...Object.fromEntries(Object.entries(op.patch).filter(([, v]) => v !== undefined)) } as EditState['caption']; break
+      case 'caption': {
+        const p = op.patch
+        s.caption = { presetId: p.presetId ?? s.caption.presetId, highlight: p.highlight ?? s.caption.highlight, zone: p.zone ?? s.caption.zone, style: p.resetStyle ? (p.style ?? {}) : deepMerge(s.caption.style, p.style ?? {}) }
+        break
+      }
       case 'layoutClip': s.layoutOps = []; s.layoutOps.push(op); break
       case 'layout':
       case 'follow': s.layoutOps.push(op); break

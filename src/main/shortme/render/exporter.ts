@@ -1,6 +1,5 @@
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
-import { resolvePreset, type CaptionOverrides } from '../../../shared/captions'
-import { DEFAULT_CAPTION_SCALE } from '../../../shared/edits'
+import { BUILTIN_PRESETS, type StylePreset } from '../../../shared/preset'
 import { basename, dirname, join } from 'node:path'
 import type { ShortmeClip, ShortmeShot } from '@shared/shortme'
 import { FFMPEG_PATH, runBinary } from '../../pipeline/ffmpeg'
@@ -13,16 +12,19 @@ import type { Transcript } from '../transcription'
 import type { Signals } from '../clips/signals'
 import { buildFilterGraph, OUT_H, OUT_W } from './graph'
 import { captionPass } from './captionPass'
-import { buildAss, PRESETS, type CapWord, type CaptionPreset } from './ass'
+import { buildAss, type CapWord } from './ass'
+import { renderTitleOverlay } from './titleOverlay'
 import { buildPieces, keepsFromCuts, planPauseCuts, TimeMap, type Interval } from './timeline'
 import { safeFileName, uniquePath, type QualityTier } from './profiles'
 
 export interface ExportOptions {
   outDir: string
-  presetId?: string
+  /** Wirksames Preset (Preset + Änderungen aus Stil-Studio/Editor), renderer-unabhängig; Standard: erstes eingebautes. */
+  style?: StylePreset
   /** Untertitel eingebrannt; false = ohne. */
   captions?: boolean
   srt?: boolean
+  /** Titel (TikTok-Stil) einblenden und Text (LLM-Vorschlag, editierbar). */
   hook?: boolean
   hookText?: string
   removePauses?: boolean
@@ -32,8 +34,8 @@ export interface ExportOptions {
   engine?: 'tscaps' | 'ass'
   /** Herausgeschnittene Wörter (Quellzeit), aus den Editor-Operationen. */
   extraCuts?: Interval[]
-  /** Untertitel-Anpassungen aus dem Editor. */
-  caption?: { scale?: number; y?: number; highlight?: boolean } & CaptionOverrides
+  /** KI-Hervorhebung (betonte Wörter) an/aus. */
+  caption?: { highlight?: boolean }
   hookSeconds?: number
   quality?: QualityTier
   encoder?: 'auto' | 'cpu' | 'gpu'
@@ -85,8 +87,8 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
   const plan = planExport(clip, t, signals, opts.removePauses ?? true, opts.extraCuts ?? [], opts.wordEdits ?? {})
   if (plan.pieces.length === 0) throw new Error('Clip enthält nichts zu exportieren')
   await mkdir(opts.outDir, { recursive: true })
-  const found = resolvePreset(PRESETS.find((p) => p.id === opts.presetId) ?? PRESETS[0], opts.caption)
-  const preset: CaptionPreset = { ...found, size: found.size * (opts.caption?.scale ?? DEFAULT_CAPTION_SCALE), y: opts.caption?.y ?? found.y, highlight: opts.caption?.highlight === false ? found.color : found.highlight }
+  const style: StylePreset = opts.style ?? BUILTIN_PRESETS[0]
+  const capStyle = opts.caption?.highlight === false ? { ...style.caption, highlight: style.caption.color } : style.caption
 
   // libass: gebündelte + eigene Schriften in einem Ordner (ohne Electron, z. B. in Skripten: nur gebündelte)
   const fontsDirForRender = await renderFontsDir().catch(() => fontsDir())
@@ -100,7 +102,9 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
   await mkdir(work, { recursive: true })
   try {
     const capWords = opts.caption?.highlight === false ? plan.words.map((w) => ({ ...w, tag: undefined })) : plan.words
-    const hook = opts.hook === false ? null : { text: opts.hookText ?? clip.hookText, seconds: opts.hookSeconds ?? 3 }
+    const hook = opts.hook ? { text: opts.hookText ?? clip.hookText, seconds: opts.hookSeconds ?? style.title.seconds } : null
+    // Titel (TikTok-Stil): Overlay-Bildfolge aus demselben Layout wie die Editor-Vorschau (nur in der App, braucht Electron)
+    const title = hook && process.versions.electron ? await renderTitleOverlay(hook.text, style.title, hook.seconds, join(work, 'title'), opts.signal).catch((e) => { console.error('Titel-Overlay fehlgeschlagen:', e); return null }) : null
     const enc = await resolveEncoder(opts.encoder ?? 'auto')
     const quality = opts.quality ?? 'standard'
     const src = { width: meta.width, height: meta.height }
@@ -114,19 +118,20 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
         await writeFile(assPath, assText, 'utf8')
         post = `ass='${filterPath(assPath)}':fontsdir='${filterPath(fontsDirForRender)}'`
       }
-      const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, videoPost: post })
+      const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, videoPost: post, overlay: title ? { x: title.x, y: title.y } : undefined })
       const scriptPath = join(work, `${basename(dest)}.graph.txt`)
       await writeFile(scriptPath, filter, 'utf8')
       await runBinary(enc.bin, [
         '-hide_banner', '-nostats', '-y',
         '-ss', clip.start.toFixed(3), '-t', (clip.end - clip.start).toFixed(3), '-i', meta.sourcePath,
+        ...(title ? ['-framerate', String(title.fps), '-i', title.pattern] : []),
         '-/filter_complex', scriptPath, '-map', '[v]', '-map', '[a]',
         ...encoderArgs(enc.kind, q), '-r', '30', ...audioArgs(q), '-ar', '48000',
         '-movflags', '+faststart', '-t', plan.duration.toFixed(3), dest
       ], { signal: opts.signal })
     }
 
-    const fullAss = buildAss(capWords, { width: OUT_W, height: OUT_H, preset, hook })
+    const fullAss = buildAss(capWords, { width: OUT_W, height: OUT_H, style: capStyle })
     const tmp = join(work, 'out.mp4')
     const engine: 'tscaps' | 'ass' = opts.captions === false ? 'ass' : opts.engine ?? (process.versions.electron ? 'tscaps' : 'ass')
     let used: 'tscaps' | 'ass' | 'none' = opts.captions === false ? 'none' : 'ass'
@@ -135,9 +140,9 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
       try {
         // 1) Zwischenergebnis in hoher Qualität (Hook als ASS, ohne Untertitel), 2) @tscaps/engine brennt die Untertitel ein
         const mid = join(work, 'mid.mp4')
-        await render(mid, hook ? buildAss([], { width: OUT_W, height: OUT_H, preset, hook }) : null, 'high')
+        await render(mid, null, 'high')
         report(0.5, 'Untertitel …')
-        await captionPass({ input: mid, output: tmp, words: capWords, preset: found, style: { scale: opts.caption?.scale, y: opts.caption?.y, highlight: opts.caption?.highlight }, width: OUT_W, height: OUT_H },
+        await captionPass({ input: mid, output: tmp, words: capWords, style: capStyle, css: style.css, highlight: opts.caption?.highlight, width: OUT_W, height: OUT_H },
           { signal: opts.signal, onProgress: (f) => report(0.5 + f * 0.5, 'Untertitel …') })
         used = 'tscaps'
       } catch (e) {

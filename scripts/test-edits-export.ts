@@ -3,6 +3,7 @@
  *   SHORTME_DATA=.tmp/fresh npx tsx --tsconfig tsconfig.node.json scripts/test-edits-export.ts [video]
  */
 import { importFile } from '../src/main/shortme/importer'
+import { presetById, resolvePreset } from '../src/shared/preset'
 import { ensureSignals, loadClips } from '../src/main/shortme/clips/analysis'
 import { loadTranscript } from '../src/main/shortme/transcription'
 import { exportClip } from '../src/main/shortme/render/exporter'
@@ -31,7 +32,7 @@ async function main(): Promise<void> {
   let log = emptyLog(clip.id)
   log = push(log, { t: 'cutWords', words: cutIdx, cut: true })
   log = push(log, { t: 'hook', text: 'Mein neuer Hook' })
-  log = push(log, { t: 'caption', patch: { scale: 1.3, y: 0.5, highlight: false, presetId: 'pop' } })
+  log = push(log, { t: 'caption', patch: { presetId: 'pop', highlight: false, style: { caption: { y: 0.5, sizePx: 110 } } } })
   log = push(log, { t: 'follow', at: clip.start + 10, cx: 0.8 })
   await saveEdits(imp.meta.hash, log)
   const loaded = await loadEdits(imp.meta.hash, clip.id)
@@ -40,7 +41,7 @@ async function main(): Promise<void> {
   const st = stateOf(baseState(clip), loaded)
   const eff = effectiveClip(clip, t.words, st)
   check(eff.removed.length === 3, 'drei Wörter als Schnittbereiche gemeldet')
-  const res = await run(eff, { presetId: st.caption.presetId, extraCuts: eff.removed, caption: { scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight }, hookText: st.hook.text, hookSeconds: st.hook.seconds })
+  const res = await run(eff, { style: resolvePreset(presetById(st.caption.presetId), st.caption.style), extraCuts: eff.removed, caption: { highlight: st.caption.highlight }, hookText: st.hook.text, hookSeconds: st.hook.seconds })
   const dur = (await probeVideo(res.path)).durationSec
   const removed = eff.removed.reduce((n, [a, b]) => n + (b - a), 0)
   console.log(`ohne Edits ${plainDur.toFixed(2)} s, mit Edits ${dur.toFixed(2)} s (entfernt ${removed.toFixed(2)} s)`)

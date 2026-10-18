@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { EditState } from '@shared/edits'
+import type { StyleDefaults } from '@shared/edits'
 import type { PersonsPatch, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
 const api = (): Window['cutawan']['shortme'] | null => (typeof window !== 'undefined' && window.cutawan?.shortme ? window.cutawan.shortme : null)
@@ -33,9 +33,9 @@ interface ProjectState {
   persons: ShortmePersons | null
   feedback: Record<string, -1 | 0 | 1>
   /** Globaler Standardstil der Untertitel (Stil-Studio). */
-  style: Partial<EditState['caption']>
+  style: StyleDefaults
   loadStyle: () => Promise<void>
-  saveStyle: (s: Partial<EditState['caption']>) => Promise<void>
+  saveStyle: (s: StyleDefaults) => Promise<void>
   setFeedback: (clipId: string, vote: -1 | 0 | 1) => Promise<void>
   personsOpen: boolean
   pendingExport: { clipIds: string[]; presetId: string; srt: boolean } | null
@@ -65,8 +65,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   persons: null,
   feedback: {},
   style: {},
-  loadStyle: async () => { const a = api(); if (a) set({ style: (await a.styleGet()) as Partial<EditState['caption']> }) },
-  saveStyle: async (st) => { const a = api(); if (a) set({ style: (await a.styleSet(st as Record<string, unknown>)) as Partial<EditState['caption']> }) },
+  loadStyle: async () => { const a = api(); if (a) set({ style: await a.styleGet() }) },
+  saveStyle: async (st) => { const a = api(); if (a) set({ style: await a.styleSet(st) }) },
   setFeedback: async (clipId, vote) => { const a = api(); const hash = get().clipsFile?.hash; if (!a || !hash) return; set({ feedback: await a.feedbackSet(hash, clipId, vote) }) },
   personsOpen: false,
   pendingExport: null,

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { PresetTile } from './PresetUI'
+import { usePresets } from './presets'
 import { motion, AnimatePresence, useMotionValue, animate, type PanInfo } from 'motion/react'
 import { UploadCloud, Link2, Sparkles, ChevronDown } from 'lucide-react'
 import { useStore } from './store'
 import { useProject } from './projectStore'
-import { IMG, PRESETS } from './data'
+import { IMG } from './data'
 import { Button, Pill, Segmented, Switch, Row } from './ui'
 import { ProjectGrid } from './ProjectGrid'
 import { useSprings } from './motion'
@@ -91,6 +93,11 @@ function CreateSheet(): React.JSX.Element {
   const imported = useProject((s) => s.imported)
   const startTranscribe = useProject((s) => s.startTranscribe)
   const hasApi = useProject((s) => s.hasApi)
+  const style = useProject((s) => s.style)
+  const saveStyle = useProject((s) => s.saveStyle)
+  const allPresets = usePresets((s) => s.all)
+  const loadPresets = usePresets((s) => s.load)
+  useEffect(() => { void loadPresets() }, [loadPresets])
   const [diarize, setDiarize] = useState(false)
   const [adv, setAdv] = useState(false)
   const { bounce, reduced } = useSprings()
@@ -152,20 +159,14 @@ function CreateSheet(): React.JSX.Element {
               <Row label="Cliplänge"><Segmented options={['Automatisch', '≤ 30 s', '30–60 s', '60–90 s']} value={opts.length} onChange={(length) => setOpts({ length })} /></Row>
               <Row label="Untertitel">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
-                  {PRESETS.map((p) => (
-                    <button key={p.id} className="sm-tile" aria-pressed={opts.captions === 'preset' && presetId === p.id} onClick={() => { setPreset(p.id); setOpts({ captions: 'preset' }) }}>
-                      <div style={{ fontFamily: p.font, fontWeight: p.weight, textTransform: p.upper ? 'uppercase' : 'none', fontSize: 15, color: p.color, background: p.box ? 'rgba(0,0,0,0.7)' : 'none', display: 'inline-block', padding: p.box ? '0 6px' : 0, WebkitTextStroke: '0.5px #000' }}>
-                        Das <span style={{ color: p.hi }}>Wort</span>
-                      </div>
-                      <small style={{ display: 'block', marginTop: 6 }}>{p.name}</small>
-                    </button>
-                  ))}
+                  {allPresets.map((p) => <PresetTile key={p.id} preset={p} selected={opts.captions === 'preset' && (style.presetId ?? presetId) === p.id} onClick={() => { setPreset(p.id); setOpts({ captions: 'preset' }); void saveStyle({ ...style, presetId: p.id, style: {} }) }} />)}
                   <button className="sm-tile" aria-pressed={opts.captions === 'off'} onClick={() => setOpts({ captions: 'off' })}>
                     <div style={{ fontSize: 15, color: 'var(--text-3)' }}>Aus</div>
                     <small style={{ display: 'block', marginTop: 6 }}>Keine Untertitel</small>
                   </button>
                 </div>
               </Row>
+              <Row label="Titel einblenden" hint="Standard für alle neuen Clips; pro Clip im Editor änderbar"><Switch on={!!style.titleEnabled} onChange={(b) => void saveStyle({ ...style, titleEnabled: b })} label="Titel einblenden" /></Row>
               <Row label="Anzahl Clips" hint="Auto ≈ 1 je 2,5 Min"><Segmented options={['Auto', '5', '10', '15', '20', '30']} value={opts.count ?? 'Auto'} onChange={(count) => setOpts({ count })} /></Row>
               <Row label="Sprechpausen entfernen"><Switch on={opts.removePauses} onChange={(removePauses) => setOpts({ removePauses })} label="Sprechpausen entfernen" /></Row>
               <Row label="Workflow"><Segmented options={['Automatisch', 'Prüfen & Bearbeiten']} value={opts.workflow} onChange={(workflow) => setOpts({ workflow })} /></Row>

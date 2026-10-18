@@ -36,6 +36,8 @@ export interface GraphOptions {
   fadeOutSec?: number
   /** Filterkette nach dem Zusammenfügen (z. B. eingebrannte Untertitel). */
   videoPost?: string
+  /** Titel-Overlay (Bildfolge mit Alpha als Eingang 1): wird vor `videoPost` aufs Video gelegt. */
+  overlay?: { x: number; y: number }
   /** Dauer nach dem Kürzen (für die Ausblendung). */
   duration: number
 }
@@ -47,8 +49,11 @@ export function buildFilterGraph(pieces: Piece[], o: GraphOptions): string {
   const n = pieces.length
   const labels = pieces.map((_, k) => `[v${k}][a${k}]`).join('')
   const post = [o.audioFilter, o.fadeOutSec ? `afade=t=out:st=${Math.max(0, o.duration - o.fadeOutSec).toFixed(3)}:d=${o.fadeOutSec}` : ''].filter(Boolean).join(',')
-  parts.push(`${labels}concat=n=${n}:v=1:a=1[${o.videoPost ? 'vc' : 'v'}][${post ? 'ac' : 'a'}]`)
-  if (o.videoPost) parts.push(`[vc]${o.videoPost}[v]`)
+  const vOut = o.overlay || o.videoPost ? 'vc' : 'v'
+  parts.push(`${labels}concat=n=${n}:v=1:a=1[${vOut}][${post ? 'ac' : 'a'}]`)
+  let cur = 'vc'
+  if (o.overlay) { parts.push(`[${cur}][1:v]overlay=${o.overlay.x}:${o.overlay.y}:eof_action=pass:format=auto[${o.videoPost ? 'vo' : 'v'}]`); cur = 'vo' }
+  if (o.videoPost) parts.push(`[${cur}]${o.videoPost}[v]`)
   if (post) parts.push(`[ac]${post}[a]`)
   return parts.join(';\n')
 }

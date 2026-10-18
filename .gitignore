@@ -17,3 +17,5 @@ spikes/subs/bundle.js
 
 /tools/boxmot-export/venv/
 /tools/boxmot-export/*.pt
+
+/testclips/

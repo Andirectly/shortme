@@ -51,7 +51,7 @@ export const useStore = create<State>((set, get) => ({
   view: load('sm.view', 'grid'),
   selected: [],
   activeClip: CLIPS[0].id,
-  presetId: load('sm.preset', 'impact'),
+  presetId: load('sm.preset', 'glow-karaoke'),
   testlab: load('sm.testlab', false),
   progress: 0,
   paused: false,

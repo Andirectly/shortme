@@ -1,9 +1,14 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, Wand2, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { baseState, canRedo, canUndo, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
 import type { PreviewPlan, ShortmeShot } from '@shared/shortme'
-import { PRESETS, captionCss, groupWords, isFiller, resolvePreset, scopeCss } from '@shared/captions'
+import { groupWords } from '@shared/captions'
+import type { PresetPatch } from '@shared/preset'
+import { CaptionLayer, TitleLayer } from './CaptionLayers'
+import { effective, isBuiltin, usePresets } from './presets'
+import { AnimControls, CaptionControls, TitleControls } from './StyleControls'
+import { PresetBar, PresetPicker } from './PresetUI'
 import { useStore } from './store'
 import { IMG, TRANSCRIPT } from './data'
 import { useClipList } from './clipData'
@@ -87,21 +92,21 @@ export function EditorScreen(): React.JSX.Element {
   const [draft, setDraft] = useState('')
   const [liveTrim, setLiveTrim] = useState<[number, number] | null>(null)
   const [hookDraft, setHookDraft] = useState<string | null>(null)
-  const [sizeDraft, setSizeDraft] = useState<number | null>(null)
-  const [posDraft, setPosDraft] = useState<number | null>(null)
-  const basePreset = PRESETS.find((p) => p.id === st.caption.presetId) ?? PRESETS[0]
-  const preset = resolvePreset(basePreset, st.caption)
+  const allPresets = usePresets((s) => s.all)
+  const loadPresets = usePresets((s) => s.load)
+  useEffect(() => { void loadPresets() }, [loadPresets])
+  /** vorläufige Änderungen während eines Regler-Zugs (Vorschau live; erst beim Loslassen als Operation gespeichert) */
+  const [live, setLive] = useState<PresetPatch | null>(null)
+  const preset = useMemo(() => effective(allPresets, st.caption.presetId, st.caption.style, live), [allPresets, st.caption.presetId, st.caption.style, live])
   const [fonts, setFonts] = useState<string[]>([])
   const [fontCss, setFontCss] = useState('')
   useEffect(() => { if (hasApi) void window.cutawan.listFonts().then((l) => setFonts(l.map((f) => f.family))).catch(() => undefined) }, [hasApi])
-  useEffect(() => { const f = st.caption.font; if (!hasApi || !f || !fonts.includes(f)) { setFontCss(''); return } void window.cutawan.shortme.fontCss(f).then(setFontCss).catch(() => setFontCss('')) }, [hasApi, st.caption.font, fonts])
+  useEffect(() => { const f = preset.caption.font.family; if (!hasApi || !fonts.includes(f)) { setFontCss(''); return } void window.cutawan.shortme.fontCss(f).then(setFontCss).catch(() => setFontCss('')) }, [hasApi, preset.caption.font.family, fonts])
   const importFonts = async (): Promise<void> => { const l = await window.cutawan.addFonts(); setFonts(l.map((f) => f.family)) }
   const committed: [number, number] = [st.start - origStart, st.end - origStart]
   const trim = liveTrim ?? committed
   const lastClipOp = [...st.layoutOps].reverse().find((o) => o.t === 'layoutClip')
   const clipLayout = lastClipOp && st.layoutOps[st.layoutOps.length - 1] === lastClipOp ? LAYOUT_LABEL[lastClipOp.layout] : 'Smart'
-  const size = sizeDraft ?? Math.round(st.caption.scale * 60)
-  const pos = posDraft ?? Math.round(st.caption.y * 100)
   const hook = hookDraft ?? st.hook.text
   const cut = st.cutWords
 
@@ -249,9 +254,10 @@ export function EditorScreen(): React.JSX.Element {
     commit({ t: 'editWord', word: g, text: next === orig ? '' : next }) // leer = Änderung zurücknehmen
   }
   const caption = (patch: CaptionPatch): void => commit({ t: 'caption', patch })
+  /** Stiländerung (Preset-Patch) als Operation; beendet die vorläufige Anzeige */
+  const styleCommit = (p: PresetPatch): void => { setLive(null); caption({ style: p }) }
   const curIdx = Math.max(0, words.findLastIndex((w) => w.t <= t))
-  const groups = useMemo(() => groupWords(words.filter((w) => !cut.includes(w.g)).map((w) => ({ w: w.w, start: w.t, end: w.e, g: w.g, hi: w.hi, tag: w.hi ? ('emphasis' as const) : undefined })), preset, size / 60), [words, cut, preset, size])
-  const cap = groups.find((gr) => gr.some((w) => w.g === words[curIdx]?.g)) ?? groups.find((gr) => gr[0].start >= t) ?? groups[groups.length - 1] ?? []
+  const groups = useMemo(() => groupWords(words.filter((w) => !cut.includes(w.g)).map((w) => ({ w: w.w, start: w.t, end: w.e, g: w.g, hi: w.hi, tag: w.hi ? ('emphasis' as const) : undefined })), preset.caption), [words, cut, preset.caption])
   const zn = ZONES[zone]
   const absT = origStart + t
   const wordRef = useRef<HTMLSpanElement>(null)
@@ -260,7 +266,7 @@ export function EditorScreen(): React.JSX.Element {
   const exportNow = async (): Promise<void> => { await persist(logRef.current); await exportClips([clipId], st.caption.presetId, false) }
   const applyAll = async (): Promise<void> => {
     const others = (allReal ?? []).map((c) => c.id).filter((id) => id !== clipId)
-    if (hasApi && hash) await window.cutawan.shortme.applyAll(hash, others, { presetId: st.caption.presetId, scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight, font: st.caption.font })
+    if (hasApi && hash) await window.cutawan.shortme.applyAll(hash, others, { presetId: st.caption.presetId, style: st.caption.style, resetStyle: true, highlight: st.caption.highlight })
   }
   const rects = shotNow && source ? sourceRects({ width: source.width, height: source.height }, shotNow.shot, shotNow.zoom) : []
   const outDuration = plan ? plan.duration : trim[1] - trim[0]
@@ -315,40 +321,40 @@ export function EditorScreen(): React.JSX.Element {
             {srcUrl
               ? <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
               : <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover' }} />}
-            {st.hook.enabled && t < st.hook.seconds && hook && <div style={{ position: 'absolute', top: '8%', left: 0, right: 0, textAlign: 'center', fontFamily: 'Poppins', fontWeight: 700, fontSize: '3.4cqh', padding: '0 7%', textShadow: '0 2px 10px #000' }}><span style={{ background: 'rgba(0,0,0,0.5)', padding: '0.2em 0.5em', borderRadius: '0.4em', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' }}>{hook}</span></div>}
-            <style>{fontCss}</style>
-            <style>{scopeCss(captionCss(preset, { scale: size / 60, highlight: st.caption.highlight }), '.sm-cap')}</style>
-            <div className="sm-cap" style={{ position: 'absolute', left: 0, right: 0, top: `${pos}%`, transform: 'translateY(-50%)', padding: '0 4%' }}>
-              <div className="segment"><div className="line">
-                {cap.map((x) => <span key={x.g} className={`word${x.g === words[curIdx]?.g ? ' word-being-narrated' : ''}${x.hi ? ' emphasis' : isFiller(x.w) ? ' filler' : ''}`}>{x.w}</span>)}
-              </div></div>
-            </div>
+            <CaptionLayer preset={preset} groups={groups} t={t} highlight={st.caption.highlight} fontCss={fontCss} />
+            {st.hook.enabled && hook && <TitleLayer preset={preset} text={hook} t={t} seconds={st.hook.seconds} onMove={(y) => setLive({ title: { y } })} onCommit={(y) => styleCommit({ title: { y } })} />}
             {zn && <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${zn.top * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${zn.bottom * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', right: 0, top: `${zn.top * 100}%`, bottom: `${zn.bottom * 100}%`, width: `${zn.right * 100}%`, background: 'rgba(255,255,255,0.16)' }} /></div>}
           </div>
         </div>
 
         {/* Inspector */}
         <div className="sm-glass" style={{ padding: 16, overflowY: 'auto', display: 'grid', alignContent: 'start', gap: 12 }}>
-          <Segmented options={['Untertitel', 'Bildausschnitt', 'Hook']} value={tab} onChange={setTab} />
+          <Segmented options={['Untertitel', 'Animation', 'Titel', 'Bildausschnitt']} value={tab} onChange={setTab} />
           {tab === 'Untertitel' && (
             <div>
-              <Row label="Stil"><Segmented options={PRESETS.map((p) => p.name)} value={preset.name} onChange={(n) => caption({ presetId: PRESETS.find((p) => p.name === n)!.id })} /></Row>
-              <Row label="Schrift" hint="Eigene Schriften (.ttf / .otf)">
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <select aria-label="Schrift" value={st.caption.font ?? ''} onChange={(e) => caption({ font: e.target.value })} style={{ minWidth: 0, width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '6px 10px', color: 'inherit' }}>
-                    <option value="">Standard des Stils ({basePreset.font})</option>
-                    <option value="Anton">Anton</option>
-                    <option value="Poppins">Poppins</option>
-                    {fonts.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                  <Button variant="secondary" disabled={!hasApi} onClick={() => void importFonts()}>Importieren …</Button>
-                </div>
-              </Row>
-              <Row label="Größe"><Slider label="Schrift" value={size} onChange={setSizeDraft} onCommit={(v) => { setSizeDraft(null); caption({ scale: v / 60 }) }} /></Row>
-              <Row label="Position" hint="Drag-Regler"><Slider label="Vertikal" value={pos} min={10} max={90} onChange={setPosDraft} onCommit={(v) => { setPosDraft(null); caption({ y: v / 100 }) }} /></Row>
+              <Row label="Vorlage"><PresetPicker presetId={st.caption.presetId} onPick={(id, p) => { setLive(null); caption({ presetId: id, resetStyle: true, style: {} }); if (!isBuiltin(id)) commit({ t: 'hook', enabled: p.title.enabled }) }} /></Row>
+              <PresetBar preset={preset} presetId={st.caption.presetId} patch={st.caption.style} titleEnabled={st.hook.enabled} hasApi={hasApi} canApplyAll={(allReal?.length ?? 0) > 1} onApplyAll={() => void applyAll()} />
+              <CaptionControls value={preset} onLive={(p) => setLive(p)} onCommit={styleCommit} fonts={fonts} onImportFonts={() => void importFonts()} hasApi={hasApi} />
               <Row label="Hervorhebung (KI-Tags)"><Switch on={st.caption.highlight} onChange={(b) => caption({ highlight: b })} label="Hervorhebung" /></Row>
               <Row label="Sicherheitszonen"><Segmented options={['Aus', 'TikTok', 'Reels', 'Shorts']} value={zone} onChange={setZone} /></Row>
-              <Row label="Alle Clips"><Button variant="secondary" disabled={!hasApi || (allReal?.length ?? 0) < 2} onClick={() => void applyAll()}><Wand2 size={15} /> Stil auf alle anwenden</Button></Row>
+            </div>
+          )}
+          {tab === 'Animation' && (
+            <div>
+              <h3>Untertitel</h3>
+              <AnimControls kind="caption" anim={preset.caption.anim} onLive={setLive} onCommit={styleCommit} />
+              <h3 style={{ marginTop: 18 }}>Titel</h3>
+              <AnimControls kind="title" anim={preset.title.anim} onLive={setLive} onCommit={styleCommit} />
+              <small style={{ display: 'block', marginTop: 10 }}>Änderungen gelten sofort in der Vorschau und genauso im Export. Standard: weich (Dämpfung 1,0), kein Überschwingen.</small>
+            </div>
+          )}
+          {tab === 'Titel' && (
+            <div>
+              <Row label="Titel einblenden" hint="im Erstellen-Dialog als Standard einstellbar"><Switch on={st.hook.enabled} onChange={(b) => commit({ t: 'hook', enabled: b })} label="Titel einblenden" /></Row>
+              <Row label="Text" hint="vom LLM vorgeschlagen"><input className="sm-input" value={hook} onChange={(e) => setHookDraft(e.target.value)} onBlur={() => { if (hookDraft !== null && hookDraft !== st.hook.text) commit({ t: 'hook', text: hookDraft }); setHookDraft(null) }} /></Row>
+              <Row label="Dauer"><Slider label="Sekunden" value={st.hook.seconds} min={1} max={8} onChange={() => undefined} onCommit={(v) => commit({ t: 'hook', text: st.hook.text, seconds: v })} /></Row>
+              <TitleControls value={preset} onLive={setLive} onCommit={styleCommit} />
+              <small style={{ display: 'block', marginTop: 10 }}>Der Titel lässt sich in der Vorschau verschieben (ziehen). Schrift: TikTok Sans (SIL OFL 1.1).</small>
             </div>
           )}
           {tab === 'Bildausschnitt' && (
@@ -359,13 +365,6 @@ export function EditorScreen(): React.JSX.Element {
               <Row label="Kamera folgt" hint="ab hier"><small>Im Quellmonitor auf eine Person klicken – der Ausschnitt springt als fester Schnitt dorthin.</small></Row>
               <Row label="Quelle anzeigen"><Switch on={showSource} onChange={setShowSource} label="Quelle anzeigen" /></Row>
               <small>Gesichtsquote {Math.round(clip.faceRatio * 100)} % · {st.layoutOps.length} Änderung(en) am Ausschnitt</small>
-            </div>
-          )}
-          {tab === 'Hook' && (
-            <div>
-              <Row label="Hook-Titel einblenden" hint="standardmäßig aus"><Switch on={st.hook.enabled} onChange={(b) => commit({ t: 'hook', enabled: b })} label="Hook-Titel einblenden" /></Row>
-              <Row label="Text"><input className="sm-input" value={hook} onChange={(e) => setHookDraft(e.target.value)} onBlur={() => { if (hookDraft !== null && hookDraft !== st.hook.text) commit({ t: 'hook', text: hookDraft }); setHookDraft(null) }} /></Row>
-              <Row label="Dauer"><Slider label="Sekunden" value={st.hook.seconds} min={1} max={6} onChange={() => undefined} onCommit={(v) => commit({ t: 'hook', text: st.hook.text, seconds: v })} /></Row>
             </div>
           )}
         </div>
