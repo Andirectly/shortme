@@ -14,8 +14,9 @@ import { loadTranscript, runTranscription } from './transcription'
 import { loadClips, runAnalysis, layoutFile } from './clips/analysis'
 import { loadPersons, personsFile, replanWithPersons } from './clips/persons'
 import { writeFileAtomic } from './atomic'
-import { modelsView, decide } from '../testlab/registry'
+import { modelsView, decide, activeModelId } from '../testlab/registry'
 import { labSources, runLab } from '../testlab/lab'
+import { prepareRemotionBrowser } from '../remotion/render'
 import type { LabRunRequest } from '../../shared/models'
 import { loadStyle, saveStyle } from './styleDefaults'
 import type { StyleDefaults } from '../../shared/edits'
@@ -77,6 +78,7 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('testlab:models', () => modelsView())
   ipcMain.handle('testlab:sources', async () => { const l = await labSources(); for (const s of l) allowMediaPath(s.path); return l })
   ipcMain.handle('testlab:run', (_e, req: LabRunRequest) => runLab(req, (p) => broadcast('testlab:progress', p)))
+  ipcMain.handle('testlab:prepareRemotion', () => prepareRemotionBrowser((_f, message) => broadcast('testlab:progress', { side: 'B', message })).catch(() => ''))
   ipcMain.handle('testlab:decide', (_e, slot: string, keep: string, drop: string) => decide(slot, keep, drop))
   ipcMain.handle('shortme:styleGet', () => loadStyle())
   ipcMain.handle('shortme:styleSet', (_e, style: StyleDefaults) => saveStyle(style))
@@ -121,7 +123,7 @@ export function registerShortmeIpc(): void {
         // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
         const st = stateOf(baseState(clips[i], undefined, await loadStyle()), await loadEdits(hash, clips[i].id))
         const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
-        await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+        await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, renderer: (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' : 'tscaps', caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
       }
       void shell.openPath(outDir)
     })
@@ -217,7 +219,7 @@ export async function runExportSelfTestIfRequested(): Promise<void> {
     if (!meta || !clip || !transcript) throw new Error('Projekt/Clip/Transkript fehlt')
     const signals = await ensureSignals(meta)
     const t0 = Date.now()
-    const r = await exportClip(meta, clip, transcript, signals, { outDir: join(process.cwd(), '.tmp', 'selftest-export'), engine: engine === 'ass' ? 'ass' : 'tscaps', hook: !process.env.SHORTME_SELFTEST_NOTITLE, hookText: process.env.SHORTME_SELFTEST_TITLE, style: effectivePreset(await allPresets(), { presetId: process.env.SHORTME_SELFTEST_PRESET ?? 'glow-karaoke', highlight: true, zone: 'Aus', style: process.env.SHORTME_SELFTEST_PATCH ? JSON.parse(process.env.SHORTME_SELFTEST_PATCH) : {} }) })
+    const r = await exportClip(meta, clip, transcript, signals, { outDir: join(process.cwd(), '.tmp', 'selftest-export'), engine: engine === 'ass' ? 'ass' : 'tscaps', hook: !process.env.SHORTME_SELFTEST_NOTITLE, renderer: process.env.SHORTME_SELFTEST_RENDERER === 'remotion' ? 'remotion' : 'tscaps', hookText: process.env.SHORTME_SELFTEST_TITLE, style: effectivePreset(await allPresets(), { presetId: process.env.SHORTME_SELFTEST_PRESET ?? 'glow-karaoke', highlight: true, zone: 'Aus', style: process.env.SHORTME_SELFTEST_PATCH ? JSON.parse(process.env.SHORTME_SELFTEST_PATCH) : {} }) })
     console.log(`SELFTEST export engine=${r.captionEngine} path=${r.path} dur=${r.durationSec.toFixed(2)} took=${((Date.now() - t0) / 1000).toFixed(1)}s`)
   } catch (e) {
     console.log(`SELFTEST export error ${e instanceof Error ? e.message : e}`)

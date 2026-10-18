@@ -194,6 +194,7 @@ const api = {
       models: (): Promise<ModelsView> => ipcRenderer.invoke('testlab:models'),
       sources: (): Promise<LabSource[]> => ipcRenderer.invoke('testlab:sources'),
       run: (req: LabRunRequest): Promise<{ a: LabResult; b: LabResult }> => ipcRenderer.invoke('testlab:run', req),
+      prepareRemotion: (): Promise<string> => ipcRenderer.invoke('testlab:prepareRemotion'),
       decide: (slot: string, keep: string, drop: string): Promise<ModelsView> => ipcRenderer.invoke('testlab:decide', slot, keep, drop),
       onProgress: (cb: (p: { side: 'A' | 'B'; message: string }) => void): (() => void) => {
         const l = (_e: Electron.IpcRendererEvent, p: { side: 'A' | 'B'; message: string }): void => cb(p)

@@ -15,11 +15,13 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "start": "electron-vite preview",
-    "package": "electron-vite build && electron-builder",
-    "package:dir": "electron-vite build && electron-builder --dir"
+    "package": "npm run remotion:bundle && electron-vite build && electron-builder",
+    "package:dir": "npm run remotion:bundle && electron-vite build && electron-builder --dir",
+    "remotion:bundle": "node captions-remotion/bundle.cjs resources/remotion-bundle"
   },
   "dependencies": {
     "@ffprobe-installer/ffprobe": "2.1.2",
+    "@remotion/renderer": "4.0.536",
     "@tscaps/engine": "^0.7.0",
     "electron-updater": "^6.8.9",
     "ffmpeg-static": "^5.2.0",
@@ -30,6 +32,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@remotion/bundler": "4.0.536",
+    "@remotion/player": "4.0.536",
     "@tailwindcss/vite": "^4.1.0",
     "@types/node": "^22.13.0",
     "@types/react": "^19.0.0",
@@ -45,6 +49,7 @@
     "rcedit": "^5.0.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "remotion": "4.0.536",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.23.0",
     "typescript": "^5.8.0",
@@ -70,7 +75,8 @@
       "node_modules/sherpa-onnx-node/**",
       "node_modules/sherpa-onnx-win-x64/**",
       "out/main/asrWorker.js",
-      "out/main/chunks/**"
+      "out/main/chunks/**",
+      "node_modules/@remotion/compositor-win32-x64-msvc/**"
     ],
     "extraResources": [
       {
@@ -100,6 +106,10 @@
       {
         "from": "build/icon.ico",
         "to": "icon.ico"
+      },
+      {
+        "from": "resources/remotion-bundle",
+        "to": "remotion-bundle"
       }
     ],
     "win": {

@@ -1,5 +1,5 @@
 {
-  "_info": "Katalog für das Testlab. Pro Modell: Platz, Kurzbeschreibung, Vorteile, Nachteile, Größe/Tempo, Lizenz, geeignet für. 'status': aktiv = aktuell in Shortme, kandidat = noch zu integrieren. Werte aus der Recherche vom Oktober 2026; eigene Testlab-Messungen haben Vorrang. Ergänzt: 'integrated' (true = im Code eingebunden und im Testlab wählbar), Status 'test' (integrierte Alternative) und 'entfernen' (zum Entfernen); Entscheidungen aus dem Testlab werden hier und in docs/MODELS.md nachgetragen. 'assets' = Modell-Manager-IDs, die das Modell braucht (fehlende werden im Testlab beim Start automatisch geladen).",
+  "_info": "Katalog für das Testlab. Pro Modell: Platz, Kurzbeschreibung, Vorteile, Nachteile, Größe/Tempo, Lizenz, geeignet für. 'status': aktiv = aktuell in Shortme, kandidat = noch zu integrieren. Werte aus der Recherche vom Oktober 2026; eigene Testlab-Messungen haben Vorrang. Ergänzt: 'integrated' (true = im Code eingebunden und im Testlab wählbar), Status 'test' (integrierte Alternative) und 'entfernen' (zum Entfernen); Entscheidungen aus dem Testlab werden hier und in docs/MODELS.md nachgetragen. 'assets' = Modell-Manager-IDs, die das Modell braucht (fehlende werden im Testlab beim Start automatisch geladen). Platz 'renderer' (Untertitel-Renderer): tscaps aktiv, Remotion als integrierte Alternative.",
   "slots": [
     {
       "id": "face",
@@ -28,6 +28,10 @@
     {
       "id": "llm",
       "name": "Clip-Auswahl (LLM)"
+    },
+    {
+      "id": "renderer",
+      "name": "Untertitel-Renderer"
     }
   ],
   "models": [
@@ -372,6 +376,47 @@
       "license": "Apache-2.0",
       "bestFor": "Test, ob mehr Modellgröße die Auswahl verbessert",
       "integrated": false
+    },
+    {
+      "id": "tscaps_renderer",
+      "slot": "renderer",
+      "status": "aktiv",
+      "integrated": true,
+      "name": "tscaps (@tscaps/engine)",
+      "short": "Aktueller Renderer: CSS-Vorlagen, Bilder per SVG im versteckten Fenster, Export direkt als Video.",
+      "pros": [
+        "Schnell (60 s Clip in unter 10 s)",
+        "Klein, bereits eingebaut",
+        "CSS-Animationen mit eingefrorener Zeit – gleiche Darstellung wie die Vorschau"
+      ],
+      "cons": [
+        "Kein echtes backdrop-filter (SVG-Rasterung)",
+        "Eigene Engine, weniger verbreitet als Remotion"
+      ],
+      "size": "ca. 2 MB",
+      "license": "AGPL-3.0 (privat ok)",
+      "bestFor": "Standard für alle Typen"
+    },
+    {
+      "id": "remotion_renderer",
+      "slot": "renderer",
+      "status": "test",
+      "integrated": true,
+      "name": "Remotion",
+      "short": "React-Komposition, Bilder per Headless-Chrome, Overlay wird mit FFmpeg über das Video gelegt.",
+      "pros": [
+        "Verbreitetes Werkzeug, viele Beispiele und Effekte",
+        "Echte Zeitleisten-/Feder-Animationen möglich (hier: dasselbe Preset-JSON, gleiche Darstellung)",
+        "Player für die Editor-Vorschau"
+      ],
+      "cons": [
+        "Deutlich größer (Chrome Headless Shell ca. 300 MB + Compositor 30 MB + Bundle 40 MB)",
+        "Langsamer als tscaps (Bild für Bild per Browser)",
+        "Remotion-Lizenz: für Firmen > 3 Personen kostenpflichtig, privat frei"
+      ],
+      "size": "ca. 370 MB zusätzlich",
+      "license": "Remotion License (privat frei)",
+      "bestFor": "Wenn komplexere Animationen/Vorlagen gewünscht sind"
     }
   ]
 }

@@ -15,9 +15,9 @@ describe('Modell-Plätze', () => {
   it('höchstens zwei integrierte Alternativen je Platz', () => {
     for (const s of cat.slots) expect(alternativesOk(cat.models, s.id, cat.models.find((m) => m.slot === s.id && m.status === 'aktiv')?.id ?? ''), s.id).toBe(true)
   })
-  it('neben den aktiven Modellen sind nur SCRFD-10G und BoT-SORT-ReID integriert', () => {
+  it('neben den aktiven Modellen sind nur SCRFD-10G, BoT-SORT-ReID und Remotion integriert', () => {
     const extra = cat.models.filter((m) => m.integrated && m.status !== 'aktiv').map((m) => m.id)
-    expect(extra.sort()).toEqual(['botsort_reid', 'scrfd_10g'])
+    expect(extra.sort()).toEqual(['botsort_reid', 'remotion_renderer', 'scrfd_10g'])
   })
   it('wirksamer Status: Entscheidung > Zum Entfernen > Test > Kandidat', () => {
     const yunet = cat.models.find((m) => m.id === 'yunet')!, scrfd = cat.models.find((m) => m.id === 'scrfd_10g')!, k = cat.models.find((m) => m.id === 'scrfd_2_5g')!

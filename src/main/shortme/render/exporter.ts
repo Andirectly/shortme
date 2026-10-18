@@ -14,6 +14,7 @@ import { buildFilterGraph, OUT_H, OUT_W } from './graph'
 import { captionPass } from './captionPass'
 import { buildAss, type CapWord } from './ass'
 import { renderTitleOverlay } from './titleOverlay'
+import { compositeOverlay, remotionAvailable, renderRemotionOverlay } from '../../remotion/render'
 import { buildPieces, keepsFromCuts, planPauseCuts, TimeMap, type Interval } from './timeline'
 import { safeFileName, uniquePath, type QualityTier } from './profiles'
 
@@ -32,6 +33,8 @@ export interface ExportOptions {
   wordEdits?: Record<number, string>
   /** Untertitel-Renderer: tscaps (Standard in der App, versteckte Fenster) oder ASS/libass (Fallback, Skripte). */
   engine?: 'tscaps' | 'ass'
+  /** Aktives Modell des Testlab-Platzes „Untertitel-Renderer“ (Standard tscaps); Remotion nur in der App. */
+  renderer?: 'tscaps' | 'remotion'
   /** Herausgeschnittene Wörter (Quellzeit), aus den Editor-Operationen. */
   extraCuts?: Interval[]
   /** KI-Hervorhebung (betonte Wörter) an/aus. */
@@ -43,7 +46,7 @@ export interface ExportOptions {
   onProgress?: (fraction: number, message: string) => void
 }
 
-export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number; captionEngine: 'tscaps' | 'ass' | 'none' }
+export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number; captionEngine: 'tscaps' | 'ass' | 'remotion' | 'none' }
 
 /** Reine Planung eines Clips: Pausenschnitte, Zeitachse, Stücke, Wörter auf der gekürzten Zeitleiste. */
 export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = [], wordEdits: Record<number, string> = {}) {
@@ -104,7 +107,8 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
     const capWords = opts.caption?.highlight === false ? plan.words.map((w) => ({ ...w, tag: undefined })) : plan.words
     const hook = opts.hook ? { text: opts.hookText ?? clip.hookText, seconds: opts.hookSeconds ?? style.title.seconds } : null
     // Titel (TikTok-Stil): Overlay-Bildfolge aus demselben Layout wie die Editor-Vorschau (nur in der App, braucht Electron)
-    const title = hook && process.versions.electron ? await renderTitleOverlay(hook.text, style.title, hook.seconds, join(work, 'title'), opts.signal).catch((e) => { console.error('Titel-Overlay fehlgeschlagen:', e); return null }) : null
+    const useRemotion = opts.renderer === 'remotion' && !!process.versions.electron && remotionAvailable() && opts.captions !== false
+    const title = hook && !useRemotion && process.versions.electron ? await renderTitleOverlay(hook.text, style.title, hook.seconds, join(work, 'title'), opts.signal).catch((e) => { console.error('Titel-Overlay fehlgeschlagen:', e); return null }) : null
     const enc = await resolveEncoder(opts.encoder ?? 'auto')
     const quality = opts.quality ?? 'standard'
     const src = { width: meta.width, height: meta.height }
@@ -134,9 +138,25 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
     const fullAss = buildAss(capWords, { width: OUT_W, height: OUT_H, style: capStyle })
     const tmp = join(work, 'out.mp4')
     const engine: 'tscaps' | 'ass' = opts.captions === false ? 'ass' : opts.engine ?? (process.versions.electron ? 'tscaps' : 'ass')
-    let used: 'tscaps' | 'ass' | 'none' = opts.captions === false ? 'none' : 'ass'
+    let used: 'tscaps' | 'ass' | 'remotion' | 'none' = opts.captions === false ? 'none' : 'ass'
     report(0.1, 'Rendert …')
-    if (engine === 'tscaps') {
+    if (useRemotion) {
+      try {
+        // Remotion: Zwischenergebnis ohne Untertitel → Overlay-Bildfolge (Untertitel + Titel aus demselben Preset) → FFmpeg legt sie darüber
+        const mid = join(work, 'mid.mp4')
+        await render(mid, null, 'high')
+        report(0.4, 'Untertitel (Remotion) …')
+        const overlay = await renderRemotionOverlay({ preset: { ...style, caption: capStyle }, words: capWords, highlight: opts.caption?.highlight !== false, titleText: hook?.text ?? '', titleSeconds: hook?.seconds ?? 3, durationSec: plan.duration, workDir: join(work, 'remotion'), signal: opts.signal, onProgress: (f, m) => report(0.4 + f * 0.5, m) })
+        report(0.92, 'Zusammenfügen …')
+        await compositeOverlay(mid, overlay, tmp, [...encoderArgs(enc.kind, quality), '-r', '30'], enc.bin, opts.signal)
+        used = 'remotion'
+      } catch (e) {
+        if (opts.signal?.aborted) throw e
+        console.error('Remotion-Untertitel fehlgeschlagen, Fallback tscaps/ASS:', e)
+        await rm(tmp, { force: true })
+      }
+    }
+    if (used !== 'remotion' && engine === 'tscaps') {
       try {
         // 1) Zwischenergebnis in hoher Qualität (Hook als ASS, ohne Untertitel), 2) @tscaps/engine brennt die Untertitel ein
         const mid = join(work, 'mid.mp4')
@@ -151,7 +171,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
         await rm(tmp, { force: true })
       }
     }
-    if (used !== 'tscaps') await render(tmp, opts.captions === false ? null : fullAss, quality)
+    if (used !== 'tscaps' && used !== 'remotion') await render(tmp, opts.captions === false ? null : fullAss, quality)
     await mkdir(dirname(finalPath), { recursive: true })
     await rm(finalPath, { force: true })
     await rename(tmp, finalPath)

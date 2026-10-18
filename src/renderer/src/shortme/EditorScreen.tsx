@@ -6,6 +6,7 @@ import type { PreviewPlan, ShortmeShot } from '@shared/shortme'
 import { groupWords } from '@shared/captions'
 import type { PresetPatch } from '@shared/preset'
 import { CaptionLayer, TitleLayer } from './CaptionLayers'
+import { RemotionPreview } from './RemotionPreview'
 import { effective, isBuiltin, usePresets } from './presets'
 import { AnimControls, CaptionControls, TitleControls } from './StyleControls'
 import { PresetBar, PresetPicker } from './PresetUI'
@@ -97,6 +98,9 @@ export function EditorScreen(): React.JSX.Element {
   useEffect(() => { void loadPresets() }, [loadPresets])
   /** vorläufige Änderungen während eines Regler-Zugs (Vorschau live; erst beim Loslassen als Operation gespeichert) */
   const [live, setLive] = useState<PresetPatch | null>(null)
+  /** Testlab-Entscheidung: ist Remotion der aktive Untertitel-Renderer? Dann zeigt die Vorschau den Remotion-Player. */
+  const [remotionOn, setRemotionOn] = useState(false)
+  useEffect(() => { if (hasApi) void window.cutawan.shortme.testlab.models().then((v) => setRemotionOn(v.active.renderer === 'remotion_renderer')).catch(() => undefined) }, [hasApi])
   const preset = useMemo(() => effective(allPresets, st.caption.presetId, st.caption.style, live), [allPresets, st.caption.presetId, st.caption.style, live])
   const [fonts, setFonts] = useState<string[]>([])
   const [fontCss, setFontCss] = useState('')
@@ -321,8 +325,10 @@ export function EditorScreen(): React.JSX.Element {
             {srcUrl
               ? <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
               : <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover' }} />}
-            <CaptionLayer preset={preset} groups={groups} t={t} highlight={st.caption.highlight} fontCss={fontCss} />
-            {st.hook.enabled && hook && <TitleLayer preset={preset} text={hook} t={t} seconds={st.hook.seconds} onMove={(y) => setLive({ title: { y } })} onCommit={(y) => styleCommit({ title: { y } })} />}
+            {remotionOn
+              ? <RemotionPreview preset={preset} words={words.filter((w) => !cut.includes(w.g)).map((w) => ({ w: w.w, start: w.t, end: w.e, tag: w.hi ? ('emphasis' as const) : undefined }))} t={t} highlight={st.caption.highlight} titleText={st.hook.enabled ? hook : ''} titleSeconds={st.hook.seconds} duration={D} />
+              : <CaptionLayer preset={preset} groups={groups} t={t} highlight={st.caption.highlight} fontCss={fontCss} />}
+            {!remotionOn && st.hook.enabled && hook && <TitleLayer preset={preset} text={hook} t={t} seconds={st.hook.seconds} onMove={(y) => setLive({ title: { y } })} onCommit={(y) => styleCommit({ title: { y } })} />}
             {zn && <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${zn.top * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${zn.bottom * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', right: 0, top: `${zn.top * 100}%`, bottom: `${zn.bottom * 100}%`, width: `${zn.right * 100}%`, background: 'rgba(255,255,255,0.16)' }} /></div>}
           </div>
         </div>

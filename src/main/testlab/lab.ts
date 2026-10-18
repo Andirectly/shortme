@@ -15,6 +15,7 @@ import { layoutForClip } from '../shortme/layout/run'
 import { activeSpeakers } from '../shortme/layout/plan'
 import type { LabResult, LabRunRequest, LabSource, LabTrack } from '../../shared/models'
 import { activeModelId, loadCatalog, recordMeasured } from './registry'
+import { runRendererSide } from './rendererLab'
 
 const HZ = 12.5
 const STEP = ASD_FPS / HZ // 2 Frames je Probe
@@ -23,7 +24,7 @@ const VERSION = 1
 /** Verfahren je Platz: Modell-ID → Parameter für die Analyse. Nur Plätze mit Verfahren sind vergleichbar. */
 const FACE_DETECTORS: Record<string, 'yunet' | 'scrfd'> = { yunet: 'yunet', scrfd_10g: 'scrfd' }
 const TRACKERS: Record<string, 'iou' | 'botsort'> = { iou_tracks: 'iou', botsort_reid: 'botsort' }
-export const LAB_SLOTS = ['face', 'tracking']
+export const LAB_SLOTS = ['face', 'tracking', 'renderer']
 
 /** Geschätzte ID-Wechsel: Spur B beginnt ≤ 3 s nach Ende von Spur A, ohne Kamerawechsel dazwischen und < 0,15 Bildbreiten entfernt → vermutlich dieselbe Person mit neuer ID. */
 export function countIdSwitches(tracks: LabTrack[], cutTimes: number[]): number {
@@ -133,6 +134,12 @@ export async function runLab(req: LabRunRequest, onProgress: (p: LabProgress) =>
   }
   const src = (await labSources()).find((s) => s.id === req.source)
   if (!src) throw new Error('Testclip nicht gefunden')
+  if (req.slot === 'renderer') {
+    const preset = req.presetId ?? 'glow-karaoke'
+    const a = await runRendererSide(req.modelA, src.path, req.start, req.dur, preset, (message) => onProgress({ side: 'A', message }))
+    const b = await runRendererSide(req.modelB, src.path, req.start, req.dur, preset, (message) => onProgress({ side: 'B', message }))
+    return { a, b }
+  }
   const a = await runOne(req.slot, req.modelA, src.path, req.start, req.dur, (message) => onProgress({ side: 'A', message }))
   const b = await runOne(req.slot, req.modelB, src.path, req.start, req.dur, (message) => onProgress({ side: 'B', message }))
   return { a, b }

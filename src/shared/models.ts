@@ -81,6 +81,10 @@ export interface LabResult {
   /** Aktive Sprecher-Spur je Probe (null = keiner). */
   active: Array<number | null>
   shots: Array<{ start: number; end: number; layout: string; cx: number; cx2?: number; zoom: number }>
+  /** Renderer-Vergleich: fertiges Video dieser Seite, Exportzeit hochgerechnet auf 60 s, zusätzliche App-Größe (MB) */
+  video?: string
+  per60Sec?: number
+  extraMb?: number
 }
 
-export interface LabRunRequest { slot: string; modelA: string; modelB: string; source: string; start: number; dur: number }
+export interface LabRunRequest { slot: string; modelA: string; modelB: string; source: string; start: number; dur: number; /** nur Platz „Untertitel-Renderer“: gemeinsames Preset */ presetId?: string }

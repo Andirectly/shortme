@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { usePresets } from './presets'
 import { ChevronDown, ChevronRight, FlaskConical, Pause, Play } from 'lucide-react'
 import type { LabResult, LabSource, ModelView, ModelsView } from '@shared/models'
 import { sourceRects } from '@shared/previewDraw'
@@ -103,12 +104,19 @@ function Pane({ res, label, path, t, playing, master, onTime, overlays }: { res:
         <span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8 }}>{label}</span>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <span className="sm-tag">Laufzeit {res.runtimeSec} s</span>
-        <span className="sm-tag">VRAM-Spitze +{res.vramPeakMb >= 0 ? `${res.vramPeakMb} MB` : '?'}</span>
-        <span className="sm-tag" title={`${res.speechSec} s Sprache (VAD)`}>Sprechzeit mit Gesicht {res.speechFaceShare === null ? '–' : `${Math.round(res.speechFaceShare * 100)} %`}</span>
-        <span className="sm-tag">{res.tracks.length} Spuren</span>
-        <small style={{ alignSelf: 'center' }}>{res.context}</small>
-        <span className="sm-tag" title="Neue Spur beginnt ≤ 3 s nach dem Ende einer anderen an gleicher Stelle, ohne Kamerawechsel (Schätzung)">ID-Wechsel (geschätzt) {res.idSwitches}</span>
+        {res.video ? (
+          <>
+            <span className="sm-tag" title={`gemessen: ${res.runtimeSec} s für ${Math.round(res.dur)} s Video`}>Exportzeit für 60 s ≈ {res.per60Sec} s</span>
+            <span className="sm-tag">Zusätzliche App-Größe +{res.extraMb} MB</span>
+            <small style={{ alignSelf: 'center' }}>{res.context}</small>
+          </>
+        ) : null}
+        {!res.video && <span className="sm-tag">Laufzeit {res.runtimeSec} s</span>}
+        {!res.video && <span className="sm-tag">VRAM-Spitze +{res.vramPeakMb >= 0 ? `${res.vramPeakMb} MB` : '?'}</span>}
+        {!res.video && <span className="sm-tag" title={`${res.speechSec} s Sprache (VAD)`}>Sprechzeit mit Gesicht {res.speechFaceShare === null ? '–' : `${Math.round(res.speechFaceShare * 100)} %`}</span>}
+        {!res.video && <span className="sm-tag">{res.tracks.length} Spuren</span>}
+        {!res.video && <small style={{ alignSelf: 'center' }}>{res.context}</small>}
+        {!res.video && <span className="sm-tag" title="Neue Spur beginnt ≤ 3 s nach dem Ende einer anderen an gleicher Stelle, ohne Kamerawechsel (Schätzung)">ID-Wechsel (geschätzt) {res.idSwitches}</span>}
       </div>
     </div>
   )
@@ -146,12 +154,18 @@ export function TestlabScreen(): React.JSX.Element {
   }, [view, slot, models])
   const mA = models.find((m) => m.id === aId), mB = models.find((m) => m.id === bId)
   const src = sources.find((s) => s.id === srcId)
-  const comparable = slot === 'face' || slot === 'tracking'
+  const comparable = slot === 'face' || slot === 'tracking' || slot === 'renderer'
+  const allPresets = usePresets((p) => p.all)
+  const loadPresets = usePresets((p) => p.load)
+  const [presetId, setPresetId] = useState('glow-karaoke')
+  useEffect(() => { void loadPresets() }, [loadPresets])
+  // Chrome Headless Shell für Remotion im Hintergrund vorbereiten, sobald der Renderer-Platz offen ist
+  useEffect(() => { if (slot === 'renderer' && api) void api.prepareRemotion().catch(() => undefined) }, [slot, api])
   const run = async (): Promise<void> => {
     if (!api || !src || !aId || !bId) return
     setRunning(true); setErr(''); setResults(null); setPlaying(false); setT(0); setDecided(''); setMsgs({ A: 'wartet …', B: 'wartet …' })
     try {
-      const r = await api.run({ slot, modelA: aId, modelB: bId, source: srcId, start, dur })
+      const r = await api.run({ slot, modelA: aId, modelB: bId, source: srcId, start, dur, presetId })
       setResults({ ...r, path: src.path })
       await reload()
     } catch (e) { setErr(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e)) } finally { setRunning(false) }
@@ -181,6 +195,11 @@ export function TestlabScreen(): React.JSX.Element {
           <div style={{ display: 'grid', gap: 8 }}><small>Links (A)</small><select aria-label="Modell links" value={aId} onChange={(e) => setA(e.target.value)} style={sel}>{optionsFor(bId)}</select><InfoBox m={mA} /></div>
           <div style={{ display: 'grid', gap: 8 }}><small>Rechts (B)</small><select aria-label="Modell rechts" value={bId} onChange={(e) => setB(e.target.value)} style={sel}>{optionsFor(aId)}</select><InfoBox m={mB} /></div>
         </div>
+        {slot === 'renderer' && (
+          <label style={{ display: 'grid', gap: 6, maxWidth: 420 }}><small>Preset (für beide Seiten gleich)</small>
+            <select aria-label="Preset" value={presetId} onChange={(e) => setPresetId(e.target.value)} style={sel}>{allPresets.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+          </label>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) 120px 120px auto', gap: 12, alignItems: 'end' }}>
           <label style={{ display: 'grid', gap: 6 }}><small>Testclip</small>
             <select aria-label="Testclip" value={srcId} onChange={(e) => setSrc(e.target.value)} style={sel}>{sources.map((s) => <option key={s.id} value={s.id}>{s.label}{s.durationSec ? ` (${fmt(s.durationSec)})` : ''}</option>)}</select>
@@ -189,15 +208,15 @@ export function TestlabScreen(): React.JSX.Element {
           <label style={{ display: 'grid', gap: 6 }}><small>Dauer (s)</small><input className="sm-input" type="number" min={5} max={120} value={dur} onChange={(e) => setDur(Math.min(120, Math.max(5, +e.target.value)))} aria-label="Dauer in Sekunden" /></label>
           <Button variant="primary" disabled={running || !src || !aId || !bId || !comparable} onClick={() => void run()}>{running ? 'Läuft …' : 'Vergleich starten'}</Button>
         </div>
-        {!comparable && <small>Für diesen Platz gibt es noch kein Testverfahren – verfügbar ist der Vergleich bei „Gesichtserkennung“ und „Personen-Tracking“.</small>}
+        {!comparable && <small>Für diesen Platz gibt es noch kein Testverfahren – verfügbar ist der Vergleich bei „Gesichtserkennung“, „Personen-Tracking“ und „Untertitel-Renderer“.</small>}
         {running && <small>A: {msgs.A} · B: {msgs.B}</small>}
         {err && <small style={{ color: 'var(--warn)' }}>{err}</small>}
       </div>
       {results && (
         <div className="sm-glass" style={{ padding: 16, display: 'grid', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16 }}>
-            <Pane res={results.a} label={`A · ${mA?.name ?? results.a.model}`} path={results.path} t={t} playing={playing} master onTime={onTime} overlays={ov} />
-            <Pane res={results.b} label={`B · ${mB?.name ?? results.b.model}`} path={results.path} t={t} playing={playing} master={false} onTime={onTime} overlays={ov} />
+            <Pane res={results.a} label={`A · ${mA?.name ?? results.a.model}`} path={results.a.video ?? results.path} t={t} playing={playing} master onTime={onTime} overlays={ov} />
+            <Pane res={results.b} label={`B · ${mB?.name ?? results.b.model}`} path={results.b.video ?? results.path} t={t} playing={playing} master={false} onTime={onTime} overlays={ov} />
           </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <Button variant="primary" aria-label={playing ? 'Pause' : 'Abspielen'} onClick={() => setPlaying(!playing)} style={{ width: 44, padding: 0 }}>{playing ? <Pause size={16} /> : <Play size={16} />}</Button>

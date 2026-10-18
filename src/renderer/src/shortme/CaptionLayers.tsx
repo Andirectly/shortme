@@ -58,8 +58,9 @@ export function useTitleLayout(text: string, preset: StylePreset): TitleLayout |
 }
 
 /** Titel (TikTok-Stil) in der Vorschau; per Ziehen vertikal verschiebbar (`onMove` live, `onCommit` beim Loslassen). */
-export function TitleLayer({ preset, text, t, seconds, onMove, onCommit, scope = 'sm-title-scope' }: { preset: StylePreset; text: string; t: number; seconds: number; onMove?: (y: number) => void; onCommit?: (y: number) => void; scope?: string }): React.JSX.Element | null {
+export function TitleLayer({ preset, text, t, seconds, onMove, onCommit, onReady, scope = 'sm-title-scope' }: { preset: StylePreset; text: string; t: number; seconds: number; onMove?: (y: number) => void; onCommit?: (y: number) => void; /** Layout gemessen (Remotion wartet darauf) */ onReady?: () => void; scope?: string }): React.JSX.Element | null {
   const layout = useTitleLayout(text, preset)
+  useEffect(() => { if (layout) onReady?.() }, [layout, onReady])
   const wrap = useRef<HTMLDivElement>(null)
   const drag = useRef<{ active: boolean; y: number }>({ active: false, y: preset.title.y })
   if (!layout) return null
