@@ -14,6 +14,12 @@ import { layoutForClip } from '../layout/run'
 import { applyPersons, buildPersons } from './persons'
 import { loadHeat } from './heat'
 import { loadChatSignal } from '../../twitch/chat'
+import { loadProfile, channelLayout } from '../profiles'
+import { findFacecam, camHasFace } from '../layout/facecam'
+import { mergeStreamScenes, scenesOf } from '../layout/streamShots'
+import { defaultStream, type StreamLayout } from '../../../shared/streamLayout'
+import type { ContentType, FrameChoice } from '../../../shared/videoKind'
+import type { PlanOptions } from '../../../shared/layoutPlan'
 import { overlapsSilence } from '../../twitch/silence'
 import { detectAudioEvents, loadEvents, saveEvents, yamnetAvailable, type AudioEvent } from './audioEvents'
 import { loadTopics, saveTopics, type TopicMap } from './topics'
@@ -21,17 +27,16 @@ import type { PlanInput } from '../../../shared/layoutPlan'
 
 export interface AnalysisOptions {
   query?: string
-  /** 'stream' = Stream/Gaming (Twitch-Importe schlagen das vor): Auswahl achtet auf Reaktionen und Highlights. */
-  contentType?: 'auto' | 'stream'
+  /** Inhaltstyp → Profil (Tracking, Ton-Markierungen, Ranking-Gewichte, Prompt-Variante). Standard: Podcast / Interview. */
+  contentType?: ContentType
+  /** Gewählter Bildausschnitt; ohne Angabe der Standard des Profils. */
+  frame?: FrameChoice
   wanted?: number
   signal?: AbortSignal
   /** Erzwingt den Fallback ohne LLM (Tests / kein Modell). */
   noLlm?: boolean
   onProgress?: (stage: string, fraction: number, message: string) => void
 }
-
-const STREAM_HINT = 'Das ist ein Stream/Gaming-Video: starke Reaktionen und Ausbrüche, überraschende Wendungen, Highlights im Spiel (Siege, Fails, knappe Szenen), witzige Sprüche. Ruhiges Spielgeschehen ohne Kommentar ist uninteressant.'
-export const effectiveQuery = (o: Pick<AnalysisOptions, 'query' | 'contentType'>): string | undefined => (o.contentType === 'stream' ? `${STREAM_HINT} ${o.query ?? ''}`.trim() : o.query)
 
 export const layoutFile = (hash: string, clipId: string): string => projectFile(hash, `layout/${clipId.replace(/[^\w.-]/g, '_')}.json`)
 
@@ -116,13 +121,17 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   const cuts = await ensureShots(meta, opts.signal, (f) => report('shots', f, 'Kamerawechsel erkennen …'))
   const heat = await loadHeat(meta.hash)
   report('signals', 0.5, 'Audio-Ereignisse erkennen (Lachen, Applaus, Pausen) …')
-  const events0 = await ensureEvents(meta, t.speech, opts.signal)
+  const profile = await loadProfile(opts.contentType)
+  const frame: FrameChoice = opts.frame ?? profile.frame
+  const events00 = await ensureEvents(meta, t.speech, opts.signal)
+  // Profil: nur die vorgesehenen Ton-Markierungen (fehlt YAMNet, gibt es ohnehin nur Pausen)
+  const events0 = events00 ? events00.filter((e) => profile.marks.includes(e.kind)) : events00
   const chat = meta.twitch?.chat ? await loadChatSignal(meta.hash) : null
   const events = chat?.laughs.length ? [...(events0 ?? []), ...chat.laughs].sort((a, b) => a.start - b.start) : events0
   if (chat) report('signals', 1, `Chat-Signal gefunden (${chat.messages} Nachrichten) – fließt ins Ranking ein`)
   if (heat) report('signals', 1, 'Most-replayed-Kurve gefunden – fließt ins Ranking ein')
-  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat, events, chat: chat?.heat ?? null }
-  const sel = { query: effectiveQuery(opts), wanted: opts.wanted, signal: opts.signal, report, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
+  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat, events, chat: chat?.heat ?? null, weights: profile.ranking }
+  const sel = { query: [profile.prompt, opts.query].filter(Boolean).join(' ') || undefined, wanted: opts.wanted, signal: opts.signal, report, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
 
   let mode: ClipsFile['mode'] = 'llm'
   let clips: ShortmeClip[]
@@ -141,6 +150,16 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   if (silent.length) clips = clips.filter((c) => !overlapsSilence(silent, c.start, c.end))
   // Tracking & Layouts (M5): Gesichtsquote fließt ins Ranking ein
   // Layout-Analyse (Gesichter, Spuren, Sprecher) je Clip – zwei Clips gleichzeitig: Decodieren (FFmpeg) und Inferenz überlappen sich
+  const plan: Partial<PlanOptions> = { allowSplit: profile.tracking.split && frame !== 'fixed', follow: frame === 'fixed' ? 'fixed' : profile.tracking.follow }
+  // Facecam + Gameplay: Layout des Kanals (gespeichert) oder Facecam im Video finden; ohne Facecam bleibt es beim Gameplay-Ausschnitt
+  let streamBase: StreamLayout | null = null
+  if (frame === 'stream') {
+    report('layout', 0, 'Facecam suchen …')
+    const dims = { width: meta.width, height: meta.height }
+    streamBase = await channelLayout(meta.twitch?.channel)
+    if (!streamBase) { const found = await findFacecam(meta.sourcePath, 0, meta.durationSec, 14, opts.signal).catch(() => null); if (found) streamBase = defaultStream(dims, found.cam) }
+    report('layout', 0, streamBase ? 'Facecam gefunden' : 'Keine Facecam gefunden – Gameplay-Ausschnitt')
+  }
   const layouts: Awaited<ReturnType<typeof layoutForClip>>[] = new Array(clips.length)
   let nextClip = 0
   let doneClips = 0
@@ -148,10 +167,23 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     for (;;) {
       const i = nextClip++
       if (i >= clips.length) return
-      const l = await layoutForClip(meta, clips[i], cuts, opts.signal)
+      const l = await layoutForClip(meta, clips[i], cuts, opts.signal, undefined, plan)
       layouts[i] = l
       await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(l.input))
-      clips[i] = { ...clips[i], shots: l.shots, faceRatio: l.faceRatio, score: Math.max(0, clips[i].score - l.penalty) }
+      let shots = l.shots
+      let penalty = l.penalty
+      let stream: StreamLayout | undefined
+      if (frame === 'fit') shots = [{ start: 0, end: clips[i].end - clips[i].start, layout: 'fit', cx: 0.5, zoom: 1 }]
+      else if (frame === 'stream') {
+        penalty = 0 // Gesichtsquote sagt bei Streams nichts: das Gameplay ist der Inhalt
+        if (streamBase) {
+          const base = streamBase
+          const scenes = await Promise.all(scenesOf(clips[i].start, clips[i].end, cuts).map(async (sc) => ({ ...sc, cam: await camHasFace(meta.sourcePath, (sc.start + sc.end) / 2, base.cam, opts.signal).catch(() => false) })))
+          shots = mergeStreamScenes(clips[i].start, clips[i].end, l.shots, scenes, base)
+          stream = base
+        } else shots = [{ start: 0, end: clips[i].end - clips[i].start, layout: 'fixed', cx: 0.5, zoom: 1 }]
+      }
+      clips[i] = { ...clips[i], shots, faceRatio: l.faceRatio, score: Math.max(0, clips[i].score - penalty), ...(stream ? { stream } : {}) }
       report('layout', ++doneClips / clips.length, `Bildausschnitt planen (${doneClips}/${clips.length}) …`)
     }
   }

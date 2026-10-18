@@ -1,5 +1,6 @@
 import type { ShortmeShot } from './shortme'
 import { cropBox } from './framing'
+import { planStream } from './streamLayout'
 
 /** Minimale Canvas-Schnittstelle (ohne DOM-Typen, damit die Geometrie in Node getestet werden kann). */
 export interface Ctx2D {
@@ -14,8 +15,15 @@ export interface Ctx2D {
  * Zeichnet ein Vorschaubild exakt wie der Export (gleiche Geometrie aus shared/framing.ts):
  * smart/fixed = fester 9:16-Ausschnitt, fit = 16:9 mittig auf unscharfer Kopie, split = zwei Personen übereinander.
  */
-export function drawLayout(ctx: Ctx2D, video: unknown, src: { width: number; height: number }, shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2'> & { zoom?: number }, zoom: number, W: number, H: number): void {
+export function drawLayout(ctx: Ctx2D, video: unknown, src: { width: number; height: number }, shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2' | 'stream'> & { zoom?: number }, zoom: number, W: number, H: number): void {
   ctx.clearRect(0, 0, W, H)
+  if (shot.layout === 'stream' && shot.stream) {
+    // Facecam + Gameplay: dieselbe Geometrie wie im Export (planStream); Gameplay zuerst, damit das kleine Fenster darüber liegt
+    const p = planStream(src, shot.stream)
+    const k = W / 1080
+    for (const part of [p.game, p.cam]) ctx.drawImage(video, part.crop.x, part.crop.y, part.crop.w, part.crop.h, part.dest.x * k, part.dest.y * k, part.dest.w * k, part.dest.h * k)
+    return
+  }
   if (shot.layout === 'fit') {
     const cover = Math.max(W / src.width, H / src.height)
     const bw = src.width * cover
@@ -41,7 +49,11 @@ export function drawLayout(ctx: Ctx2D, video: unknown, src: { width: number; hei
 }
 
 /** Rechteck des aktuellen Ausschnitts in der Quelle (0..1), für die Markierung im Quellmonitor. */
-export function sourceRects(src: { width: number; height: number }, shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2'> & { zoom?: number }, zoom: number): Array<{ x: number; w: number }> {
+export function sourceRects(src: { width: number; height: number }, shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2' | 'stream'> & { zoom?: number }, zoom: number): Array<{ x: number; w: number; y?: number; h?: number; kind?: 'cam' | 'game' }> {
+  if (shot.layout === 'stream' && shot.stream) {
+    const p = planStream(src, shot.stream)
+    return ([['game', p.game.crop], ['cam', p.cam.crop]] as const).map(([kind, c]) => ({ kind, x: c.x / src.width, w: c.w / src.width, y: c.y / src.height, h: c.h / src.height }))
+  }
   if (shot.layout === 'fit') return [{ x: 0, w: 1 }]
   const aspect = shot.layout === 'split' ? 1080 / 960 : 1080 / 1920
   return [shot.cx, ...(shot.layout === 'split' && shot.cx2 !== undefined ? [shot.cx2] : [])].map((cx) => {

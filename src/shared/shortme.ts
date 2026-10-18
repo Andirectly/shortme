@@ -1,5 +1,7 @@
 // Shortme: Typen zwischen Main und Renderer (Import, Jobs, Transkript).
 import type { TwitchMeta } from './twitch'
+import type { StreamLayout } from './streamLayout'
+import type { ContentType } from './videoKind'
 
 export interface ShortmeMeta {
   hash: string
@@ -14,6 +16,9 @@ export interface ShortmeMeta {
   created: string
   stages: Record<string, { done: boolean; at?: string }>
   twitch?: TwitchMeta
+  /** Gewählter Inhaltstyp (Erstellen-Dialog, im Editor umstellbar). */
+  contentType?: ContentType
+  sourceUrl?: string
 }
 
 export interface ShortmePreflight { ok: boolean; errors: string[]; warnings: string[]; peakGb: number }
@@ -84,6 +89,8 @@ export interface ShortmeClip {
   /** Gesichtsquote 0..1 und Shots (feste Ausschnitte je Einstellung), nach M5. */
   faceRatio?: number
   shots?: ShortmeShot[]
+  /** Facecam-Layout des Clips (erkannt oder vom Kanal übernommen); Grundlage für Szenen mit layout 'stream'. */
+  stream?: StreamLayout
   /** Korrigierte Untertitel-Texte (globaler Wortindex → Text): Zeichensetzung, Groß-/Kleinschreibung, erkannte Fehler. */
   corrections?: Record<number, string>
 }
@@ -92,7 +99,9 @@ export interface ShortmeClip {
 export interface ShortmeShot {
   start: number
   end: number
-  layout: 'smart' | 'split' | 'fit' | 'fixed'
+  layout: 'smart' | 'split' | 'fit' | 'fixed' | 'stream'
+  /** layout 'stream': Facecam oben/unten/50:50/Fenster + Gameplay (Rahmen der Quelle). */
+  stream?: StreamLayout
   /** Horizontale Mitte (0..1 der Quellbreite) des 9:16-Ausschnitts; bei split: obere Person. */
   cx: number
   /** split: untere Person. */
@@ -108,6 +117,9 @@ export interface ShortmeClips {
   createdAt: string
   mode: 'llm' | 'texttiling'
   clips: ShortmeClip[]
+  /** Gewählter Inhaltstyp des Projekts und (bei Twitch) der Kanal. */
+  contentType?: ContentType | null
+  channel?: string | null
   /** Vorschaubilder als Data-URL je Clip-ID. */
   thumbs: Record<string, string | null>
   /** Quellvideo (für die Editor-Vorschau über media://). */

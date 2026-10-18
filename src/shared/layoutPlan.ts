@@ -42,6 +42,10 @@ export interface PlanOptions {
   wideFaceArea?: number
   /** Ab so vielen sichtbaren Personen, die nicht in einen 9:16-Ausschnitt passen, zeigt der Planer das ganze Bild. */
   groupMinPersons?: number
+  /** Inhaltstyp-Profil: Split bei zwei Personen erlaubt (Standard ja). */
+  allowSplit?: boolean
+  /** speaker = folgt dem Sprechenden (Standard), main = bleibt bei der Hauptperson (Vlog), fixed = ein fester Ausschnitt (Solo). */
+  follow?: 'speaker' | 'main' | 'fixed'
 }
 
 /** Mindestvorsprung (Logit) des besten Tracks vor dem zweiten, damit ASD zählt (clips-studio `_ASD_LEAD`). */
@@ -133,10 +137,25 @@ export function pingPongWindows(active: Array<number | null>, dt: number, opt: P
   return out
 }
 
-export function planShots(inp: PlanInput, opt: PlanOptions = PLAN_DEFAULTS): ShortmeShot[] {
+/** Hauptperson: Rolle „main“, sonst die Person mit der größten Gesamtfläche im Bild. */
+export function mainTrack(inp: PlanInput): number | null {
+  const cands = inp.tracks.filter((t) => !t_ignored(inp, t))
+  const roled = cands.find((t) => !!t.person && inp.personRoles?.[t.person] === 'main')
+  if (roled) return roled.id
+  let best: { id: number; a: number } | null = null
+  for (const t of cands) { const a = t.areas.reduce((x, y) => x + y, 0); if (!best || a > best.a) best = { id: t.id, a } }
+  return best?.id ?? null
+}
+
+export function planShots(inp: PlanInput, opt0: PlanOptions = PLAN_DEFAULTS): ShortmeShot[] {
   const w = cropWidth(inp.sourceAspect, inp.targetAspect)
-  const active = activeSpeakers(inp, opt)
-  const pp = pingPongWindows(active, inp.dt, opt, inp.tracks)
+  const follow = opt0.follow ?? 'speaker'
+  // Vlog/Solo: immer die Hauptperson, keine Sprecherwechsel, kein Split; Solo zusätzlich ein einziger fester Ausschnitt
+  const opt: PlanOptions = follow === 'speaker' ? opt0 : { ...opt0, noSpeakerSec: 1e6, ...(follow === 'fixed' ? { moveLimit: 1 } : {}) }
+  const main = follow === 'speaker' ? null : mainTrack(inp)
+  const active: Array<number | null> = follow === 'speaker' ? activeSpeakers(inp, opt)
+    : Array.from({ length: inp.ticks }, (_, i) => { const t = inp.tracks.find((x) => x.id === main); return t && at(t, i) ? t.id : null })
+  const pp = follow !== 'speaker' || opt.allowSplit === false ? [] : pingPongWindows(active, inp.dt, opt, inp.tracks)
   const inPP = (i: number): boolean => pp.some(([a, b]) => i >= a && i <= b)
   const noSpeakerTicks = Math.round(opt.noSpeakerSec / inp.dt)
 

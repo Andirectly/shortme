@@ -14,6 +14,7 @@ import { buildFilterGraph, OUT_H, OUT_W } from './graph'
 import { captionPass } from './captionPass'
 import { buildAss, type CapWord } from './ass'
 import { renderTitleOverlay } from './titleOverlay'
+import { streamSeamY } from '../../../shared/streamLayout'
 import { compositeOverlay, remotionAvailable, renderRemotionOverlay } from '../../remotion/render'
 import { buildPieces, keepsFromCuts, planPauseCuts, TimeMap, type Interval } from './timeline'
 import { safeFileName, uniquePath, type QualityTier } from './profiles'
@@ -35,6 +36,8 @@ export interface ExportOptions {
   engine?: 'tscaps' | 'ass'
   /** Aktives Modell des Testlab-Platzes „Untertitel-Renderer“ (Standard tscaps); Remotion nur in der App. */
   renderer?: 'tscaps' | 'remotion'
+  /** false: Untertitelposition wurde vom Nutzer gesetzt – nicht an die Facecam-Naht legen. */
+  seamCaption?: boolean
   /** Herausgeschnittene Wörter (Quellzeit), aus den Editor-Operationen. */
   extraCuts?: Interval[]
   /** KI-Hervorhebung (betonte Wörter) an/aus. */
@@ -91,7 +94,10 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
   if (plan.pieces.length === 0) throw new Error('Clip enthält nichts zu exportieren')
   await mkdir(opts.outDir, { recursive: true })
   const style: StylePreset = opts.style ?? BUILTIN_PRESETS[0]
-  const capStyle = opts.caption?.highlight === false ? { ...style.caption, highlight: style.caption.color } : style.caption
+  // Facecam + Gameplay: Untertitel standardmäßig an der Naht zwischen beiden (außer der Nutzer hat die Position selbst gesetzt)
+  const seam = opts.seamCaption === false ? null : streamSeamY(clip.shots ?? [], { width: meta.width, height: meta.height })
+  const baseCap = seam !== null ? { ...style.caption, y: seam } : style.caption
+  const capStyle = opts.caption?.highlight === false ? { ...baseCap, highlight: baseCap.color } : baseCap
 
   // libass: gebündelte + eigene Schriften in einem Ordner (ohne Electron, z. B. in Skripten: nur gebündelte)
   const fontsDirForRender = await renderFontsDir().catch(() => fontsDir())

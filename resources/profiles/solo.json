@@ -1,0 +1,9 @@
+{
+  "label": "Talking Head / Solo",
+  "frame": "fixed",
+  "tracking": { "split": false, "follow": "fixed" },
+  "marks": ["laugh", "loud", "pause"],
+  "ranking": { "signal": 4, "heat": 1, "chat": 1 },
+  "prompt": "Das ist ein Solo-Video einer Person vor der Kamera: bevorzuge klare Thesen, Tipps und Pointen, die ohne Vorwissen verständlich sind.",
+  "models": ["yamnet"]
+}

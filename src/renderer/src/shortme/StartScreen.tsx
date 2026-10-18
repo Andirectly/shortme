@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useMotionValue, animate, type PanInfo } from '
 import { UploadCloud, Link2, Sparkles, ChevronDown, AlertTriangle } from 'lucide-react'
 import { useStore } from './store'
 import { isTwitchUrl } from '@shared/twitch'
+import { CONTENT_TYPES, contentLabel, FRAME_LABELS } from '@shared/videoKind'
 import { TwitchPanel, useTwitchInspect, type Section } from './TwitchPanel'
 import { useTwitch } from './twitchStore'
 import { useProject } from './projectStore'
@@ -111,6 +112,11 @@ function CreateSheet(): React.JSX.Element {
   const startTranscribe = useProject((s) => s.startTranscribe)
   const contentType = useProject((s) => s.contentType)
   const setContentType = useProject((s) => s.setContentType)
+  const kindSource = useProject((s) => s.kindSource)
+  const kindReason = useProject((s) => s.kindReason)
+  const suggesting = useProject((s) => s.suggesting)
+  const frame = useProject((s) => s.frame)
+  const setFrame = useProject((s) => s.setFrame)
   const silentSec = (imported?.meta.twitch?.silent ?? []).reduce((n, r) => n + (r[1] - r[0]), 0)
   const hasApi = useProject((s) => s.hasApi)
   const style = useProject((s) => s.style)
@@ -175,9 +181,11 @@ function CreateSheet(): React.JSX.Element {
               </div>
             </div>
             <div style={{ overflowY: 'auto', padding: '0 24px 12px' }} {...stop}>
-              {imported?.meta.twitch && <Row label="Inhalt"><Segmented options={['Automatisch', 'Stream/Gaming']} value={contentType === 'stream' ? 'Stream/Gaming' : 'Automatisch'} onChange={(n) => setContentType(n === 'Stream/Gaming' ? 'stream' : 'auto')} /></Row>}
+              <Row label="Was ist das für ein Video?" toggle={suggesting ? <small>wird eingeschätzt …</small> : kindSource && kindSource !== 'manual' ? <span className="sm-tag" title={kindReason}>{kindSource === 'remembered' ? 'zuletzt gewählt' : 'erkannt'}</span> : undefined}>
+                <Segmented options={CONTENT_TYPES.map((c) => c.label)} value={contentLabel(contentType)} onChange={(n) => void setContentType(CONTENT_TYPES.find((c) => c.label === n)!.id)} />
+              </Row>
               <Row label="Format"><Segmented options={['9:16', '1:1', '16:9']} value={opts.format} onChange={(format) => setOpts({ format })} /></Row>
-              <Row label="Bildausschnitt"><Segmented options={['Smart', 'Ganzes Bild', 'Split', 'Fest']} value={opts.frame} onChange={(frame) => setOpts({ frame })} /></Row>
+              <Row label="Bildausschnitt"><Segmented options={Object.values(FRAME_LABELS)} value={frame} onChange={setFrame} /></Row>
               <Row label="Cliplänge"><Segmented options={['Automatisch', '≤ 30 s', '30–60 s', '60–90 s']} value={opts.length} onChange={(length) => setOpts({ length })} /></Row>
               <Row label="Untertitel">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>

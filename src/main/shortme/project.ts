@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { dataRoot } from '../engines/paths'
 import { writeFileAtomic } from './atomic'
 import type { TwitchMeta } from '../../shared/twitch'
+import type { ContentType } from '../../shared/videoKind'
 
 export interface ProjectMeta {
   hash: string
@@ -20,6 +21,9 @@ export interface ProjectMeta {
   stages: Record<string, { done: boolean; at?: string }>
   /** Nur bei Twitch-Importen. */
   twitch?: TwitchMeta
+  contentType?: ContentType
+  /** Link, über den das Video geladen wurde (für „letzte Auswahl pro Quelle“). */
+  sourceUrl?: string
 }
 
 const SAMPLE = 4 * 1024 * 1024

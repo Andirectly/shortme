@@ -5,6 +5,30 @@ import { useEngines } from './engines'
 import { useStore } from './store'
 import { Button, Pill, Row, Segmented, Switch } from './ui'
 
+/** Gespeicherte Facecam-Layouts pro Twitch-Kanal ansehen und löschen. */
+function ChannelLayouts(): React.JSX.Element | null {
+  const api = typeof window !== 'undefined' ? window.cutawan?.shortme : undefined
+  const [list, setList] = useState<Array<{ channel: string; preset: string; gap: number; updatedAt: string }>>([])
+  useEffect(() => { void api?.channelLayouts().then(setList).catch(() => undefined) }, [api])
+  if (!api) return null
+  const PRESET: Record<string, string> = { top: 'Facecam oben', half: '50 : 50', bottom: 'Facecam unten', pip: 'Kleines Fenster' }
+  return (
+    <Row label="Kanal-Layouts (Facecam + Gameplay)">
+      {list.length === 0 ? <small>Noch keine gespeichert.</small> : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {list.map((l) => (
+            <div key={l.channel} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ flex: 1, fontSize: 14 }}>{l.channel}</span>
+              <span className="sm-tag">{PRESET[l.preset] ?? l.preset}</span>
+              <Button variant="ghost" aria-label={`Layout von ${l.channel} löschen`} onClick={() => void api.channelLayoutDelete(l.channel).then(setList)}>Löschen</Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Row>
+  )
+}
+
 function TwitchSettings(): React.JSX.Element {
   const status = useTwitch((s) => s.status)
   const refresh = useTwitch((s) => s.refreshStatus)
@@ -18,6 +42,7 @@ function TwitchSettings(): React.JSX.Element {
   return (
     <div className="sm-glass" style={{ padding: '4px 22px 16px' }}>
       <Row label="Twitch-Chat als Ranking-Signal nutzen" toggle={<Switch on={!!status?.chatSignal} onChange={(b) => void api.setSettings({ chatSignal: b }).then(refresh)} label="Twitch-Chat als Ranking-Signal nutzen" />} />
+      <ChannelLayouts />
       <Row label="Live-Puffer (Minuten)"><Segmented options={['5', '15', '30', '60']} value={String(minutes)} onChange={(v) => { setMinutes(Number(v)); void api.setSettings({ bufferMinutes: Number(v) }) }} /></Row>
       <Row label="Twitch-Token (optional)">
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

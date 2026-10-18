@@ -1,0 +1,9 @@
+{
+  "label": "Stream / Gaming",
+  "frame": "stream",
+  "tracking": { "split": false, "follow": "main" },
+  "marks": ["laugh", "loud", "applause"],
+  "ranking": { "signal": 8, "heat": 1, "chat": 1.3 },
+  "prompt": "Das ist ein Stream/Gaming-Video: starke Reaktionen und Ausbrüche, überraschende Wendungen, Highlights im Spiel (Siege, Fails, knappe Szenen), witzige Sprüche. Ruhiges Spielgeschehen ohne Kommentar ist uninteressant.",
+  "models": ["yamnet"]
+}

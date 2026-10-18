@@ -1,0 +1,9 @@
+{
+  "label": "Vortrag / Präsentation",
+  "frame": "stream",
+  "tracking": { "split": false, "follow": "main" },
+  "marks": ["applause", "laugh", "pause"],
+  "ranking": { "signal": 3, "heat": 1, "chat": 1 },
+  "prompt": "Das ist ein Vortrag oder eine Präsentation: bevorzuge in sich geschlossene Erklärungen, klare Aussagen, Beispiele und Pointen; Folien sind nur Begleitung.",
+  "models": ["yamnet"]
+}

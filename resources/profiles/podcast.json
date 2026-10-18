@@ -1,0 +1,9 @@
+{
+  "label": "Podcast / Interview",
+  "frame": "smart",
+  "tracking": { "split": true, "follow": "speaker" },
+  "marks": ["laugh", "applause", "loud", "pause"],
+  "ranking": { "signal": 5, "heat": 1, "chat": 1 },
+  "prompt": "Das ist ein Podcast oder Interview: bevorzuge in sich geschlossene Antworten, Anekdoten, Meinungen und Streit; Frage und Antwort gehören zusammen.",
+  "models": ["yamnet"]
+}

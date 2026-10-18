@@ -2,7 +2,7 @@ import type { ShortmeClip, ShortmeShot } from '@shared/shortme'
 import { analyzeClipASD, ASD_FPS, type AsdAnalysis } from '../../pipeline/asd'
 import type { ProjectMeta } from '../project'
 import { loadTranscript } from '../transcription'
-import { facePenalty, faceRatio, planShots, type PlanInput, type PlanTrack } from './plan'
+import { facePenalty, faceRatio, planShots, PLAN_DEFAULTS, type PlanInput, type PlanOptions, type PlanTrack } from './plan'
 
 const STRIDE = ASD_FPS / 5 // Planungsraster 5 Ticks/s
 
@@ -11,7 +11,7 @@ export interface ClipLayout { shots: ShortmeShot[]; faceRatio: number; penalty: 
   identities: Array<{ track: number; emb: Float32Array; crop?: Buffer; sec: number }> }
 
 /** LR-ASD-Analyse (Gesichter, Tracks, Sprecher-Werte) → Plan-Eingabe auf 5-Hz-Raster, relativ zum Clipbeginn. */
-export async function layoutForClip(meta: ProjectMeta, clip: Pick<ShortmeClip, 'start' | 'end'>, shotCuts: number[], signal?: AbortSignal, pre?: AsdAnalysis | null): Promise<ClipLayout> {
+export async function layoutForClip(meta: ProjectMeta, clip: Pick<ShortmeClip, 'start' | 'end'>, shotCuts: number[], signal?: AbortSignal, pre?: AsdAnalysis | null, plan?: Partial<PlanOptions>): Promise<ClipLayout> {
   const dur = clip.end - clip.start
   const ticks = Math.max(1, Math.round(dur * 5))
   const dt = 1 / 5
@@ -33,7 +33,7 @@ export async function layoutForClip(meta: ProjectMeta, clip: Pick<ShortmeClip, '
   const tr = await loadTranscript(meta.hash).catch(() => null)
   const speech = tr?.speech.length ? Array.from({ length: ticks }, (_, i) => { const t = clip.start + (i + 0.5) * dt; return tr.speech.some(([a, b]) => t >= a && t <= b) }) : undefined
   const input: PlanInput = { tracks, ticks, dt, cuts: [...cuts].filter((c) => c > 0 && c < ticks).sort((a, b) => a - b), sourceAspect: meta.width / meta.height, speech }
-  const shots = planShots(input)
+  const shots = planShots(input, plan ? { ...PLAN_DEFAULTS, ...plan } : PLAN_DEFAULTS)
   const ratio = faceRatio(shots, input)
   const identities = (analysis?.tracks ?? []).flatMap((t, track) => (t.emb ? [{ track, emb: t.emb, crop: t.crop, sec: t.centres.length / ASD_FPS }] : []))
   return { shots, faceRatio: ratio, penalty: facePenalty(ratio), input, identities }

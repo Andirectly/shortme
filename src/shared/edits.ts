@@ -4,6 +4,7 @@
 import type { ShortmeClip, ShortmeShot } from './shortme'
 import { deepMerge, type PresetPatch } from './preset'
 import { planShots, type PlanInput, type PlanTrack } from './layoutPlan'
+import { isFullStream, type StreamLayout } from './streamLayout'
 
 /** Änderung am Untertitel-/Titelstil: anderes Preset und/oder Änderungen am Preset (tief zusammengeführt). */
 export interface CaptionPatch {
@@ -17,6 +18,9 @@ export interface CaptionPatch {
   /** Sicherheitszone (nur Anzeige im Editor). */
   zone?: 'Aus' | 'TikTok' | 'Reels' | 'Shorts'
 }
+
+/** Änderung am Facecam-Layout: Rahmen, Layout-Variante, Abstand. Ohne `at` für den ganzen Clip, mit `at` nur für die Szene (Einstellung) um diese Quellzeit. */
+export type StreamPatch = Partial<StreamLayout>
 
 export type Op =
   | { t: 'trim'; start: number; end: number }
@@ -32,6 +36,7 @@ export type Op =
   | { t: 'follow'; at: number; cx: number }
   /** Ganzer Clip: `smart` = automatischer Plan (alle Layout-Änderungen davor entfallen), sonst überall dieses Layout (Vollbild = fest, Mitte). */
   | { t: 'layoutClip'; layout: ShortmeShot['layout'] }
+  | { t: 'stream'; patch: StreamPatch; at?: number }
 
 export interface EditLog { version: 1; clipId: string; ops: Op[]; /** Anzahl angewendeter Operationen (Rest = Redo). */ cursor: number }
 
@@ -44,6 +49,8 @@ export interface EditState {
   wordEdits: Record<number, string>
   caption: { presetId: string; highlight: boolean; zone: NonNullable<CaptionPatch['zone']>; style: PresetPatch }
   layoutOps: Array<Extract<Op, { t: 'layout' | 'follow' | 'layoutClip' }>>
+  /** Facecam-Layout-Änderungen in Reihenfolge (letzte gewinnt). */
+  streamOps: Array<Extract<Op, { t: 'stream' }>>
 }
 
 export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops: [], cursor: 0 })
@@ -52,12 +59,12 @@ export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops:
 export interface StyleDefaults { presetId?: string; style?: PresetPatch; titleEnabled?: boolean }
 
 export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string> }, presetId = 'glow-karaoke', defaults: StyleDefaults = {}): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [] }
+  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */
 export function reduce(base: EditState, ops: Op[]): EditState {
-  const s: EditState = { ...base, cutWords: [...base.cutWords], hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption, style: { ...base.caption.style } }, layoutOps: [...base.layoutOps] }
+  const s: EditState = { ...base, cutWords: [...base.cutWords], hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption, style: { ...base.caption.style } }, layoutOps: [...base.layoutOps], streamOps: [...(base.streamOps ?? [])] }
   for (const op of ops) {
     switch (op.t) {
       case 'trim': s.start = Math.min(op.start, op.end - 0.5); s.end = op.end; break
@@ -75,6 +82,7 @@ export function reduce(base: EditState, ops: Op[]): EditState {
         break
       }
       case 'layoutClip': s.layoutOps = []; s.layoutOps.push(op); break
+      case 'stream': s.streamOps.push(op); break
       case 'layout':
       case 'follow': s.layoutOps.push(op); break
     }
@@ -119,8 +127,19 @@ export function effectiveClip<C extends Pick<ShortmeClip, 'start' | 'end' | 'fir
   const removed: Array<[number, number]> = st.cutWords.filter((i) => i >= first && i <= last && words[i]).map((i) => [words[i].start, words[i].end] as [number, number])
   // Shots auf absolute Zeit, dann Überschreibungen, dann auf neuen Beginn beziehen
   const abs = (clip.shots ?? []).map((s) => ({ ...s, start: clip.start + s.start, end: clip.start + s.end }))
-  const shots = applyLayoutOps(abs, st.layoutOps, st.start, st.end, layout ? { input: layout, clipStart: clip.start } : undefined).map((s) => ({ ...s, start: s.start - st.start, end: s.end - st.start }))
+  const shots = applyStreamOps(applyLayoutOps(abs, st.layoutOps, st.start, st.end, layout ? { input: layout, clipStart: clip.start } : undefined), st.streamOps ?? [], (clip as { stream?: StreamLayout }).stream).map((s) => ({ ...s, start: s.start - st.start, end: s.end - st.start }))
   return { ...clip, start: st.start, end: st.end, firstWord: first, lastWord: last, shots, hookText: st.hook.text, removed, wordEdits: st.wordEdits }
+}
+
+/** Facecam-Layout je Stream-Szene: Grundlage = Layout der Szene, sonst das des Clips; dann die Änderungen (Clip weit, dann nur die Szene um `at`). */
+export function applyStreamOps(shots: ShortmeShot[], ops: Array<Extract<Op, { t: 'stream' }>>, base?: StreamLayout): ShortmeShot[] {
+  return shots.map((s) => {
+    if (s.layout !== 'stream') return s
+    let cur: StreamLayout | undefined = s.stream ?? base
+    for (const op of ops) if (op.at === undefined || (op.at >= s.start - 1e-6 && op.at < s.end - 1e-6)) cur = cur ? { ...cur, ...op.patch } : isFullStream(op.patch) ? op.patch : undefined
+    if (!cur) return { ...s, layout: 'fixed' as const } // ohne Facecam-Layout kein Stream-Bild
+    return { ...s, stream: cur }
+  })
 }
 
 /** Layout-/Follow-Operationen auf absolute Shots anwenden und auf [from,to] beschneiden. Reihenfolge der Operationen zählt (letzte gewinnt). */

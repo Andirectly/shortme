@@ -5,7 +5,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'node:path'
 import { importFile, importUrl, type ImportResult } from './importer'
 import { JobQueue } from './jobs'
-import { discardProject, loadMeta, projectFile, projectsRoot } from './project'
+import { discardProject, loadMeta, projectFile, projectsRoot, saveMeta } from './project'
 import { allowMediaPath } from '../mediaAccess'
 import { editorAssets } from './editorAssets'
 import { planExport } from './render/exporter'
@@ -32,6 +32,11 @@ import { baseState, effectiveClip, stateOf, type CaptionPatch, type EditLog } fr
 import { allPresets, deleteUserPreset, effectivePreset, saveUserPreset } from './presets'
 import { sanitizePreset } from '../../shared/preset'
 import { safeFileName } from './render/profiles'
+import type { ContentType, FrameChoice } from '../../shared/videoKind'
+import { channelLayouts, deleteChannelLayout, loadProfile, rememberChoice, saveChannelLayout, sourceKey } from './profiles'
+import { suggestKind } from './layout/suggest'
+import { findFacecam } from './layout/facecam'
+import { defaultStream, sanitizeStream, type StreamLayout } from '../../shared/streamLayout'
 
 export const jobs = new JobQueue()
 
@@ -50,13 +55,42 @@ export function registerShortmeIpc(): void {
 
   ipcMain.handle('shortme:importFile', async (_e, path: string) => withStills(await importFile(path)))
   ipcMain.handle('shortme:importUrl', async (_e, url: string) => withStills(await importUrl(url, (p, message) => broadcast('shortme:importProgress', { progress: p, message }))))
-  /** Verarbeitung: Transkription (0–55 %), dann Analyse + Clip-Auswahl (55–100 %). */
-  ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: 'auto' | 'stream' }) => {
+  // Inhaltstyp-Vorschlag, Facecam-Layouts pro Kanal
+  ipcMain.handle('shortme:suggestKind', async (_e, hash: string) => { const meta = await loadMeta(hash); if (!meta) throw new Error('Projekt nicht gefunden'); return suggestKind(meta) })
+  /** Inhaltstyp nachträglich ändern: Ausschnitt und Ranking werden neu berechnet (Transkript bleibt). */
+  ipcMain.handle('shortme:reanalyze', async (_e, hash: string, kind: ContentType, frame?: FrameChoice) => {
     const meta = await loadMeta(hash)
     if (!meta) throw new Error('Projekt nicht gefunden')
+    meta.contentType = kind
+    await saveMeta(meta)
+    const fr = frame ?? (await loadProfile(kind)).frame
+    await rememberChoice(sourceKey({ channel: meta.twitch?.channel, url: meta.sourceUrl, path: meta.sourcePath }), { kind, frame: fr })
+    return jobs.enqueue(hash, meta.title, async ({ signal, report }) => { await runAnalysis(meta, { contentType: kind, frame: fr, signal, onProgress: report }) })
+  })
+  ipcMain.handle('shortme:profile', (_e, kind: ContentType) => loadProfile(kind))
+  ipcMain.handle('shortme:channelLayouts', () => channelLayouts())
+  ipcMain.handle('shortme:channelLayoutDelete', async (_e, channel: string) => { await deleteChannelLayout(channel); return channelLayouts() })
+  ipcMain.handle('shortme:channelLayoutSave', async (_e, channel: string, layout: StreamLayout) => { await saveChannelLayout(channel, sanitizeStream(layout, layout)); return channelLayouts() })
+  /** Facecam in einem Projekt neu suchen (Editor: „Facecam suchen“, wenn der Clip noch kein Facecam-Layout hat). */
+  ipcMain.handle('shortme:findStream', async (_e, hash: string) => {
+    const meta = await loadMeta(hash)
+    if (!meta) throw new Error('Projekt nicht gefunden')
+    const f = await findFacecam(meta.sourcePath, 0, meta.durationSec)
+    return f ? defaultStream({ width: meta.width, height: meta.height }, f.cam) : null
+  })
+  /** Verarbeitung: Transkription (0–55 %), dann Analyse + Clip-Auswahl (55–100 %). */
+  ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice }) => {
+    const meta = await loadMeta(hash)
+    if (!meta) throw new Error('Projekt nicht gefunden')
+    // Inhaltstyp am Projekt merken und als letzte Auswahl dieser Quelle (Twitch: des Kanals) speichern
+    if (opts?.contentType) {
+      meta.contentType = opts.contentType
+      await saveMeta(meta)
+      await rememberChoice(sourceKey({ channel: meta.twitch?.channel, url: meta.sourceUrl, path: meta.sourcePath }), { kind: opts.contentType, frame: opts.frame ?? (await loadProfile(opts.contentType)).frame })
+    }
     return jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
       await runTranscription(meta, { diarize: !!opts?.diarize, signal, onProgress: (p) => report(p.stage, p.fraction, p.message) })
-      await runAnalysis(meta, { query: opts?.query, contentType: opts?.contentType, wanted: opts?.wanted, signal, onProgress: report })
+      await runAnalysis(meta, { query: opts?.query, contentType: opts?.contentType, frame: opts?.frame, wanted: opts?.wanted, signal, onProgress: report })
     }, () => discardProject(hash))
   })
   const personsView = async (hash: string): Promise<ShortmePersons | null> => {
@@ -107,7 +141,7 @@ export function registerShortmeIpc(): void {
     }
     const thumbs: Record<string, string | null> = {}
     for (const c of file.clips) thumbs[c.id] = await dataUrl(thumbPath(hash, c.id))
-    return { ...file, thumbs, source: m ? { path: resolve(m.sourcePath), width: m.width, height: m.height, title: m.title, durationSec: m.durationSec } : null }
+    return { ...file, contentType: m?.contentType ?? null, channel: m?.twitch?.channel ?? null, thumbs, source: m ? { path: resolve(m.sourcePath), width: m.width, height: m.height, title: m.title, durationSec: m.durationSec } : null }
   })
   /** Export: ausgewählte Clips nacheinander rendern (Pausen entfernt, −14 LUFS, Untertitel eingebrannt). */
   ipcMain.handle('shortme:export', async (_e, hash: string, clipIds: string[], opts: { srt?: boolean; captions?: boolean }) => {
@@ -123,7 +157,7 @@ export function registerShortmeIpc(): void {
         // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
         const st = stateOf(baseState(clips[i], undefined, await loadStyle()), await loadEdits(hash, clips[i].id))
         const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
-        await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, renderer: (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' : 'tscaps', caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+        await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, renderer: (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' : 'tscaps', seamCaption: st.caption.style.caption?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
       }
       void shell.openPath(outDir)
     })

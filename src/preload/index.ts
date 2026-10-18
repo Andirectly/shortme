@@ -24,6 +24,8 @@ import type { AssetSpec, AssetStatus, CheckItem, HardwareInfo } from '@shared/en
 import type { CaptionPatch, EditLog } from '@shared/edits'
 import type { StylePreset } from '@shared/preset'
 import type { StyleDefaults } from '@shared/edits'
+import type { ContentType, FrameChoice, KindProfile } from '@shared/videoKind'
+import type { StreamLayout } from '@shared/streamLayout'
 import type { LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twitch'
 import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
 import type { PersonsPatch, PreviewPlan, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
@@ -168,7 +170,7 @@ const api = {
   shortme: {
     importFile: (path: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importFile', path),
     importUrl: (url: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importUrl', url),
-    transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: 'auto' | 'stream' }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
+    transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
     jobs: (): Promise<ShortmeJob[]> => ipcRenderer.invoke('shortme:jobs'),
     pause: (id: string): Promise<void> => ipcRenderer.invoke('shortme:pause', id),
     resume: (id: string): Promise<void> => ipcRenderer.invoke('shortme:resume', id),
@@ -203,6 +205,14 @@ const api = {
         return () => ipcRenderer.removeListener('testlab:progress', l)
       }
     },
+    /** Inhaltstyp: Vorschlag beim Import, Profile, Facecam-Layouts pro Kanal. */
+    suggestKind: (hash: string): Promise<{ kind: ContentType; reason: string; source: 'twitch' | 'remembered' | 'detected'; frame: FrameChoice; detected: ContentType }> => ipcRenderer.invoke('shortme:suggestKind', hash),
+    reanalyze: (hash: string, kind: ContentType, frame?: FrameChoice): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:reanalyze', hash, kind, frame),
+    profile: (kind: ContentType): Promise<KindProfile> => ipcRenderer.invoke('shortme:profile', kind),
+    channelLayouts: (): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayouts'),
+    channelLayoutDelete: (channel: string): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutDelete', channel),
+    channelLayoutSave: (channel: string, layout: StreamLayout): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutSave', channel, layout),
+    findStream: (hash: string): Promise<StreamLayout | null> => ipcRenderer.invoke('shortme:findStream', hash),
     twitch: {
       status: (): Promise<TwitchStatus> => ipcRenderer.invoke('twitch:status'),
       settings: (): Promise<{ chatSignal: boolean; bufferMinutes: number }> => ipcRenderer.invoke('twitch:settings'),

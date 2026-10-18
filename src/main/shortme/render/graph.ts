@@ -1,6 +1,7 @@
 import type { Piece } from './timeline'
 
 import { cropBox, OUT_H, OUT_W, type SourceDims } from '@shared/framing'
+import { planStream } from '@shared/streamLayout'
 
 export { cropBox, OUT_H, OUT_W, type SourceDims }
 
@@ -11,6 +12,16 @@ export function videoChain(p: Piece, k: number, src: SourceDims, base: number): 
   if (sh.layout === 'fit') {
     // 16:9 mittig, oben/unten unscharfe vergrößerte Kopie
     return `${trim},fps=30,split=2[bs${k}][fs${k}];[bs${k}]scale=${OUT_W}:${OUT_H}:force_original_aspect_ratio=increase,crop=${OUT_W}:${OUT_H},gblur=sigma=36[bg${k}];[fs${k}]scale=${OUT_W}:-2[fg${k}];[bg${k}][fg${k}]overlay=(W-w)/2:(H-h)/2,setsar=1[v${k}]`
+  }
+  if (sh.layout === 'stream' && sh.stream) {
+    // Facecam + Gameplay: zwei Ausschnitte der Quelle, untereinander (oder Facecam als kleines Fenster darüber)
+    const p = planStream(src, sh.stream)
+    const g = p.game.crop, c = p.cam.crop, dg = p.game.dest, dc = p.cam.dest
+    const head = `${trim},fps=30,split=2[sc${k}][sg${k}];[sg${k}]crop=${g.w}:${g.h}:${g.x}:${g.y},scale=${dg.w}:${dg.h}:flags=lanczos[tg${k}];[sc${k}]crop=${c.w}:${c.h}:${c.x}:${c.y},scale=${dc.w}:${dc.h}:flags=lanczos[tc${k}]`
+    if (p.pip) return `${head};[tg${k}][tc${k}]overlay=${dc.x}:${dc.y},setsar=1[v${k}]`
+    const gap = OUT_H - dg.h - dc.h
+    if (dc.y === 0) return `${head};[tc${k}]pad=${OUT_W}:${dc.h + gap}:0:0:color=black[pc${k}];[pc${k}][tg${k}]vstack=inputs=2,setsar=1[v${k}]`
+    return `${head};[tg${k}]pad=${OUT_W}:${dg.h + gap}:0:0:color=black[pg${k}];[pg${k}][tc${k}]vstack=inputs=2,setsar=1[v${k}]`
   }
   if (sh.layout === 'split' && sh.cx2 !== undefined) {
     const a = cropBox(src, sh.cx, OUT_W / (OUT_H / 2), p.zoom * sh.zoom)

@@ -92,6 +92,10 @@
         "to": "prompts"
       },
       {
+        "from": "resources/profiles",
+        "to": "profiles"
+      },
+      {
         "from": "resources/fonts",
         "to": "fonts"
       },

@@ -8,7 +8,7 @@ const TAG_LABEL: Record<string, string> = { hook: 'Hook', entity: 'Name/Zahl', e
 /** Echte Clips (M4) → Kartenmodell der Oberfläche. */
 export function toUiClip(c: ShortmeClip, thumb: string | null): Clip {
   return {
-    id: c.id, title: c.title, hook: c.hookText, score: c.score, duration: Math.round(c.end - c.start), faceRatio: c.faceRatio ?? 1, thumb: thumb ?? '',
+    id: c.id, title: c.title, hook: c.hookText, score: c.score, duration: Math.round(c.end - c.start), faceRatio: c.stream ? 1 : (c.faceRatio ?? 1), thumb: thumb ?? '',
     tags: [...new Set(c.tags.map((t) => TAG_LABEL[t.kind]))].slice(0, 3),
     reason: c.reason, criteria: LABELS.map(([k, label]) => ({ label, value: c.criteria[k] }))
   }

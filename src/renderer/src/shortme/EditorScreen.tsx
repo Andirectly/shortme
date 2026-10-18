@@ -17,11 +17,14 @@ import { useProject } from './projectStore'
 import { Button, Pill, Segmented, Slider, Switch, Row } from './ui'
 import { useSprings } from './motion'
 import { drawLayout, sourceRects } from '@shared/previewDraw'
+import { STREAM_PRESETS, streamSeamY, type StreamLayout } from '@shared/streamLayout'
+import { CONTENT_TYPES, contentLabel, type ContentType } from '@shared/videoKind'
+import { StreamFrames } from './StreamFrames'
 
 const ZONES: Record<string, { top: number; bottom: number; right: number }> = { TikTok: { top: 0.12, bottom: 0.2, right: 0.14 }, Reels: { top: 0.1, bottom: 0.18, right: 0.1 }, Shorts: { top: 0.1, bottom: 0.22, right: 0.12 } }
-const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', Vollbild: 'fixed', 'Ganzes Bild': 'fit', Split: 'split' }
-const LAYOUT_LABEL: Record<ShortmeShot['layout'], string> = { smart: 'Smart', fit: 'Ganzes Bild', split: 'Split', fixed: 'Vollbild' }
-const LAYOUT_COLOR: Record<ShortmeShot['layout'], string> = { smart: 'rgba(255,255,255,0.55)', fit: 'rgba(255,255,255,0.32)', split: 'rgba(255,255,255,0.62)', fixed: 'rgba(255,255,255,0.18)' }
+const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', Vollbild: 'fixed', 'Ganzes Bild': 'fit', Split: 'split', 'Facecam + Gameplay': 'stream' }
+const LAYOUT_LABEL: Record<ShortmeShot['layout'], string> = { smart: 'Smart', fit: 'Ganzes Bild', split: 'Split', fixed: 'Vollbild', stream: 'Facecam + Gameplay' }
+const LAYOUT_COLOR: Record<ShortmeShot['layout'], string> = { smart: 'rgba(255,255,255,0.55)', fit: 'rgba(255,255,255,0.32)', split: 'rgba(255,255,255,0.62)', fixed: 'rgba(255,255,255,0.18)', stream: 'rgba(255,214,10,0.55)' }
 const CANVAS_W = 540
 const CANVAS_H = 960
 const fmt = (s: number): string => `${Math.floor(Math.max(0, s) / 60)}:${(Math.max(0, s) % 60).toFixed(1).padStart(4, '0')}`
@@ -33,6 +36,7 @@ export function EditorScreen(): React.JSX.Element {
   const real = useProject((s) => s.clipsFile?.clips.find((c) => c.id === clipId))
   const hash = useProject((s) => s.clipsFile?.hash)
   const source = useProject((s) => s.clipsFile?.source)
+  const contentFromFile = useProject((s) => s.clipsFile?.contentType) ?? undefined
   const allReal = useProject((s) => s.clipsFile?.clips)
   const transcript = useProject((s) => s.transcript)
   const hasApi = useProject((s) => s.hasApi)
@@ -101,7 +105,10 @@ export function EditorScreen(): React.JSX.Element {
   /** Testlab-Entscheidung: ist Remotion der aktive Untertitel-Renderer? Dann zeigt die Vorschau den Remotion-Player. */
   const [remotionOn, setRemotionOn] = useState(false)
   useEffect(() => { if (hasApi) void window.cutawan.shortme.testlab.models().then((v) => setRemotionOn(v.active.renderer === 'remotion_renderer')).catch(() => undefined) }, [hasApi])
-  const preset = useMemo(() => effective(allPresets, st.caption.presetId, st.caption.style, live), [allPresets, st.caption.presetId, st.caption.style, live])
+  const [plan, setPlan] = useState<PreviewPlan | null>(null)
+  const presetBase = useMemo(() => effective(allPresets, st.caption.presetId, st.caption.style, live), [allPresets, st.caption.presetId, st.caption.style, live])
+  const seam = useMemo(() => (source && plan && st.caption.style.caption?.y === undefined && live?.caption?.y === undefined ? streamSeamY(plan.pieces.map((p) => ({ start: p.src0, end: p.src1, layout: p.shot.layout, stream: p.shot.stream })), { width: source.width, height: source.height }) : null), [source, plan, st.caption.style.caption?.y, live])
+  const preset = useMemo(() => (seam === null ? presetBase : { ...presetBase, caption: { ...presetBase.caption, y: seam } }), [presetBase, seam])
   const [fonts, setFonts] = useState<string[]>([])
   const [fontCss, setFontCss] = useState('')
   useEffect(() => { if (hasApi) void window.cutawan.listFonts().then((l) => setFonts(l.map((f) => f.family))).catch(() => undefined) }, [hasApi])
@@ -110,12 +117,12 @@ export function EditorScreen(): React.JSX.Element {
   const committed: [number, number] = [st.start - origStart, st.end - origStart]
   const trim = liveTrim ?? committed
   const lastClipOp = [...st.layoutOps].reverse().find((o) => o.t === 'layoutClip')
-  const clipLayout = lastClipOp && st.layoutOps[st.layoutOps.length - 1] === lastClipOp ? LAYOUT_LABEL[lastClipOp.layout] : 'Smart'
+  const planAllStream = !!plan && plan.pieces.length > 0 && plan.pieces.every((p) => p.shot.layout === 'stream')
+  const clipLayout = lastClipOp && st.layoutOps[st.layoutOps.length - 1] === lastClipOp ? LAYOUT_LABEL[lastClipOp.layout] : planAllStream ? 'Facecam + Gameplay' : 'Smart'
   const hook = hookDraft ?? st.hook.text
   const cut = st.cutWords
 
   // ---------- Vorschau-Plan (derselbe wie im Export) ----------
-  const [plan, setPlan] = useState<PreviewPlan | null>(null)
   useEffect(() => {
     if (!loaded || !hasApi || !hash) return
     let alive = true
@@ -124,6 +131,7 @@ export function EditorScreen(): React.JSX.Element {
   }, [log, loaded, hasApi, hash, clipId, st.caption.presetId])
   const planRef = useRef<PreviewPlan | null>(null)
   planRef.current = plan
+  useEffect(() => { setStreamLive(null) }, [plan])
 
   // ---------- Wellenform, Filmstreifen ----------
   const [assets, setAssets] = useState<{ peaks: number[]; step: number; strip: string[] } | null>(null)
@@ -144,10 +152,17 @@ export function EditorScreen(): React.JSX.Element {
   const tRef = useRef(0)
   const trimRef = useRef(trim)
   trimRef.current = trim
-  const [shotNow, setShotNow] = useState<{ shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2'>; zoom: number } | null>(null)
+  type ShotView = { shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2' | 'stream'>; zoom: number }
+  const [shotNow, setShotNow] = useState<ShotView | null>(null)
+  /** Facecam-Layout während des Ziehens (Vorschau), bis der neue Plan da ist. */
+  const [streamLive, setStreamLive] = useState<Partial<StreamLayout> | null>(null)
+  const streamLiveRef = useRef<Partial<StreamLayout> | null>(null)
+  streamLiveRef.current = streamLive
+  const [scope, setScope] = useState('Ganzer Clip')
+  const [kindNext, setKindNext] = useState<ContentType | null>(null)
   const shotKey = useRef('')
 
-  const currentShot = useCallback((abs: number): { shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2'>; zoom: number } => {
+  const currentShot = useCallback((abs: number): ShotView => {
     const p = planRef.current
     const piece = p?.pieces.find((x) => abs >= x.src0 && abs < x.src1) ?? p?.pieces[p.pieces.length - 1]
     if (piece) return { shot: piece.shot, zoom: piece.zoom }
@@ -160,9 +175,11 @@ export function EditorScreen(): React.JSX.Element {
     if (!v || !c || !v.videoWidth) return
     const ctx = c.getContext('2d')
     if (!ctx) return
-    const cur = currentShot(v.currentTime)
+    const cur0 = currentShot(v.currentTime)
+    const live = streamLiveRef.current
+    const cur: ShotView = live && cur0.shot.layout === 'stream' && cur0.shot.stream ? { ...cur0, shot: { ...cur0.shot, stream: { ...cur0.shot.stream, ...live } } } : cur0
     drawLayout(ctx, v, { width: v.videoWidth, height: v.videoHeight }, cur.shot, cur.zoom, CANVAS_W, CANVAS_H)
-    const key = `${cur.shot.layout}|${cur.shot.cx.toFixed(3)}|${cur.shot.cx2?.toFixed(3)}|${cur.zoom}`
+    const key = `${cur.shot.layout}|${cur.shot.cx.toFixed(3)}|${cur.shot.cx2?.toFixed(3)}|${cur.zoom}|${cur.shot.stream ? JSON.stringify(cur.shot.stream) : ''}`
     if (key !== shotKey.current) { shotKey.current = key; setShotNow(cur) }
   }, [currentShot])
 
@@ -272,7 +289,18 @@ export function EditorScreen(): React.JSX.Element {
     const others = (allReal ?? []).map((c) => c.id).filter((id) => id !== clipId)
     if (hasApi && hash) await window.cutawan.shortme.applyAll(hash, others, { presetId: st.caption.presetId, style: st.caption.style, resetStyle: true, highlight: st.caption.highlight })
   }
-  const rects = shotNow && source ? sourceRects({ width: source.width, height: source.height }, shotNow.shot, shotNow.zoom) : []
+  const streamShot = shotNow?.shot.layout === 'stream' && shotNow.shot.stream ? { ...shotNow.shot.stream, ...(streamLive ?? {}) } : null
+  const contentKind: ContentType = contentFromFile ?? 'podcast'
+  const canStream = !!real?.stream
+  const canFind = !canStream && hasApi && !!hash && (contentKind === 'stream' || contentKind === 'talk' || true)
+  const channel = useProject((s) => s.clipsFile?.channel)
+  const [channelSaved, setChannelSaved] = useState(false)
+  const recompute = async (k: ContentType): Promise<void> => { if (!hash) return; await persist(logRef.current); await window.cutawan.shortme.reanalyze(hash, k); go('processing') }
+  const saveChannel = async (l: StreamLayout): Promise<void> => { if (channel) { await window.cutawan.shortme.channelLayoutSave(channel, l); setChannelSaved(true) } }
+  const findCam = async (): Promise<void> => { if (!hash) return; const l = await window.cutawan.shortme.findStream(hash); if (l) { commit({ t: 'stream', patch: l }); commit({ t: 'layoutClip', layout: 'stream' }) } }
+  const defaultGameFor = (l: StreamLayout): StreamLayout['game'] => ({ ...l.game, x: Math.max(0, Math.min(1 - l.game.w, 0.5 - l.game.w / 2)), y: Math.max(0, Math.min(1 - l.game.h, 0.5 - l.game.h / 2)) })
+  const rects = shotNow && source && !streamShot ? sourceRects({ width: source.width, height: source.height }, shotNow.shot, shotNow.zoom) : []
+  const commitStream = (patch: Partial<StreamLayout>): void => { setStreamLive((l) => ({ ...(l ?? {}), ...patch })); commit({ t: 'stream', patch, at: scope === 'Diese Szene' ? absT : undefined }) }
   const outDuration = plan ? plan.duration : trim[1] - trim[0]
 
   return (
@@ -310,13 +338,14 @@ export function EditorScreen(): React.JSX.Element {
         {/* Bühne: Quellmonitor + vertikale Vorschau */}
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', alignItems: 'center', minHeight: 0, minWidth: 0 }}>
           <div style={{ display: showSource ? 'grid' : 'none', gap: 8, flex: '1 1 0', minWidth: 0, maxWidth: `min(820px, calc((100vh - 360px) * ${srcAspect}))`, alignSelf: 'center' }}>
-            <div title="Klick auf eine Person: Kamera folgt ihr ab hier" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); commit({ t: 'follow', at: absT, cx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) }) }}
-              style={{ position: 'relative', aspectRatio: `${srcAspect}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 0 0 1px var(--edge)', background: '#000', cursor: 'crosshair' }}>
+            <div title="Klick auf eine Person: Kamera folgt ihr ab hier" onClick={(e) => { if (streamShot) return; const r = e.currentTarget.getBoundingClientRect(); commit({ t: 'follow', at: absT, cx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) }) }}
+              style={{ position: 'relative', aspectRatio: `${srcAspect}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 0 0 1px var(--edge)', background: '#000', cursor: streamShot ? 'default' : 'crosshair' }}>
               {srcUrl
                 ? <video ref={videoRef} src={srcUrl} preload="auto" playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 : <div style={{ width: '100%', height: '100%', backgroundImage: `url(${IMG.source})`, backgroundSize: 'cover' }} />}
+              {streamShot && source && <StreamFrames layout={streamShot} src={{ width: source.width, height: source.height }} onLive={(p) => setStreamLive((l) => ({ ...(l ?? {}), ...p }))} onCommit={commitStream} />}
               {rects.map((r, i) => <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${r.x * 100}%`, width: `${r.w * 100}%`, border: '2px solid var(--accent)', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none', boxShadow: 'var(--accent-glow)' }} />)}
-              <span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)' }}>Quelle · Person anklicken</span>
+              {!streamShot && <span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)' }}>Quelle · Person anklicken</span>}
             </div>
           </div>
           <div style={{ position: 'relative', flex: 'none', height: '100%', maxHeight: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px var(--edge-highlight)', containerType: 'size' }}>
@@ -361,8 +390,24 @@ export function EditorScreen(): React.JSX.Element {
           )}
           {tab === 'Bildausschnitt' && (
             <div>
-              <Row label="Ganzer Clip"><Segmented options={['Smart', 'Vollbild', 'Ganzes Bild']} value={clipLayout} onChange={(n) => commit({ t: 'layoutClip', layout: LAYOUTS[n] })} /></Row>
+              <Row label="Inhaltstyp" toggle={kindNext && kindNext !== contentKind ? <Button variant="secondary" onClick={() => void recompute(kindNext)}>Neu berechnen</Button> : undefined}>
+                <Segmented options={CONTENT_TYPES.map((c) => c.label)} value={contentLabel(kindNext ?? contentKind)} onChange={(n) => setKindNext(CONTENT_TYPES.find((c) => c.label === n)!.id)} />
+                {kindNext && kindNext !== contentKind && <small>Ausschnitt und Ranking werden neu berechnet (Transkript bleibt).</small>}
+              </Row>
+              <Row label="Ganzer Clip"><Segmented options={['Smart', 'Vollbild', 'Ganzes Bild', ...(canStream ? ['Facecam + Gameplay'] : [])]} value={clipLayout} onChange={(n) => commit({ t: 'layoutClip', layout: LAYOUTS[n] })} /></Row>
               <Row label="Diese Einstellung"><Segmented options={Object.keys(LAYOUTS)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} /></Row>
+              {streamShot && (
+                <>
+                  <Row label="Layout"><Segmented options={STREAM_PRESETS.map((p) => p.label)} value={STREAM_PRESETS.find((p) => p.id === streamShot.preset)!.label} onChange={(n) => commitStream({ preset: STREAM_PRESETS.find((p) => p.label === n)!.id })} /></Row>
+                  <Row label="Abstand"><Slider label="px" value={streamShot.gap} min={0} max={40} onChange={() => undefined} onCommit={(v) => commitStream({ gap: v })} /></Row>
+                  <Row label="Gilt für"><Segmented options={['Ganzer Clip', 'Diese Szene']} value={scope} onChange={setScope} /></Row>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 4 }}>
+                    <Pill onClick={() => commitStream({ game: defaultGameFor(streamShot) })}>Gameplay zentrieren</Pill>
+                    {channel && <Pill onClick={() => void saveChannel(streamShot)}>{channelSaved ? 'Kanal-Layout gespeichert' : 'Als Kanal-Layout speichern'}</Pill>}
+                  </div>
+                </>
+              )}
+              {!streamShot && canFind && <Row label="Facecam"><Pill onClick={() => void findCam()}>Facecam suchen</Pill></Row>}
               <Row label="Quelle anzeigen" toggle={<Switch on={showSource} onChange={setShowSource} label="Quelle anzeigen" />} />
             </div>
           )}

@@ -1,0 +1,9 @@
+{
+  "label": "Vlog",
+  "frame": "smart",
+  "tracking": { "split": false, "follow": "main" },
+  "marks": ["laugh", "loud", "pause"],
+  "ranking": { "signal": 6, "heat": 1, "chat": 1 },
+  "prompt": "Das ist ein Vlog: eine Hauptperson erzählt oder erlebt etwas. Bevorzuge Überraschungen, Pointen, Emotionen und kurze Erlebnisse mit klarem Ende.",
+  "models": ["yamnet"]
+}

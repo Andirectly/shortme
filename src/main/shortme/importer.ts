@@ -79,6 +79,7 @@ export async function importUrl(url: string, onProgress: (p: number, message: st
       }
     } catch { /* Screenshot bleibt */ }
   }
-  if (!res.cached && res.meta.title === safe) { res.meta.title = meta.title; await saveMeta(res.meta) }
+  if (!res.cached && res.meta.title === safe) { res.meta.title = meta.title }
+  if (!res.cached) { res.meta.sourceUrl = url; await saveMeta(res.meta) }
   return res
 }

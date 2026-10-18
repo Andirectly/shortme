@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron'
-import { discardProject, loadMeta } from '../shortme/project'
+import { discardProject, loadMeta, saveMeta } from '../shortme/project'
+import { loadProfile, rememberChoice, sourceKey } from '../shortme/profiles'
 import { runTranscription } from '../shortme/transcription'
 import { runAnalysis } from '../shortme/clips/analysis'
 import { jobs, withStills } from '../shortme/ipc'
@@ -14,9 +15,12 @@ import { cleanupLiveLeftovers, liveStatus, loadSaves, saveLive, startLive, stopL
 async function analyze(hash: string): Promise<void> {
   const meta = await loadMeta(hash)
   if (!meta) throw new Error('Projekt nicht gefunden')
+  meta.contentType = 'stream'
+  await saveMeta(meta)
+  await rememberChoice(sourceKey({ channel: meta.twitch?.channel }), { kind: 'stream', frame: (await loadProfile('stream')).frame })
   await jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
     await runTranscription(meta, { diarize: false, signal, onProgress: (p) => report(p.stage, p.fraction, p.message) })
-    await runAnalysis(meta, { contentType: 'stream', signal, onProgress: report })
+    await runAnalysis(meta, { contentType: 'stream', frame: (await loadProfile('stream')).frame, signal, onProgress: report })
   }, () => discardProject(hash))
 }
 

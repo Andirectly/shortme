@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { FRAME_LABELS, frameFromLabel, type ContentType } from '@shared/videoKind'
 import type { StyleDefaults } from '@shared/edits'
 import type { PersonsPatch, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
@@ -28,8 +29,16 @@ interface ProjectState {
   /** Twitch (VOD, Clip, laufendes VOD): mit `analyze` startet danach direkt die Clip-Analyse. */
   twitchImport: (url: string, opts: { section?: [number, number]; lastMinutes?: number; analyze?: boolean }) => Promise<boolean>
   /** Inhaltstyp für die Clip-Auswahl; Twitch-Importe schlagen „Stream/Gaming“ vor. */
-  contentType: 'auto' | 'stream'
-  setContentType: (c: 'auto' | 'stream') => void
+  contentType: ContentType
+  /** Wie der Typ zustande kam (für das Etikett „erkannt“); null = noch keine Einschätzung. */
+  kindSource: 'twitch' | 'remembered' | 'detected' | 'manual' | null
+  kindReason: string
+  suggesting: boolean
+  setContentType: (c: ContentType) => Promise<void>
+  /** Gewählter Bildausschnitt (Anzeigename) – folgt dem Typ, bleibt änderbar. */
+  frame: string
+  setFrame: (f: string) => void
+  suggest: () => Promise<void>
   clearImport: () => void
   startTranscribe: (diarize: boolean, query?: string, wanted?: number) => Promise<boolean>
   exportClips: (clipIds: string[], presetId: string, srt: boolean) => Promise<boolean>
@@ -129,6 +138,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     try {
       const r = await a.importFile(path)
       set({ imported: r, importing: false })
+      void get().suggest()
       return true
     } catch (e) {
       set({ importing: false, importError: e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e) })
@@ -142,33 +152,54 @@ export const useProject = create<ProjectState>((set, get) => ({
     try {
       const r = await a.importUrl(url)
       set({ imported: r, importing: false })
+      void get().suggest()
       return true
     } catch (e) {
       set({ importing: false, importError: e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e) })
       return false
     }
   },
-  contentType: 'auto',
-  setContentType: (contentType) => set({ contentType }),
+  contentType: 'podcast',
+  kindSource: null,
+  kindReason: '',
+  suggesting: false,
+  frame: 'Smart',
+  setFrame: (frame) => set({ frame }),
+  setContentType: async (contentType) => {
+    set({ contentType, kindSource: 'manual', kindReason: '' })
+    const a = api()
+    if (a) { const p = await a.profile(contentType).catch(() => null); if (p) set({ frame: FRAME_LABELS[p.frame] }) }
+  },
+  suggest: async () => {
+    const a = api()
+    const imp = get().imported
+    if (!a || !imp) return
+    set({ suggesting: true })
+    try {
+      const s = await a.suggestKind(imp.meta.hash)
+      set({ contentType: s.kind, kindSource: s.source, kindReason: s.reason, frame: FRAME_LABELS[s.frame], suggesting: false })
+    } catch { set({ suggesting: false }) }
+  },
   twitchImport: async (url, opts) => {
     const a = api()
     if (!a) return false
     set({ importing: true, importError: '', importProgress: 0, importMessage: 'Twitch-Link wird geprüft …' })
     try {
       const r = await a.twitch.import(url, opts)
-      set({ imported: r, importing: false, contentType: 'stream' })
+      set({ imported: r, importing: false })
+      void get().suggest()
       return true
     } catch (e) {
       set({ importing: false, importError: e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e) })
       return false
     }
   },
-  clearImport: () => set({ imported: null, importError: '', contentType: 'auto' }),
+  clearImport: () => set({ imported: null, importError: '', contentType: 'podcast', kindSource: null, kindReason: '' }),
   startTranscribe: async (diarize, query, wanted) => {
     const a = api()
     const imp = get().imported
     if (!a || !imp) return false
-    const job = await a.transcribe(imp.meta.hash, { diarize, query, wanted, contentType: get().contentType })
+    const job = await a.transcribe(imp.meta.hash, { diarize, query, wanted, contentType: get().contentType, frame: frameFromLabel(get().frame) })
     set({ job, clipsFile: null, transcript: null })
     return true
   },

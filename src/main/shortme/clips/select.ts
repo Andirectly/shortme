@@ -14,6 +14,8 @@ export interface SelectInput {
   heat?: HeatPoint[] | null
   /** Twitch-Chat-Aktivität (nur wenn der Chat-Schalter an war), um 15 s zurückgerechnet. */
   chat?: HeatPoint[] | null
+  /** Gewichte aus dem Inhaltstyp-Profil (Standard 5 / 1 / 1). */
+  weights?: { signal: number; heat: number; chat: number }
   /** Audio-Ereignisse (YAMNet/VAD) → Markierungen im Transkript für das LLM. */
   events?: AudioEvent[] | null
   words: AsrWord[]
@@ -217,9 +219,9 @@ export function lengthPenalty(sec: number): number {
 export const critSum = (c: ShortmeClip['criteria']): number => c.hook + c.payoff + c.quotable + c.standalone + c.density
 
 /** Endwert: 60 % Raster, 40 % relative Rangfolge der Finalisten (+ bis 5 Punkte aus den Ton-Signalen). */
-export function finalScore(sum: number, rank: number, finalists: number, signalMean: number, heatBonusPts = 0): number {
+export function finalScore(sum: number, rank: number, finalists: number, signalMean: number, heatBonusPts = 0, signalWeight = 5): number {
   const rankScore = finalists <= 1 ? 100 : 100 - rank * (60 / (finalists - 1))
-  return Math.max(0, Math.min(100, Math.round(0.6 * sum + 0.4 * rankScore + 5 * signalMean + heatBonusPts)))
+  return Math.max(0, Math.min(100, Math.round(0.6 * sum + 0.4 * rankScore + signalWeight * signalMean + heatBonusPts)))
 }
 
 const queryLine = (q?: string): string => (q?.trim() ? `Der Nutzer sucht besonders nach: „${q.trim()}“. Bevorzuge passende Stellen, erfinde aber nichts.\n` : '')
@@ -364,7 +366,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   // E: nach Score wählen, Grenzen einrasten (Nachbarn verbieten Überlappung)
   console.info(`[select] bewertet: ${rated.length}, Finalisten: ${finalists.length}`)
   const pool = [...finalists, ...rated.filter((r) => !finalists.includes(r)).map((r) => { r.rank = finalists.length; return r })]
-  const scored = pool.map((f) => ({ f, score: Math.max(0, finalScore(f.sum, f.rank, pool.length, (secOf(signals.loudness, sentences[f.first].start, sentences[f.last].end) + secOf(signals.burst, sentences[f.first].start, sentences[f.last].end)) / 2, (input.heat ? heatBonus(heatScore(input.heat, sentences[f.first].start, sentences[f.last].end)) : 0) + (input.chat ? chatBonus(heatScore(input.chat, sentences[f.first].start, sentences[f.last].end)) : 0)) - lengthPenalty(dur(sentences, f.first, f.last))) }))
+  const scored = pool.map((f) => ({ f, score: Math.max(0, finalScore(f.sum, f.rank, pool.length, (secOf(signals.loudness, sentences[f.first].start, sentences[f.last].end) + secOf(signals.burst, sentences[f.first].start, sentences[f.last].end)) / 2, ((input.heat ? heatBonus(heatScore(input.heat, sentences[f.first].start, sentences[f.last].end)) : 0) * (input.weights?.heat ?? 1)) + ((input.chat ? chatBonus(heatScore(input.chat, sentences[f.first].start, sentences[f.last].end)) : 0) * (input.weights?.chat ?? 1)), input.weights?.signal ?? 5) - lengthPenalty(dur(sentences, f.first, f.last))) }))
   // Qualitätsschwelle: Clips mit schwachem Hook UND/ODER nicht eigenständigem Anfang erst nehmen, wenn zu wenige gute da sind
   const solid = (f: Rated): boolean => f.criteria.standalone >= 8 && f.criteria.hook >= 8
   scored.sort((a, b) => Number(solid(b.f)) - Number(solid(a.f)) || b.score - a.score)
