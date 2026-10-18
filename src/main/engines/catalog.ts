@@ -91,6 +91,15 @@ export const CATALOG: AssetSpec[] = [
     recommendedFromVramMb: 0
   },
   {
+    id: 'yamnet',
+    name: 'YAMNet (Audio-Ereignisse)',
+    kind: 'vision',
+    note: 'Erkennt Lachen, Applaus und laute Stimme im Ton (16 MB)',
+    files: [{ url: `${HF}/audiomagic/yamnet-onnx/resolve/main/yamnet.onnx`, name: 'yamnet.onnx', size: 16093355, sha256: 'd3835ffbbd4a1bb3e777f0ca217b5007907f5171dd5d17c4236b95b2af8f908e' }],
+    expect: ['yamnet.onnx'],
+    recommendedFromVramMb: 0
+  },
+  {
     id: 'speaker-segmentation',
     name: 'pyannote Segmentierung 3.0',
     kind: 'vad',

@@ -95,3 +95,9 @@
 - [ ] Sprecher nie halb im Bild
 - [ ] Untertitel einzeilig; Korrekturen sinnvoll (keine falschen Namen)
 - [ ] Editor füllt Fullscreen sinnvoll
+
+## M13
+- [ ] Kinetisch/Glas im bewegten Export ansehen (Pop-in, Blur-in, Lesbarkeit auf hellem Bild)
+- [ ] YouTube-Link importieren → Heatmap vorhanden? Danach `eval-heat.ts` laufen lassen
+- [ ] Themenkarte plausibel? (docs: .tmp/…/topics.json)
+- [ ] Daumen setzen → feedback.jsonl wächst

@@ -61,7 +61,7 @@ export function registerEngineIpc(): void {
   /** Assistent: alles Empfohlene (Reihenfolge: klein → groß), fortsetzbar. */
   ipcMain.handle('engines:installRecommended', async () => {
     const hw = await hardware()
-    const ids = ['silero-vad', 'transnetv2', 'yolov8n-pose', 'face-embed', 'llama-server', 'node-runtime', 'speaker-segmentation', 'speaker-embedding', 'parakeet-v3', hw.recommendedLlm]
+    const ids = ['silero-vad', 'transnetv2', 'yolov8n-pose', 'face-embed', 'yamnet', 'llama-server', 'node-runtime', 'speaker-segmentation', 'speaker-embedding', 'parakeet-v3', hw.recommendedLlm]
     for (const id of ids) await assets.install(id).catch(() => undefined)
     await ensureYtDlp(() => undefined).catch(() => undefined)
     return assets.list()

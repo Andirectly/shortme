@@ -1,6 +1,6 @@
 import type { AsrWord } from '../../engines/asr/protocol'
 
-export interface Sentence { index: number; first: number; last: number; start: number; end: number; text: string }
+export interface Sentence { index: number; first: number; last: number; start: number; end: number; text: string; /** Audio-Markierungen ([lacht], [Applaus], [laut], [Pause]) für das LLM. */ ev?: string[] }
 
 /** Deutsche (und englische) Abkürzungen, nach denen ein Punkt KEIN Satzende ist. */
 const ABBREVIATIONS = new Set([

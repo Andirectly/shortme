@@ -13,6 +13,8 @@ import { makeThumbs } from './thumbs'
 import { layoutForClip } from '../layout/run'
 import { applyPersons, buildPersons } from './persons'
 import { loadHeat } from './heat'
+import { detectAudioEvents, loadEvents, saveEvents, yamnetAvailable, type AudioEvent } from './audioEvents'
+import { loadTopics, saveTopics, type TopicMap } from './topics'
 import type { PlanInput } from '../../../shared/layoutPlan'
 
 export interface AnalysisOptions {
@@ -80,6 +82,18 @@ export async function ensureShots(meta: ProjectMeta, signal?: AbortSignal, onPro
 }
 
 /** Stufe „Analysieren + Clips finden“: Signale → Kamerawechsel → LLM-Auswahl (oder TextTiling) → clips.json. */
+/** Audio-Ereignisse (YAMNet + Pausen) einmal je Projekt berechnen und zwischenspeichern; ohne Modell nur Pausen (wird später mit Modell neu berechnet). */
+async function ensureEvents(meta: ProjectMeta, speech: Array<[number, number]>, signal?: AbortSignal): Promise<AudioEvent[] | null> {
+  const cached = await loadEvents(meta.hash)
+  const hasModelEvents = !!cached?.some((e) => e.kind !== 'pause')
+  if (cached && (hasModelEvents || !yamnetAvailable())) return cached
+  try {
+    const ev = await detectAudioEvents(projectFile(meta.hash, 'audio.wav'), speech, signal)
+    await saveEvents(meta.hash, ev)
+    return ev
+  } catch (e) { if (signal?.aborted) throw e; console.error('Audio-Ereignisse fehlgeschlagen:', e); return null }
+}
+
 export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {}): Promise<ClipsFile> {
   const report = opts.onProgress ?? (() => undefined)
   const t = await loadTranscript(meta.hash)
@@ -89,9 +103,11 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   report('shots', 0, 'Kamerawechsel erkennen …')
   const cuts = await ensureShots(meta, opts.signal, (f) => report('shots', f, 'Kamerawechsel erkennen …'))
   const heat = await loadHeat(meta.hash)
+  report('signals', 0.5, 'Audio-Ereignisse erkennen (Lachen, Applaus, Pausen) …')
+  const events = await ensureEvents(meta, t.speech, opts.signal)
   if (heat) report('signals', 1, 'Most-replayed-Kurve gefunden – fließt ins Ranking ein')
-  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat }
-  const sel = { query: opts.query, wanted: opts.wanted, signal: opts.signal, report }
+  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat, events }
+  const sel = { query: opts.query, wanted: opts.wanted, signal: opts.signal, report, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
 
   let mode: ClipsFile['mode'] = 'llm'
   let clips: ShortmeClip[]

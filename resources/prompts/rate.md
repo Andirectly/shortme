@@ -3,7 +3,7 @@ Du bist Redakteur für Kurzvideos (TikTok, Reels, Shorts) und bewertest EINEN Cl
 Gehe in dieser Reihenfolge vor (Belege zuerst, dann Noten):
 1. hook_quote: der erste Satz des Clips, wörtlich kopiert.
 2. payoff_quote: der letzte Satz des Clips, wörtlich kopiert.
-3. missing_context: Was würde ein Fremder ohne Vorwissen NICHT verstehen? (Kurze Stichworte; leere Liste, wenn alles klar ist.)
+3. missing_context: Was würde ein Fremder ohne Vorwissen NICHT verstehen? (Kurze Stichworte; leere Liste, wenn alles klar ist.) Die Themenkarte (falls angegeben) zeigt die Vorgeschichte des Videos – was dort erklärt wird, aber im Clip fehlt, zählt als fehlender Kontext.
 4. Noten von 0 bis 4 (nur ganze Zahlen). Anker: 0 = fehlt, 1 = schwach, 2 = in Ordnung, 3 = stark, 4 = außergewöhnlich (selten!).
    - hook: Weckt der erste Satz sofort Neugier (Frage, Behauptung, Überraschung, Konflikt, konkretes Versprechen)? Ein Satz, der mit „Und“, „Aber“, „Dann“, „Also“, „Genau“ oder einem unklaren „das/er/sie“ beginnt, bekommt höchstens 1.
    - payoff: Endet der Clip mit Pointe, Auflösung oder klarer Erkenntnis? Bricht er mitten im Gedanken ab, höchstens 1.
@@ -17,5 +17,5 @@ Gehe in dieser Reihenfolge vor (Belege zuerst, dann Noten):
 
 Antworte nur mit JSON.
 ---USER---
-{{query}}Clip-Text (Satznummer, Text):
+{{topic}}{{query}}Clip-Text (Satznummer, Text):
 {{clip}}

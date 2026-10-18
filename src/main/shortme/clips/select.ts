@@ -1,4 +1,5 @@
 import type { ClipTagKind, ShortmeClip } from '@shared/shortme'
+import { marksBySentence, type AudioEvent } from './audioEvents'
 import { heatBonus, heatScore, type HeatPoint } from './heat'
 import type { AsrWord } from '../../engines/asr/protocol'
 import type { Signals } from './signals'
@@ -6,10 +7,13 @@ import { splitSentences, type Sentence } from './sentences'
 import { snapClip, type Range } from './snap'
 import { topicClips } from './texttiling'
 import { chatJson, int, isObj, loadPrompt, str } from './llm'
+import { buildTopicMap, topicContext, topicOfRange, type TopicMap } from './topics'
 
 export interface SelectInput {
   /** „Most replayed“-Kurve (YouTube), falls vorhanden – starkes Ranking-Signal. */
   heat?: HeatPoint[] | null
+  /** Audio-Ereignisse (YAMNet/VAD) → Markierungen im Transkript für das LLM. */
+  events?: AudioEvent[] | null
   words: AsrWord[]
   durationSec: number
   signals: Signals
@@ -19,6 +23,8 @@ export interface SelectInput {
 export interface SelectOptions {
   /** URL des laufenden llama-server; null = Fallback (TextTiling). */
   baseUrl: string | null
+  /** Themenkarte zwischenspeichern (Projektordner) – spart den Themen-Durchgang bei erneuter Auswahl. */
+  topicsCache?: { load: (sentences: number) => Promise<TopicMap | null>; save: (m: TopicMap) => Promise<void> }
   query?: string
   wanted?: number
   minSec?: number
@@ -114,12 +120,12 @@ const secOf = (sig: number[], a: number, b: number): number => {
 /** Zeile für das LLM: `[S12 | 212 s] Text (laut)`; Ton-Hinweise nur bei deutlichen Auffälligkeiten. */
 export function formatSentence(s: Sentence, sig: Signals): string {
   const marks: string[] = []
-  if (secOf(sig.burst, s.start, s.end) > 0.6) marks.push('Lachen?')
+  if (!s.ev && secOf(sig.burst, s.start, s.end) > 0.6) marks.push('Lachen?')
   if (secOf(sig.loudness, s.start, s.end) > 0.85) marks.push('laut')
-  return `[S${s.index} | ${Math.round(s.start)} s] ${s.text}${marks.length ? ` (${marks.join(', ')})` : ''}`
+  return `[S${s.index} | ${Math.round(s.start)} s] ${s.text}${s.ev?.length ? ` ${s.ev.join(' ')}` : ''}${marks.length ? ` (${marks.join(', ')})` : ''}`
 }
 
-const clipText = (sentences: Sentence[], a: number, b: number): string => sentences.slice(a, b + 1).map((s) => `[S${s.index}] ${s.text}`).join('\n')
+const clipText = (sentences: Sentence[], a: number, b: number): string => sentences.slice(a, b + 1).map((s) => `[S${s.index}] ${s.text}${s.ev?.length ? ` ${s.ev.join(' ')}` : ''}`).join('\n')
 const dur = (sentences: Sentence[], a: number, b: number): number => sentences[b].end - sentences[a].start
 const norm = (w: string): string => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
 
@@ -222,12 +228,23 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   const maxSec = Math.min(opts.maxSec ?? 75, MAX_CLIP_SEC)
   const wanted = opts.wanted ?? defaultWanted(durationSec)
   const sentences = splitSentences(words)
+  if (input.events?.length) for (const [i, ev] of marksBySentence(sentences, input.events)) sentences[i].ev = ev
   const report = opts.report ?? (() => undefined)
   if (sentences.length < 4) return []
   if (!opts.baseUrl) return fallbackClips(input, sentences, wanted, minSec, maxSec, cuts, report)
 
   const url = opts.baseUrl
   const { signal } = opts
+
+  // 0: Themen-Durchgang (Hauptthema + Themenkarte) → Bewertung („ohne Vorwissen verständlich?“) und Themenvielfalt
+  let tmap: TopicMap | null = (await opts.topicsCache?.load(sentences.length)) ?? null
+  if (!tmap) {
+    report('topics', 0, 'Themenkarte erstellen …')
+    tmap = await buildTopicMap(url, sentences, { signal, report: (f, m) => report('topics', f, m) }).catch((e) => { if (signal?.aborted) throw e; console.error('[select] Themenkarte fehlgeschlagen:', e); return null })
+    if (tmap) await opts.topicsCache?.save(tmap).catch(() => undefined)
+  }
+  console.info(`[select] Themen: ${tmap ? tmap.topics.length : 0}${tmap ? ` · ${tmap.main}` : ''}`)
+  const topicCtx = (a: number, b: number): string => topicContext(tmap, sentences[a].start, sentences[b].end)
 
   // A: Kandidaten je Fenster (Satznummern)
   const windows = buildWindows(sentences)
@@ -263,7 +280,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
     for (let round = 0; round < 2 && first > 0; round++) {
       const flagged = CONNECTIVE_START.test(sentences[first].text.trim())
       const prev = clipText(sentences, Math.max(0, first - BEFORE), first - 1)
-      const sp = await loadPrompt('standalone', { before: prev, clip: clipText(sentences, first, Math.min(last, first + 2)) })
+      const sp = await loadPrompt('standalone', { topic: topicCtx(first, Math.min(last, first + 2)), before: prev, clip: clipText(sentences, first, Math.min(last, first + 2)) })
       const v = await chatJson(url, sp, {
         signal, maxTokens: 100, temperature: 0.1,
         schema: { type: 'object', additionalProperties: false, required: ['ok', 'extend_start'], properties: { ok: { type: 'boolean' }, extend_start: { type: 'integer', minimum: 0, maximum: 2 } } },
@@ -279,7 +296,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
     // C: erste Probe (die Besten bekommen später eine zweite → Median)
     const samples: RateRaw[] = []
     {
-      const rp = await loadPrompt('rate', { query: queryLine(opts.query), clip: ctx() })
+      const rp = await loadPrompt('rate', { topic: topicCtx(first, last), query: queryLine(opts.query), clip: ctx() })
       samples.push(await chatJson(url, rp, { signal, schema: RATE_SCHEMA, validate: validateRate, maxTokens: 800, temperature: 0.2 }))
     }
     let merged = mergeRatings(samples, textNow())
@@ -305,7 +322,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   for (let i = 0; i < second.length; i++) {
     report('rate', 0.8 + 0.2 * (i / second.length), `Zweite Bewertung (${i + 1}/${second.length}) …`)
     const r = second[i]
-    const rp = await loadPrompt('rate', { query: queryLine(opts.query), clip: r.ctx ?? '' })
+    const rp = await loadPrompt('rate', { topic: topicCtx(r.first, r.last), query: queryLine(opts.query), clip: r.ctx ?? '' })
     r.samples = [...(r.samples ?? []), await chatJson(url, rp, { signal, schema: RATE_SCHEMA, validate: validateRate, maxTokens: 800, temperature: 0.5 })]
     const mg = mergeRatings(r.samples, r.text ?? '')
     r.criteria = mg.criteria
@@ -352,11 +369,17 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   const taken: Range[] = []
   const out: ShortmeClip[] = []
   const sctx = { words, sentences, silences: signals.silences, cuts, durationSec }
-  for (const { f, score } of scored) {
-    if (out.length >= wanted) break
+  // Themenvielfalt: jeder weitere Clip aus einem schon gewählten Thema kostet Punkte
+  const topicOf = (f: Rated): number => topicOfRange(tmap, sentences[f.first].start, sentences[f.last].end)
+  const perTopic = new Map<number, number>()
+  const adj = (x: { f: Rated; score: number }): number => x.score - (tmap && tmap.topics.length > 1 ? 7 * (perTopic.get(topicOf(x.f)) ?? 0) : 0)
+  while (scored.length && out.length < wanted) {
+    scored.sort((a, b) => Number(solid(b.f)) - Number(solid(a.f)) || adj(b) - adj(a))
+    const { f, score } = scored.shift()!
     const snapped = snapClip({ start: sentences[f.first].start, end: sentences[f.last].end }, { ...sctx, neighbors: taken, maxLen: MAX_CLIP_SEC })
     if (snapped.end - snapped.start < minSec * 0.6 || taken.some((t) => snapped.start < t.end && snapped.end > t.start)) { console.info(`[select] verworfen (Überlappung/zu kurz): ${snapped.start.toFixed(1)}–${snapped.end.toFixed(1)}`); continue }
     taken.push({ start: snapped.start, end: snapped.end })
+    perTopic.set(topicOf(f), (perTopic.get(topicOf(f)) ?? 0) + 1)
     // Wortgrenzen aus dem EINGERASTETEN Bereich (Nachbarn/Länge können den Kandidaten kürzen)
     const fw = Math.max(0, words.findIndex((w) => w.start >= snapped.start - 0.06))
     let lw = fw

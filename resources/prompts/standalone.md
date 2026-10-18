@@ -7,7 +7,7 @@ Verlängere nur, wenn es wirklich hilft.
 
 Antworte nur mit JSON.
 ---USER---
-Vorhergehende Sätze (nicht Teil des Clips):
+{{topic}}Vorhergehende Sätze (nicht Teil des Clips):
 {{before}}
 
 Clip-Anfang (Satznummer, Text):
