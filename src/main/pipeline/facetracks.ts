@@ -21,12 +21,13 @@ const MATCH_IOU = 0.25
 /** Detections may drop out briefly (blur, profile turn); bridge gaps up to this. */
 const MAX_GAP_SEC = 0.6
 /** Discard tracks shorter than this — too little context for a speech score. */
-const MIN_TRACK_SEC = 0.6
-const MIN_DETECTIONS = 3
+export const MIN_TRACK_SEC = 0.6
+export const MIN_DETECTIONS = 3
 /** Median smoothing window for box centre/size, in seconds. */
-const SMOOTH_SEC = 0.5
+export const SMOOTH_WINDOW_SEC = 0.5
+const SMOOTH_SEC = SMOOTH_WINDOW_SEC
 
-interface Detection {
+export interface Detection {
   frame: number
   box: FaceBox
 }
@@ -57,7 +58,7 @@ function lerpBox(a: FaceBox, b: FaceBox, t: number): FaceBox {
  * box through `end` (skipped frames before the face was next missed), then
  * smooth.
  */
-function finalizeTrack(detections: Detection[], smoothWindow: number, end: number): FaceTrack {
+export function finalizeTrack(detections: Detection[], smoothWindow: number, end: number): FaceTrack {
   const start = detections[0].frame
   const boxes: FaceBox[] = new Array(end - start + 1)
   let d = 0

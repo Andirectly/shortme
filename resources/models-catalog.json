@@ -1,5 +1,5 @@
 {
-  "_info": "Katalog für das Testlab. Pro Modell: Platz, Kurzbeschreibung, Vorteile, Nachteile, Größe/Tempo, Lizenz, geeignet für. 'status': aktiv = aktuell in Shortme, kandidat = noch zu integrieren. Werte aus der Recherche vom Oktober 2026; eigene Testlab-Messungen haben Vorrang. Ergänzt: 'integrated' (true = im Code eingebunden und im Testlab wählbar), Status 'test' (integrierte Alternative) und 'entfernen' (zum Entfernen); Entscheidungen aus dem Testlab werden hier und in docs/MODELS.md nachgetragen.",
+  "_info": "Katalog für das Testlab. Pro Modell: Platz, Kurzbeschreibung, Vorteile, Nachteile, Größe/Tempo, Lizenz, geeignet für. 'status': aktiv = aktuell in Shortme, kandidat = noch zu integrieren. Werte aus der Recherche vom Oktober 2026; eigene Testlab-Messungen haben Vorrang. Ergänzt: 'integrated' (true = im Code eingebunden und im Testlab wählbar), Status 'test' (integrierte Alternative) und 'entfernen' (zum Entfernen); Entscheidungen aus dem Testlab werden hier und in docs/MODELS.md nachgetragen. 'assets' = Modell-Manager-IDs, die das Modell braucht (fehlende werden im Testlab beim Start automatisch geladen).",
   "slots": [
     {
       "id": "face",
@@ -68,7 +68,10 @@
       "size": "ca. 17 MB, ca. 5 ms pro Bild",
       "license": "InsightFace, nicht-kommerziell (privat ok)",
       "bestFor": "Podcasts, Interviews, alle Fälle mit seitlichen Gesichtern",
-      "integrated": true
+      "integrated": true,
+      "assets": [
+        "scrfd-10g"
+      ]
     },
     {
       "id": "scrfd_2_5g",
@@ -127,7 +130,7 @@
     {
       "id": "botsort_reid",
       "slot": "tracking",
-      "status": "kandidat",
+      "status": "test",
       "name": "BoT-SORT-ReID (BoxMOT + OSNet x0.25)",
       "short": "Erkennt Personen am Körper-Aussehen (Kleidung, Statur) wieder.",
       "pros": [
@@ -142,7 +145,7 @@
       "size": "OSNet x0.25 ca. 1 MB",
       "license": "BoxMOT AGPL (privat ok)",
       "bestFor": "Vlogs, Bewegung, lange Gesichtslücken",
-      "integrated": false
+      "integrated": true
     },
     {
       "id": "lr_asd",
@@ -200,7 +203,11 @@
       "size": "ca. 9 MB + Embedding-Modell",
       "license": "MIT / Apache-2.0",
       "bestFor": "Runden mit mehr als 4 Personen",
-      "integrated": true
+      "integrated": true,
+      "assets": [
+        "speaker-segmentation",
+        "speaker-embedding"
+      ]
     },
     {
       "id": "sortformer",
@@ -240,7 +247,10 @@
       ],
       "size": "16 MB",
       "license": "Apache-2.0",
-      "bestFor": "Standard für alle Typen"
+      "bestFor": "Standard für alle Typen",
+      "assets": [
+        "yamnet"
+      ]
     },
     {
       "id": "zencastr_laughter",
@@ -319,7 +329,10 @@
       "size": "ca. 9 GB Datei",
       "license": "Apache-2.0",
       "bestFor": "Standard",
-      "integrated": true
+      "integrated": true,
+      "assets": [
+        "qwen3-14b"
+      ]
     },
     {
       "id": "gemma4_12b",

@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, stat } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { dataRoot } from '../engines/paths'
+import { assets } from '../engines'
 import { analyzeClipASD, ASD_FPS } from '../pipeline/asd'
 import { importFile } from '../shortme/importer'
 import { loadMeta, projectsRoot } from '../shortme/project'
@@ -13,7 +14,7 @@ import { loadTranscript } from '../shortme/transcription'
 import { layoutForClip } from '../shortme/layout/run'
 import { activeSpeakers } from '../shortme/layout/plan'
 import type { LabResult, LabRunRequest, LabSource, LabTrack } from '../../shared/models'
-import { loadCatalog, recordMeasured } from './registry'
+import { activeModelId, loadCatalog, recordMeasured } from './registry'
 
 const HZ = 12.5
 const STEP = ASD_FPS / HZ // 2 Frames je Probe
@@ -21,7 +22,22 @@ const VERSION = 1
 
 /** Verfahren je Platz: Modell-ID → Parameter für die Analyse. Nur Plätze mit Verfahren sind vergleichbar. */
 const FACE_DETECTORS: Record<string, 'yunet' | 'scrfd'> = { yunet: 'yunet', scrfd_10g: 'scrfd' }
-export const LAB_SLOTS = ['face']
+const TRACKERS: Record<string, 'iou' | 'botsort'> = { iou_tracks: 'iou', botsort_reid: 'botsort' }
+export const LAB_SLOTS = ['face', 'tracking']
+
+/** Geschätzte ID-Wechsel: Spur B beginnt ≤ 3 s nach Ende von Spur A, ohne Kamerawechsel dazwischen und < 0,15 Bildbreiten entfernt → vermutlich dieselbe Person mit neuer ID. */
+export function countIdSwitches(tracks: LabTrack[], cutTimes: number[]): number {
+  const ends = tracks.map((t) => ({ id: t.id, t0: t.t0, end: t.t0 + (t.boxes.length - 1) * t.dt, last: t.boxes[t.boxes.length - 1] })).filter((t) => t.last)
+  let n = 0
+  for (const b of tracks) {
+    if (!b.boxes.length) continue
+    const first = b.boxes[0]
+    const bc = (first[0] + first[2]) / 2
+    const hit = ends.some((a) => a.id !== b.id && a.end <= b.t0 + 0.2 && b.t0 - a.end <= 3 && !cutTimes.some((c) => c > a.end && c <= b.t0 + 0.1) && Math.abs((a.last[0] + a.last[2]) / 2 - bc) < 0.15)
+    if (hit) n++
+  }
+  return n
+}
 
 const vramMb = (): number => { try { return Number(execFileSync('nvidia-smi', ['--query-gpu=memory.used', '--format=csv,noheader,nounits'], { encoding: 'utf8', windowsHide: true }).split('\n')[0]) } catch { return -1 } }
 
@@ -42,17 +58,20 @@ export async function labSources(): Promise<LabSource[]> {
 }
 
 const cacheDir = (): string => join(dataRoot(), 'testlab')
-async function cacheKey(path: string, model: string, start: number, dur: number): Promise<string> {
+async function cacheKey(path: string, model: string, start: number, dur: number, ctx: string): Promise<string> {
   const st = await stat(path)
-  return createHash('sha1').update(`${path}|${st.size}|${st.mtimeMs}|${model}|${start}|${dur}|v${VERSION}`).digest('hex').slice(0, 20)
+  return createHash('sha1').update(`${path}|${st.size}|${st.mtimeMs}|${model}|${start}|${dur}|${ctx}|v${VERSION}`).digest('hex').slice(0, 20)
 }
 
 export interface LabProgress { side: 'A' | 'B'; message: string }
 
 async function runOne(slot: string, model: string, path: string, start: number, dur: number, onProgress: (m: string) => void): Promise<LabResult> {
-  if (slot !== 'face' || !FACE_DETECTORS[model]) throw new Error('Für diesen Platz gibt es noch kein Testverfahren')
+  if (!((slot === 'face' && FACE_DETECTORS[model]) || (slot === 'tracking' && TRACKERS[model]))) throw new Error('Für diesen Platz gibt es noch kein Testverfahren')
   await mkdir(cacheDir(), { recursive: true })
-  const file = join(cacheDir(), `${await cacheKey(path, model, start, dur)}.json`)
+  // Das jeweils andere Modell bleibt das aktive – nur der getestete Platz ändert sich
+  const [activeFace, activeTracker] = await Promise.all([activeModelId('face'), activeModelId('tracking')])
+  const context = slot === 'face' ? `Tracker: ${activeTracker}` : `Gesichtserkennung: ${activeFace}`
+  const file = join(cacheDir(), `${await cacheKey(path, model, start, dur, context)}.json`)
   if (existsSync(file)) { onProgress('aus dem Zwischenspeicher'); return JSON.parse(await readFile(file, 'utf8')) as LabResult }
   const imp = await importFile(path)
   const meta = imp.meta
@@ -66,7 +85,7 @@ async function runOne(slot: string, model: string, path: string, start: number, 
   const t0 = Date.now()
   onProgress('Gesichter, Spuren und Sprecher berechnen …')
   let analysis
-  try { analysis = await analyzeClipASD(meta.sourcePath, start, end, undefined, { detector: FACE_DETECTORS[model] }) } finally { clearInterval(poll) }
+  try { analysis = await analyzeClipASD(meta.sourcePath, start, end, undefined, slot === 'face' ? { detector: FACE_DETECTORS[model] } : { tracker: TRACKERS[model] }) } finally { clearInterval(poll) }
   peak = Math.max(peak, vramMb())
   const layout = await layoutForClip(meta, { start, end }, cuts, undefined, analysis)
   const runtimeSec = (Date.now() - t0) / 1000
@@ -84,6 +103,7 @@ async function runOne(slot: string, model: string, path: string, start: number, 
   let speechSec = 0, withFace = 0
   for (const [a, b] of speech) for (let t = a; t < b; t += 0.2) { speechSec += 0.2; if (tracks.some((tk) => { const k = Math.round((t - tk.t0) * HZ); return k >= 0 && k < tk.boxes.length })) withFace += 0.2 }
   const res: LabResult = {
+    idSwitches: countIdSwitches(tracks, (analysis?.sceneCuts ?? []).map((f) => f / ASD_FPS)), context,
     version: 1, model, slot, source: basename(path), start, dur: end - start, runtimeSec: +runtimeSec.toFixed(1), vramPeakMb: base >= 0 ? Math.max(0, peak - base) : -1,
     speechFaceShare: speechSec > 0 ? +(withFace / speechSec).toFixed(3) : null, speechSec: +speechSec.toFixed(1), hz: HZ, tracks, active,
     shots: layout.shots.map((s) => ({ start: s.start, end: s.end, layout: s.layout, cx: s.cx, cx2: s.cx2, zoom: s.zoom }))
@@ -99,6 +119,17 @@ export async function runLab(req: LabRunRequest, onProgress: (p: LabProgress) =>
   for (const id of [req.modelA, req.modelB]) {
     const m = cat.models.find((x) => x.id === id && x.slot === req.slot)
     if (!m?.integrated) throw new Error(`„${id}“ ist noch nicht integriert`)
+  }
+  // Fehlende Modelldateien automatisch laden (Fortschritt je Seite)
+  for (const [side, id] of [['A', req.modelA], ['B', req.modelB]] as const) {
+    for (const asset of cat.models.find((x) => x.id === id)?.assets ?? []) {
+      if (await assets.isInstalled(asset)) continue
+      onProgress({ side, message: `Modell „${asset}“ wird geladen …` })
+      const onStatus = (st: { id: string; state: string; progress: number }): void => { if (st.id === asset && st.state === 'downloading') onProgress({ side, message: `Modell „${asset}“ wird geladen … ${Math.round(st.progress * 100)} %` }) }
+      assets.on('status', onStatus)
+      try { await assets.install(asset) } finally { assets.off('status', onStatus) }
+      if (!(await assets.isInstalled(asset))) throw new Error(`Modell „${asset}“ konnte nicht geladen werden (Modell-Manager prüfen)`)
+    }
   }
   const src = (await labSources()).find((s) => s.id === req.source)
   if (!src) throw new Error('Testclip nicht gefunden')

@@ -127,6 +127,8 @@ export function EditorScreen(): React.JSX.Element {
   }, [hasApi, hash, clipId, real])
 
   // ---------- Player: echtes Video (Bild + Ton) ----------
+  // Seitenverhältnis der Quelle: der Monitor hat genau dieses Verhältnis → keine schwarzen Ränder, Markierungen liegen exakt auf dem Bild
+  const srcAspect = source && source.width > 0 && source.height > 0 ? Math.max(0.5, Math.min(3, source.width / source.height)) : 16 / 9
   const srcUrl = source ? window.cutawan.mediaUrl(source.path) : null
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -298,18 +300,18 @@ export function EditorScreen(): React.JSX.Element {
 
         {/* Bühne: Quellmonitor + vertikale Vorschau */}
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', alignItems: 'center', minHeight: 0, minWidth: 0 }}>
-          <div style={{ display: showSource ? 'grid' : 'none', gap: 8, flex: '1 1 0', minWidth: 0, maxWidth: 'min(820px, calc((100vh - 360px) * 16 / 9))', alignSelf: 'center' }}>
+          <div style={{ display: showSource ? 'grid' : 'none', gap: 8, flex: '1 1 0', minWidth: 0, maxWidth: `min(820px, calc((100vh - 360px) * ${srcAspect}))`, alignSelf: 'center' }}>
             <div title="Klick auf eine Person: Kamera folgt ihr ab hier" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); commit({ t: 'follow', at: absT, cx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) }) }}
-              style={{ position: 'relative', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--edge)', background: '#000', cursor: 'crosshair' }}>
+              style={{ position: 'relative', aspectRatio: `${srcAspect}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 0 0 1px var(--edge)', background: '#000', cursor: 'crosshair' }}>
               {srcUrl
-                ? <video ref={videoRef} src={srcUrl} preload="auto" playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                ? <video ref={videoRef} src={srcUrl} preload="auto" playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 : <div style={{ width: '100%', height: '100%', backgroundImage: `url(${IMG.source})`, backgroundSize: 'cover' }} />}
               {rects.map((r, i) => <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${r.x * 100}%`, width: `${r.w * 100}%`, border: '2px solid var(--accent)', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none', boxShadow: 'var(--accent-glow)' }} />)}
               <span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)' }}>Quelle · Person anklicken</span>
             </div>
             <small>Heller Rahmen = aktueller Ausschnitt im Export</small>
           </div>
-          <div style={{ position: 'relative', flex: 'none', height: '100%', maxHeight: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--edge-highlight)', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', containerType: 'size' }}>
+          <div style={{ position: 'relative', flex: 'none', height: '100%', maxHeight: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px var(--edge-highlight)', containerType: 'size' }}>
             {srcUrl
               ? <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
               : <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover' }} />}

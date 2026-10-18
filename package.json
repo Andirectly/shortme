@@ -42,6 +42,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "js-yaml": "^4.3.0",
     "lucide-react": "^0.487.0",
+    "rcedit": "^5.0.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwindcss": "^4.1.0",
@@ -95,6 +96,10 @@
       {
         "from": "resources/models-catalog.json",
         "to": "models-catalog.json"
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
       }
     ],
     "win": {
@@ -106,7 +111,8 @@
           ]
         }
       ],
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "artifactName": "Shortme-Setup-${version}.${ext}",
@@ -115,6 +121,7 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "afterPack": "scripts/afterPack.cjs"
   }
 }

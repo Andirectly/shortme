@@ -124,3 +124,8 @@ textarea.sm-input { height: auto; padding: 10px 16px; border-radius: 18px; resiz
 
 .sm-switch[aria-checked='true'] i { background: #000; }
 .sm-score { text-shadow: none; }
+
+/* Auswahllisten (native <select>): dunkles Popup statt weißem Feld */
+.sm-root select { color-scheme: dark; }
+.sm-root select option, .sm-root select optgroup { background-color: #1c1c1f; color: #f5f5f7; }
+.sm-root select option:disabled { color: #8a8a90; }

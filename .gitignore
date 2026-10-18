@@ -14,3 +14,6 @@ spikes/out/
 Test Videos/
 files/
 spikes/subs/bundle.js
+
+/tools/boxmot-export/venv/
+/tools/boxmot-export/*.pt

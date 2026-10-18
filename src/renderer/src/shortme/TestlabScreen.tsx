@@ -107,6 +107,8 @@ function Pane({ res, label, path, t, playing, master, onTime, overlays }: { res:
         <span className="sm-tag">VRAM-Spitze +{res.vramPeakMb >= 0 ? `${res.vramPeakMb} MB` : '?'}</span>
         <span className="sm-tag" title={`${res.speechSec} s Sprache (VAD)`}>Sprechzeit mit Gesicht {res.speechFaceShare === null ? '–' : `${Math.round(res.speechFaceShare * 100)} %`}</span>
         <span className="sm-tag">{res.tracks.length} Spuren</span>
+        <small style={{ alignSelf: 'center' }}>{res.context}</small>
+        <span className="sm-tag" title="Neue Spur beginnt ≤ 3 s nach dem Ende einer anderen an gleicher Stelle, ohne Kamerawechsel (Schätzung)">ID-Wechsel (geschätzt) {res.idSwitches}</span>
       </div>
     </div>
   )
@@ -144,7 +146,7 @@ export function TestlabScreen(): React.JSX.Element {
   }, [view, slot, models])
   const mA = models.find((m) => m.id === aId), mB = models.find((m) => m.id === bId)
   const src = sources.find((s) => s.id === srcId)
-  const comparable = (view?.slots ?? []).map((s) => s.id).includes(slot) && slot === 'face'
+  const comparable = slot === 'face' || slot === 'tracking'
   const run = async (): Promise<void> => {
     if (!api || !src || !aId || !bId) return
     setRunning(true); setErr(''); setResults(null); setPlaying(false); setT(0); setDecided(''); setMsgs({ A: 'wartet …', B: 'wartet …' })
@@ -165,7 +167,7 @@ export function TestlabScreen(): React.JSX.Element {
 
   if (!hasApi || !api) return <div style={{ paddingTop: 12 }}><h1>Testlab</h1><small>Nur in der Desktop-App verfügbar.</small></div>
   const sel: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 10px', color: 'inherit' }
-  const optionsFor = (other: string): React.JSX.Element[] => models.map((m) => <option key={m.id} value={m.id} disabled={!m.integrated || m.id === other}>{m.name}{!m.integrated ? ' – noch nicht integriert' : m.id === other ? ' – schon auf der anderen Seite' : ` – ${STATUS_LABEL[m.effective]}`}</option>)
+  const optionsFor = (other: string): React.JSX.Element[] => models.map((m) => <option key={m.id} value={m.id} disabled={!m.integrated || m.id === other}>{m.name}{!m.integrated ? ' – noch nicht integriert' : m.id === other ? ' – schon auf der anderen Seite' : ` – ${STATUS_LABEL[m.effective]}${m.installed ? '' : ' (wird beim Start geladen)'}`}</option>)
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gap: 16, paddingTop: 12, paddingBottom: 40 }}>
       <div><h1 style={{ display: 'flex', gap: 10, alignItems: 'center' }}><FlaskConical size={26} /> Testlab</h1><small>Zwei Modelle am selben Ausschnitt nebeneinander. Die Pipeline nutzt immer das aktive Modell des Platzes.</small></div>
@@ -187,7 +189,7 @@ export function TestlabScreen(): React.JSX.Element {
           <label style={{ display: 'grid', gap: 6 }}><small>Dauer (s)</small><input className="sm-input" type="number" min={5} max={120} value={dur} onChange={(e) => setDur(Math.min(120, Math.max(5, +e.target.value)))} aria-label="Dauer in Sekunden" /></label>
           <Button variant="primary" disabled={running || !src || !aId || !bId || !comparable} onClick={() => void run()}>{running ? 'Läuft …' : 'Vergleich starten'}</Button>
         </div>
-        {!comparable && <small>Für diesen Platz gibt es noch kein Testverfahren – verfügbar ist der Vergleich bei „Gesichtserkennung“.</small>}
+        {!comparable && <small>Für diesen Platz gibt es noch kein Testverfahren – verfügbar ist der Vergleich bei „Gesichtserkennung“ und „Personen-Tracking“.</small>}
         {running && <small>A: {msgs.A} · B: {msgs.B}</small>}
         {err && <small style={{ color: 'var(--warn)' }}>{err}</small>}
       </div>

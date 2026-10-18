@@ -21,5 +21,16 @@
       "Read(**/package-lock.json)",
       "Read(**/pnpm-lock.yaml)"
     ]
+  },
+  "extraKnownMarketplaces": {
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "ponytail@ponytail": true
   }
 }

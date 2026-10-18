@@ -16,7 +16,7 @@ Wird vom Testlab bzw. `scripts/sync-models-docs.ts` erzeugt – nicht von Hand �
 |---|---|---|
 | IoU-Tracks (aktuell) | Verbindet Erkennungen über Überlappung der Boxen. | aktiv |
 | ByteTrack | Bewährter Tracker, nutzt auch unsichere Erkennungen. | Kandidat (nicht integriert) |
-| BoT-SORT-ReID (BoxMOT + OSNet x0.25) | Erkennt Personen am Körper-Aussehen (Kleidung, Statur) wieder. | Kandidat (nicht integriert) |
+| BoT-SORT-ReID (BoxMOT + OSNet x0.25) | Erkennt Personen am Körper-Aussehen (Kleidung, Statur) wieder. | Test |
 
 ## Sprechererkennung (wer spricht im Bild) (`asd`)
 

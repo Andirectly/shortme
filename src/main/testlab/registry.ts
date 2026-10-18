@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app } from 'electron'
 import { dataRoot } from '../engines/paths'
+import { assets } from '../engines'
 import { writeFileAtomic } from '../shortme/atomic'
 import { MAX_ALTERNATIVES, type CatalogModel, type CatalogSlot, type Measured, type ModelStatus, type ModelsView, type ModelView } from '../../shared/models'
 
@@ -35,7 +36,7 @@ export async function modelsView(): Promise<ModelsView> {
   const [cat, st] = await Promise.all([loadCatalog(), loadState()])
   const active: Record<string, string> = {}
   for (const s of cat.slots) active[s.id] = st.active[s.id] ?? cat.models.find((m) => m.slot === s.id && m.status === 'aktiv')?.id ?? ''
-  const models: ModelView[] = cat.models.map((m) => ({ ...m, effective: effectiveStatus(m, st.active, st.remove, cat.models), measured: st.measured[m.id] }))
+  const models: ModelView[] = await Promise.all(cat.models.map(async (m) => ({ ...m, effective: effectiveStatus(m, st.active, st.remove, cat.models), measured: st.measured[m.id], installed: !m.assets?.length || (await Promise.all(m.assets.map((a) => assets.isInstalled(a).catch(() => false)))).every(Boolean) })))
   return { slots: cat.slots, models, active }
 }
 

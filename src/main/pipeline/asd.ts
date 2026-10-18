@@ -13,6 +13,8 @@ import { detectFacesScrfd, scrfdAvailable } from './scrfd'
 import { activeModelId } from '../testlab/registry'
 import { detectPose, mergeFacesAndHeads, poseAvailable } from './pose'
 import { buildFaceTracks, type FaceTrack } from './facetracks'
+import { buildBotSortTracks } from './botsort'
+import { embedBodies, reidAvailable } from './reid'
 import { detectFaces, frameDifference, modelsDir, MODEL_W, MODEL_H } from './detect'
 import { iou, type FaceBox } from './speaker'
 import { detectFacesYuNet, faceDetectionSize, yunetAvailable } from './yunet'
@@ -134,6 +136,8 @@ interface FaceSample { f: number; box: FaceBox; emb: Float32Array; crop: Buffer 
 interface DetectionPass {
   embeds: FaceSample[]
   facesPerFrame: Array<FaceBox[] | null>
+  /** ReID-Merkmale je Erkennung (nur Tracker BoT-SORT), parallel zu facesPerFrame. */
+  reid: Array<Float32Array[] | null>
   sceneCuts: number[]
   sceneTransitions: Array<{ start: number; end: number }>
   frameCount: number
@@ -191,9 +195,11 @@ export async function runDetectionPass(
   highResolution?: { width: number; height: number },
   stride = DETECT_STRIDE,
   adaptive = true,
-  faceDetector: 'yunet' | 'scrfd' = 'yunet'
+  faceDetector: 'yunet' | 'scrfd' = 'yunet',
+  withReid = false
 ): Promise<DetectionPass> {
   const facesPerFrame: Array<FaceBox[] | null> = []
+  const reid: Array<Float32Array[] | null> = []
   let lastFull = -Infinity, fullCount = 0, allLarge = false
   const detectHigh = async (frame: Buffer, f: number, cut: boolean): Promise<FaceBox[]> => {
     if (faceDetector === 'scrfd') return detectFacesScrfd(frame, width, height, signal)
@@ -257,12 +263,15 @@ export async function runDetectionPass(
         // Pose-Köpfe ergänzen Personen ohne erkanntes Gesicht (Profil, abgewandt)
         if (usePose && highResolution) faces = mergeFacesAndHeads(faces, await detectPose(frame, width, height, signal).catch(() => []))
         facesPerFrame.push(faces)
+        // BoT-SORT: Aussehens-Merkmal aus dem Oberkörper unter jedem Gesicht (hält die Person auch ohne sichtbares Gesicht)
+        reid.push(withReid && highResolution && faces.length ? await embedBodies(frame, width, height, faces, signal).catch(() => []) : null)
         facePresent = faces.length > 0
         if (facePresent) {
           lastFaceFrame = f
         }
       } else {
         facesPerFrame.push(null)
+        reid.push(null)
       }
       // Weight by source time, not the denser sampling of talking-head shots.
       if (facePresent) framesWithFaces++
@@ -277,7 +286,7 @@ export async function runDetectionPass(
   // of each cluster (when the new shot has settled).
   const mergeWindow = Math.max(1, Math.round(CUT_MERGE_SEC * ASD_FPS))
   const sceneCuts = rawCuts.filter((cut, i) => i === rawCuts.length - 1 || rawCuts[i + 1] - cut > mergeWindow)
-  return { embeds, facesPerFrame, sceneCuts, sceneTransitions: sceneTransitionRanges(differences), frameCount, faceFrameRatio }
+  return { embeds, reid, facesPerFrame, sceneCuts, sceneTransitions: sceneTransitionRanges(differences), frameCount, faceFrameRatio }
 }
 
 /** 2x2 box downscale of packed RGB (odd trailing row/column dropped). */
@@ -493,7 +502,7 @@ export async function analyzeClipASD(
   startSec: number,
   endSec: number,
   signal?: AbortSignal,
-  comparison?: { detector?: 'ultraface' | 'yunet' | 'scrfd'; cropWidth?: number; detectStride?: number; fixedResolution?: boolean }
+  comparison?: { tracker?: 'iou' | 'botsort'; detector?: 'ultraface' | 'yunet' | 'scrfd'; cropWidth?: number; detectStride?: number; fixedResolution?: boolean }
 ): Promise<AsdAnalysis | null> {
   if (!(await asdAvailable())) return null
 
@@ -503,13 +512,15 @@ export async function analyzeClipASD(
   const wanted = comparison?.detector ?? ((await activeModelId('face')) === 'scrfd_10g' ? 'scrfd' : 'yunet')
   if (wanted === 'scrfd' && !scrfdAvailable() && comparison?.detector === 'scrfd') throw new Error('SCRFD-Modell fehlt')
   const faceDetector: 'yunet' | 'scrfd' = wanted === 'scrfd' && scrfdAvailable() ? 'scrfd' : 'yunet'
+  // Platz „Personen-Tracking“: aktives Modell aus dem Testlab (Standard: IoU-Tracks)
+  const tracker: 'iou' | 'botsort' = (comparison?.tracker ?? ((await activeModelId('tracking')) === 'botsort_reid' ? 'botsort' : 'iou')) === 'botsort' && reidAvailable() ? 'botsort' : 'iou'
   let useYuNet = (comparison?.detector !== 'ultraface' && yunetAvailable()) || faceDetector === 'scrfd'
   if (comparison?.detector === 'yunet' && !useYuNet) throw new Error('YuNet comparison model is unavailable')
   let detection: DetectionPass
   try {
     detection = await timed('asd/detect', () => runDetectionPass(videoPath, startSec, duration, signal,
       useYuNet ? faceDetectionSize(info.width, info.height) : undefined, comparison?.detectStride,
-      !comparison?.fixedResolution, faceDetector), { duration })
+      !comparison?.fixedResolution, faceDetector, tracker === 'botsort'), { duration })
   } catch (error) {
     if (!useYuNet || signal?.aborted || comparison?.detector === 'yunet') throw error
     console.error('High-resolution face detection failed; retrying with UltraFace:', error)
@@ -518,7 +529,7 @@ export async function analyzeClipASD(
   }
   if (detection.frameCount === 0) return null
 
-  const tracks = buildFaceTracks(detection.facesPerFrame, detection.sceneCuts, ASD_FPS)
+  const tracks = tracker === 'botsort' ? buildBotSortTracks(detection.facesPerFrame, detection.reid, detection.sceneCuts, ASD_FPS) : buildFaceTracks(detection.facesPerFrame, detection.sceneCuts, ASD_FPS)
   if (
     tracks.length === 0 ||
     trackCoverageRatio(tracks, detection.frameCount) < MIN_TRACK_COVERAGE

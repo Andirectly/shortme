@@ -10,6 +10,8 @@ export interface CatalogModel {
   status: ModelStatus
   /** Im Code eingebunden und im Testlab wählbar. */
   integrated?: boolean
+  /** Modell-Manager-IDs der benötigten Dateien (fehlt = mitgeliefert). */
+  assets?: string[]
   name: string
   short: string
   pros: string[]
@@ -34,6 +36,8 @@ export interface ModelView extends CatalogModel {
   /** Wirksamer Status (Katalog + Entscheidungen im Testlab). */
   effective: ModelStatus
   measured?: Measured
+  /** Alle benötigten Dateien sind geladen. */
+  installed: boolean
 }
 
 export interface ModelsView { slots: CatalogSlot[]; models: ModelView[]; active: Record<string, string> }
@@ -67,6 +71,10 @@ export interface LabResult {
   vramPeakMb: number
   speechFaceShare: number | null
   speechSec: number
+  /** Geschätzte ID-Wechsel: neue Spur beginnt kurz nach dem Ende einer anderen an gleicher Stelle (gleiche Einstellung). */
+  idSwitches: number
+  /** Aktive Modelle der anderen Plätze beim Test (Face/Tracker), damit nur das getestete Modell den Unterschied macht. */
+  context: string
   /** Probenraster (Hz) der Spuren/Sprecher. */
   hz: number
   tracks: LabTrack[]
