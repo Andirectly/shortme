@@ -27,7 +27,7 @@ export const PRESETS: CaptionPreset[] = [
   { id: 'mono', name: 'Dezent', font: 'Poppins Medium', size: 0.034, weight: 500, color: '#E5E7EB', highlight: '#FFFFFF', outline: '#000000', outlineWidth: 3, upper: false, box: false, wordsPerLine: 5, y: 0.7 }
 ]
 
-export interface CaptionStyleOptions { scale?: number; y?: number; highlight?: boolean }
+export interface CaptionStyleOptions { scale?: number; y?: number; highlight?: boolean; /** Schriftfamilie statt der des Stils. */ font?: string }
 
 export type TagKind = 'emphasis' | 'entity' | 'hook'
 export interface CaptionWord { w: string; start: number; end: number; tag?: TagKind }

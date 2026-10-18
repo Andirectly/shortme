@@ -11,6 +11,8 @@ export interface CaptionPatch {
   /** Vertikale Mitte 0..1. */
   y?: number
   highlight?: boolean
+  /** Schriftfamilie (eigene oder mitgelieferte); leer = Schrift des Stils. */
+  font?: string
   /** Sicherheitszone (nur Anzeige im Editor). */
   zone?: 'Aus' | 'TikTok' | 'Reels' | 'Shorts'
 }
@@ -27,6 +29,8 @@ export type Op =
   | { t: 'layout'; at: number; layout: ShortmeShot['layout']; cx?: number }
   /** Person angeklickt: Kamera folgt ab Quellzeit `at` dem Punkt `cx` (0..1 der Quellbreite). */
   | { t: 'follow'; at: number; cx: number }
+  /** Ganzer Clip: `smart` = automatischer Plan (alle Layout-Änderungen davor entfallen), sonst überall dieses Layout (Vollbild = fest, Mitte). */
+  | { t: 'layoutClip'; layout: ShortmeShot['layout'] }
 
 export interface EditLog { version: 1; clipId: string; ops: Op[]; /** Anzahl angewendeter Operationen (Rest = Redo). */ cursor: number }
 
@@ -37,14 +41,17 @@ export interface EditState {
   hook: { text: string; seconds: number; enabled: boolean }
   /** Globaler Wortindex → geänderter Untertitel-Text. */
   wordEdits: Record<number, string>
-  caption: Required<Pick<CaptionPatch, 'presetId' | 'scale' | 'y' | 'highlight' | 'zone'>> & { presetId: string }
-  layoutOps: Array<Extract<Op, { t: 'layout' | 'follow' }>>
+  caption: Required<Pick<CaptionPatch, 'presetId' | 'scale' | 'y' | 'highlight' | 'zone'>> & { presetId: string; font?: string }
+  layoutOps: Array<Extract<Op, { t: 'layout' | 'follow' | 'layoutClip' }>>
 }
 
 export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops: [], cursor: 0 })
 
+/** Standard-Schriftgröße der Untertitel: Regler-Wert 25 (Regler = Skalierung × 60). */
+export const DEFAULT_CAPTION_SCALE = 25 / 60
+
 export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string> }, presetId = 'impact'): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: false }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId, scale: 1, y: 0.68, highlight: true, zone: 'Aus' }, layoutOps: [] }
+  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: false }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId, scale: DEFAULT_CAPTION_SCALE, y: 0.68, highlight: true, zone: 'Aus' }, layoutOps: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */
@@ -62,6 +69,7 @@ export function reduce(base: EditState, ops: Op[]): EditState {
       case 'hook': s.hook = { text: op.text ?? s.hook.text, seconds: op.seconds ?? s.hook.seconds, enabled: op.enabled ?? s.hook.enabled }; break
       case 'editWord': if (op.text.trim()) s.wordEdits[op.word] = op.text.trim(); else delete s.wordEdits[op.word]; break
       case 'caption': s.caption = { ...s.caption, ...Object.fromEntries(Object.entries(op.patch).filter(([, v]) => v !== undefined)) } as EditState['caption']; break
+      case 'layoutClip': s.layoutOps = []; s.layoutOps.push(op); break
       case 'layout':
       case 'follow': s.layoutOps.push(op); break
     }
@@ -158,6 +166,11 @@ export function applyLayoutOps(shots: ShortmeShot[], ops: EditState['layoutOps']
   let cur = shots.map((s) => ({ ...s }))
   if (cur.length === 0) cur = [{ start: from, end: to, layout: 'fixed', cx: 0.5, zoom: 1 }]
   for (const op of ops) {
+    if (op.t === 'layoutClip') {
+      if (op.layout === 'smart') { cur = shots.map((s) => ({ ...s })); continue }
+      cur = [{ start: from, end: to, layout: op.layout, cx: 0.5, zoom: 1 }]
+      continue
+    }
     if (scene) {
       // szenenweise: gilt für die ganze Kameraeinstellung um `at` (kein Springen zwischen Personen davor/danach)
       const tick = Math.round((op.at - scene.clipStart) / scene.input.dt)

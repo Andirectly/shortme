@@ -47,7 +47,7 @@
 /* Titelleiste: Drag-Region, native Fensterknöpfe rechts (titleBarOverlay) */
 .sm-titlebar { position: absolute; top: 0; left: 0; right: 0; height: var(--titlebar-h); -webkit-app-region: drag; display: flex; align-items: center; padding: 0 16px; gap: 10px; z-index: 50; font-size: 12px; color: var(--text-2); }
 .sm-titlebar .sm-nodrag { -webkit-app-region: no-drag; }
-.sm-logo { width: 18px; height: 18px; border-radius: 6px; background: linear-gradient(135deg, #ffffff, #8a8a8a); box-shadow: var(--accent-glow); }
+.sm-logo { width: 18px; height: 18px; display: grid; place-items: center; color: #fff; }
 
 /* Glas */
 .sm-glass { background: var(--glass-panel); border: 1px solid var(--edge); box-shadow: inset 0 1px 0 var(--edge-highlight); backdrop-filter: var(--glass-blur); border-radius: var(--r-panel); }

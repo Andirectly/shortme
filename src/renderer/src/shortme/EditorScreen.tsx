@@ -13,8 +13,8 @@ import { useSprings } from './motion'
 import { drawLayout, sourceRects } from '@shared/previewDraw'
 
 const ZONES: Record<string, { top: number; bottom: number; right: number }> = { TikTok: { top: 0.12, bottom: 0.2, right: 0.14 }, Reels: { top: 0.1, bottom: 0.18, right: 0.1 }, Shorts: { top: 0.1, bottom: 0.22, right: 0.12 } }
-const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', 'Ganzes Bild': 'fit', Split: 'split', Fest: 'fixed' }
-const LAYOUT_LABEL: Record<ShortmeShot['layout'], string> = { smart: 'Smart', fit: 'Ganzes Bild', split: 'Split', fixed: 'Fest' }
+const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', Vollbild: 'fixed', 'Ganzes Bild': 'fit', Split: 'split' }
+const LAYOUT_LABEL: Record<ShortmeShot['layout'], string> = { smart: 'Smart', fit: 'Ganzes Bild', split: 'Split', fixed: 'Vollbild' }
 const LAYOUT_COLOR: Record<ShortmeShot['layout'], string> = { smart: 'rgba(255,255,255,0.55)', fit: 'rgba(255,255,255,0.32)', split: 'rgba(255,255,255,0.62)', fixed: 'rgba(255,255,255,0.18)' }
 const CANVAS_W = 540
 const CANVAS_H = 960
@@ -88,9 +88,17 @@ export function EditorScreen(): React.JSX.Element {
   const [hookDraft, setHookDraft] = useState<string | null>(null)
   const [sizeDraft, setSizeDraft] = useState<number | null>(null)
   const [posDraft, setPosDraft] = useState<number | null>(null)
-  const preset = PRESETS.find((p) => p.id === st.caption.presetId) ?? PRESETS[0]
+  const basePreset = PRESETS.find((p) => p.id === st.caption.presetId) ?? PRESETS[0]
+  const preset = st.caption.font ? { ...basePreset, font: st.caption.font } : basePreset
+  const [fonts, setFonts] = useState<string[]>([])
+  const [fontCss, setFontCss] = useState('')
+  useEffect(() => { if (hasApi) void window.cutawan.listFonts().then((l) => setFonts(l.map((f) => f.family))).catch(() => undefined) }, [hasApi])
+  useEffect(() => { const f = st.caption.font; if (!hasApi || !f || !fonts.includes(f)) { setFontCss(''); return } void window.cutawan.shortme.fontCss(f).then(setFontCss).catch(() => setFontCss('')) }, [hasApi, st.caption.font, fonts])
+  const importFonts = async (): Promise<void> => { const l = await window.cutawan.addFonts(); setFonts(l.map((f) => f.family)) }
   const committed: [number, number] = [st.start - origStart, st.end - origStart]
   const trim = liveTrim ?? committed
+  const lastClipOp = [...st.layoutOps].reverse().find((o) => o.t === 'layoutClip')
+  const clipLayout = lastClipOp && st.layoutOps[st.layoutOps.length - 1] === lastClipOp ? LAYOUT_LABEL[lastClipOp.layout] : 'Smart'
   const size = sizeDraft ?? Math.round(st.caption.scale * 60)
   const pos = posDraft ?? Math.round(st.caption.y * 100)
   const hook = hookDraft ?? st.hook.text
@@ -249,7 +257,7 @@ export function EditorScreen(): React.JSX.Element {
   const exportNow = async (): Promise<void> => { await persist(logRef.current); await exportClips([clipId], st.caption.presetId, false) }
   const applyAll = async (): Promise<void> => {
     const others = (allReal ?? []).map((c) => c.id).filter((id) => id !== clipId)
-    if (hasApi && hash) await window.cutawan.shortme.applyAll(hash, others, { presetId: st.caption.presetId, scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight })
+    if (hasApi && hash) await window.cutawan.shortme.applyAll(hash, others, { presetId: st.caption.presetId, scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight, font: st.caption.font })
   }
   const rects = shotNow && source ? sourceRects({ width: source.width, height: source.height }, shotNow.shot, shotNow.zoom) : []
   const outDuration = plan ? plan.duration : trim[1] - trim[0]
@@ -305,6 +313,7 @@ export function EditorScreen(): React.JSX.Element {
               ? <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
               : <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover' }} />}
             {st.hook.enabled && t < st.hook.seconds && hook && <div style={{ position: 'absolute', top: '8%', left: 0, right: 0, textAlign: 'center', fontFamily: 'Poppins', fontWeight: 700, fontSize: '3.4cqh', padding: '0 7%', textShadow: '0 2px 10px #000' }}><span style={{ background: 'rgba(0,0,0,0.5)', padding: '0.2em 0.5em', borderRadius: '0.4em', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' }}>{hook}</span></div>}
+            <style>{fontCss}</style>
             <style>{scopeCss(captionCss(preset, { scale: size / 60, highlight: st.caption.highlight }), '.sm-cap')}</style>
             <div className="sm-cap" style={{ position: 'absolute', left: 0, right: 0, top: `${pos}%`, transform: 'translateY(-50%)', padding: '0 4%' }}>
               <div className="segment"><div className="line">
@@ -321,6 +330,17 @@ export function EditorScreen(): React.JSX.Element {
           {tab === 'Untertitel' && (
             <div>
               <Row label="Stil"><Segmented options={PRESETS.map((p) => p.name)} value={preset.name} onChange={(n) => caption({ presetId: PRESETS.find((p) => p.name === n)!.id })} /></Row>
+              <Row label="Schrift" hint="Eigene Schriften (.ttf / .otf)">
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <select aria-label="Schrift" value={st.caption.font ?? ''} onChange={(e) => caption({ font: e.target.value })} style={{ minWidth: 0, width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '6px 10px', color: 'inherit' }}>
+                    <option value="">Standard des Stils ({basePreset.font})</option>
+                    <option value="Anton">Anton</option>
+                    <option value="Poppins">Poppins</option>
+                    {fonts.map((f) => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                  <Button variant="secondary" disabled={!hasApi} onClick={() => void importFonts()}>Importieren …</Button>
+                </div>
+              </Row>
               <Row label="Größe"><Slider label="Schrift" value={size} onChange={setSizeDraft} onCommit={(v) => { setSizeDraft(null); caption({ scale: v / 60 }) }} /></Row>
               <Row label="Position" hint="Drag-Regler"><Slider label="Vertikal" value={pos} min={10} max={90} onChange={setPosDraft} onCommit={(v) => { setPosDraft(null); caption({ y: v / 100 }) }} /></Row>
               <Row label="Hervorhebung (KI-Tags)"><Switch on={st.caption.highlight} onChange={(b) => caption({ highlight: b })} label="Hervorhebung" /></Row>
@@ -331,7 +351,8 @@ export function EditorScreen(): React.JSX.Element {
           {tab === 'Bildausschnitt' && (
             <div>
               <Row label="Aktueller Ausschnitt" hint={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''}><small>Layout ändern gilt ab der Abspielposition bis zum Ende der Einstellung.</small></Row>
-              <Row label="Layout"><Segmented options={Object.keys(LAYOUTS)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} /></Row>
+              <Row label="Ganzer Clip" hint="Smart folgt dem Sprecher, Vollbild = feste Mitte"><Segmented options={['Smart', 'Vollbild', 'Ganzes Bild']} value={clipLayout} onChange={(n) => commit({ t: 'layoutClip', layout: LAYOUTS[n] })} /></Row>
+              <Row label="Diese Einstellung"><Segmented options={Object.keys(LAYOUTS)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} /></Row>
               <Row label="Kamera folgt" hint="ab hier"><small>Im Quellmonitor auf eine Person klicken – der Ausschnitt springt als fester Schnitt dorthin.</small></Row>
               <Row label="Quelle anzeigen"><Switch on={showSource} onChange={setShowSource} label="Quelle anzeigen" /></Row>
               <small>Gesichtsquote {Math.round(clip.faceRatio * 100)} % · {st.layoutOps.length} Änderung(en) am Ausschnitt</small>

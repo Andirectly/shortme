@@ -1,4 +1,6 @@
-import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { dataRoot } from '../engines/paths'
+import { listCustomFonts } from '../fonts'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'node:path'
 import { importFile, importUrl, type ImportResult } from './importer'
@@ -55,6 +57,13 @@ export function registerShortmeIpc(): void {
     const persons = await Promise.all(pf.persons.map(async (p) => ({ id: p.id, label: p.label, role: p.role, seconds: p.seconds, thumb: p.thumb ? await dataUrl(projectFile(hash, p.thumb)) : null })))
     return { confirmed: pf.confirmed, confidence: pf.confidence, needsReview: pf.needsReview && !pf.confirmed, persons }
   }
+  /** @font-face (Data-URL) für eine eigene Schrift – für die Editor-Vorschau. */
+  ipcMain.handle('shortme:fontCss', async (_e, family: string) => {
+    const f = (await listCustomFonts()).find((x) => x.family === family)
+    if (!f) return ''
+    const otf = f.fileName.toLowerCase().endsWith('.otf')
+    return `@font-face { font-family: '${family}'; font-weight: 400 900; src: url(data:font/${otf ? 'otf' : 'ttf'};base64,${(await readFile(f.path)).toString('base64')}) format('${otf ? 'opentype' : 'truetype'}'); }`
+  })
   ipcMain.handle('shortme:persons', (_e, hash: string) => personsView(hash))
   /** Zuordnung speichern (gilt für das ganze Video) und alle Clips neu planen – ohne neue Analyse. */
   ipcMain.handle('shortme:personsSave', async (_e, hash: string, patch: PersonsPatch) => {
@@ -96,7 +105,7 @@ export function registerShortmeIpc(): void {
         // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
         const st = stateOf(baseState(clips[i], opts?.presetId), await loadEdits(hash, clips[i].id))
         const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
-        await exportClip(meta, eff, transcript, signals, { outDir, presetId: st.caption.presetId, srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, caption: { scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+        await exportClip(meta, eff, transcript, signals, { outDir, presetId: st.caption.presetId, srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, caption: { scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight, font: st.caption.font }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
       }
       void shell.openPath(outDir)
     })
@@ -123,6 +132,19 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('shortme:applyAll', (_e, hash: string, clipIds: string[], patch: CaptionPatch) => applyCaptionToAll(hash, clipIds, patch))
   ipcMain.handle('shortme:openLogs', () => shell.openPath(logDir()))
   /** Projektliste: Titel, Dauer, Clip-Anzahl und 16:9-Vorschaubild (YouTube-Thumbnail bzw. Screenshot). */
+  /** Projekt löschen (mit Rückfrage): Analyse, Clips, Bearbeitungen; ein per Link geladenes Video wird mit entfernt, eine eigene Originaldatei nie. */
+  ipcMain.handle('shortme:deleteProject', async (e, hash: string) => {
+    const meta = await loadMeta(hash)
+    if (!meta) return false
+    const win = BrowserWindow.fromWebContents(e.sender)
+    const box = { type: 'warning' as const, buttons: ['Löschen', 'Abbrechen'], defaultId: 1, cancelId: 1, title: 'Projekt löschen', message: `„${meta.title}“ löschen?`, detail: 'Clips, Bearbeitungen und Analyse werden entfernt. Deine Originaldatei bleibt erhalten; ein per Link geladenes Video wird ebenfalls gelöscht.' }
+    const r = win ? await dialog.showMessageBox(win, box) : await dialog.showMessageBox(box)
+    if (r.response !== 0) return false
+    await discardProject(hash)
+    const dl = resolve(dataRoot(), 'downloads')
+    if (resolve(meta.sourcePath).toLowerCase().startsWith(dl.toLowerCase())) await rm(meta.sourcePath, { force: true }).catch(() => undefined)
+    return true
+  })
   ipcMain.handle('shortme:projects', async () => {
     const out: Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null }> = []
     for (const d of await readdir(projectsRoot()).catch(() => [] as string[])) {

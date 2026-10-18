@@ -8,6 +8,7 @@ interface ProjectState {
   imported: ShortmeImport | null
   importing: boolean
   importMessage: string
+  importProgress: number
   importError: string
   job: ShortmeJob | null
   clipsFile: ShortmeClips | null
@@ -16,6 +17,7 @@ interface ProjectState {
   loadResults: (hash: string) => Promise<void>
   projects: ProjectCard[]
   loadProjects: () => Promise<void>
+  deleteProject: (hash: string) => Promise<boolean>
   /** Titel des geöffneten Projekts (Clip-Übersicht). */
   currentTitle: string | null
   openProject: (hash: string) => Promise<boolean>
@@ -47,6 +49,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   imported: null,
   importing: false,
   importMessage: '',
+  importProgress: 0,
   importError: '',
   job: null,
   clipsFile: null,
@@ -70,6 +73,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   hasApi: false,
   projects: [],
   currentTitle: null,
+  deleteProject: async (hash) => { const a = api(); if (!a) return false; const ok = await a.deleteProject(hash); if (ok) { if (get().clipsFile?.hash === hash) set({ clipsFile: null, persons: null }); await get().loadProjects() } return ok },
   loadProjects: async () => { const a = api(); if (a) set({ projects: await a.projects() }) },
   openProject: async (hash) => {
     const a = api()
@@ -96,14 +100,14 @@ export const useProject = create<ProjectState>((set, get) => ({
         set((s) => (s.job && s.job.id !== j.id && s.job.state === 'running' ? s : { job: j }))
         if (j.state === 'done') void get().loadResults(j.hash)
       }),
-      a.onImportProgress((p) => set({ importMessage: p.message }))
+      a.onImportProgress((p) => set({ importMessage: p.message, importProgress: p.progress }))
     ]
     void a.jobs().then((list) => { const live = list.find((j) => j.state === 'running' || j.state === 'queued' || j.state === 'paused'); if (live) set({ job: live }) })
   },
   importPath: async (path) => {
     const a = api()
     if (!a) return false
-    set({ importing: true, importError: '', importMessage: 'Video wird geprüft …' })
+    set({ importing: true, importError: '', importProgress: 0, importMessage: 'Video wird geprüft …' })
     try {
       const r = await a.importFile(path)
       set({ imported: r, importing: false })
@@ -116,7 +120,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   importUrl: async (url) => {
     const a = api()
     if (!a) return false
-    set({ importing: true, importError: '', importMessage: 'Link wird geladen …' })
+    set({ importing: true, importError: '', importProgress: 0, importMessage: 'Link wird geprüft …' })
     try {
       const r = await a.importUrl(url)
       set({ imported: r, importing: false })

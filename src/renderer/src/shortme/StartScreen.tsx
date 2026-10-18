@@ -15,6 +15,7 @@ export function StartScreen(): React.JSX.Element {
   const hasApi = useProject((s) => s.hasApi)
   const importing = useProject((s) => s.importing)
   const importMessage = useProject((s) => s.importMessage)
+  const importProgress = useProject((s) => s.importProgress)
   const importError = useProject((s) => s.importError)
   const importPath = useProject((s) => s.importPath)
   const importUrl = useProject((s) => s.importUrl)
@@ -59,6 +60,17 @@ export function StartScreen(): React.JSX.Element {
         </div>
         <Button variant="secondary" disabled={importing} onClick={() => void openLink()}>Laden</Button>
       </div>
+      {(importing || importError) && (
+        <div className="sm-card" role="status" aria-live="polite" style={{ padding: 14, display: 'grid', gap: 8 }}>
+          {importing && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ fontSize: 14 }}>{importMessage}</span><small>{importProgress > 0 && importProgress < 1 ? `${Math.round(importProgress * 100)} %` : ''}</small></div>
+              <div className="sm-bar"><i style={{ width: `${Math.max(importProgress, 0.03) * 100}%`, transition: 'width 0.3s' }} /></div>
+            </>
+          )}
+          {importError && <span style={{ color: 'var(--warn)', fontSize: 14 }}>{importError}</span>}
+        </div>
+      )}
       <section>
         <h3 style={{ marginBottom: 12 }}>Zuletzt geöffnet</h3>
         <ProjectGrid limit={6} />

@@ -47,7 +47,9 @@ function blankMeta(hash: string, path: string, info: Awaited<ReturnType<typeof p
 
 /** URL importieren (yt-dlp, gebündelt/selbst-aktualisierend); Download landet im Datenordner, danach wie eine Datei. */
 export async function importUrl(url: string, onProgress: (p: number, message: string) => void): Promise<ImportResult> {
+  onProgress(0, 'Downloader wird vorbereitet …')
   const bin = await ensureYtDlp((p) => onProgress(p.progress, p.message))
+  onProgress(0, 'Video-Infos werden abgerufen …')
   const meta = await fetchUrlMeta(bin, url)
   const dir = join(dataRoot(), 'downloads')
   await mkdir(dir, { recursive: true })
@@ -55,9 +57,11 @@ export async function importUrl(url: string, onProgress: (p: number, message: st
   const target = join(dir, `${safe}.mp4`)
   if (!existsSync(target)) {
     const part = join(dir, `${safe}.part.mp4`)
+    onProgress(0, `„${meta.title}“ wird heruntergeladen …`)
     await downloadUrlVideo(bin, meta.webpageUrl, part, (p) => onProgress(p.progress, p.message))
     await rename(part, target)
   }
+  onProgress(1, 'Video wird geprüft und Vorschaubild erstellt …')
   const res = await importFile(target)
   // YouTube & Co.: das Anbieter-Thumbnail ist als Projektbild besser als ein zufälliger Screenshot
   if (meta.thumbnail && !res.cached) {

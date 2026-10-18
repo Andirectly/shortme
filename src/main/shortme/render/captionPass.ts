@@ -1,5 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { DEFAULT_CAPTION_SCALE } from '../../../shared/edits'
 import { fontsDir } from '../../pipeline/captions'
+import { listCustomFonts } from '../../fonts'
 import { join } from 'node:path'
 import { BrowserWindow, ipcMain } from 'electron'
 import { buildVtt, captionCss, groupWords, tagWordlists, type CaptionPreset, type CaptionStyleOptions, type CaptionWord } from '@shared/captions'
@@ -9,7 +11,14 @@ const FONT_FILES: Record<string, [string, number]> = { Anton: ['Anton-Regular.tt
 /** @font-face mit eingebetteten Daten: die Engine rastert über SVG-foreignObject und sieht Seiten-Schriften nicht. */
 export async function embeddedFontCss(preset: CaptionPreset): Promise<string> {
   const out: string[] = []
+  const custom = await listCustomFonts().catch(() => [])
   for (const family of new Set([preset.font, 'Poppins'])) {
+    const own = custom.find((c) => c.family === family)
+    if (own) {
+      const data = (await readFile(own.path)).toString('base64')
+      out.push(`@font-face { font-family: '${family}'; font-weight: 400 900; src: url(data:font/${own.fileName.toLowerCase().endsWith('.otf') ? 'otf' : 'ttf'};base64,${data}) format('${own.fileName.toLowerCase().endsWith('.otf') ? 'opentype' : 'truetype'}'); }`)
+      continue
+    }
     const f = FONT_FILES[family]
     if (!f) continue
     const data = (await readFile(join(fontsDir(), f[0]))).toString('base64')
@@ -53,7 +62,8 @@ export function registerCaptionIpc(): void {
 /** Brennt die Untertitel mit @tscaps/engine in `input` → `output`. Wirft bei jedem Fehler (Aufrufer fällt auf ASS zurück). */
 export async function captionPass(job: CaptionJob, opts: { onProgress?: (f: number) => void; signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
   registerCaptionIpc()
-  const fontCss = await embeddedFontCss(job.preset)
+  const preset = job.style.font ? { ...job.preset, font: job.style.font } : job.preset
+  const fontCss = await embeddedFontCss(preset)
   if (active) throw new Error('Untertitel-Renderer ist belegt')
   const win = new BrowserWindow({ show: false, width: 1080, height: 1920, webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
   try {
@@ -68,8 +78,8 @@ export async function captionPass(job: CaptionJob, opts: { onProgress?: (f: numb
         resolve: () => { clearTimeout(timeout); resolve() }, reject: (e) => { clearTimeout(timeout); reject(e) },
         ready: () => {
           win.webContents.send('captions:run', {
-            input: job.input, output: job.output, vtt: buildVtt(groupWords(job.words, job.preset, job.style.scale ?? 1)), css: `${fontCss}
-${captionCss(job.preset, job.style)}`,
+            input: job.input, output: job.output, vtt: buildVtt(groupWords(job.words, preset, job.style.scale ?? DEFAULT_CAPTION_SCALE)), css: `${fontCss}
+${captionCss(preset, job.style)}`,
             y: job.style.y ?? job.preset.y, perLine: 12, width: job.width, height: job.height, taggers: tagWordlists(job.words)
           })
         }

@@ -237,7 +237,7 @@ function createWindow(): void {
     center: true,
     show: false,
     autoHideMenuBar: true,
-    title: 'Cutawan',
+    title: 'Shortme',
     icon: appIconPath(),
     // macOS gets the native frosted-glass treatment: system vibrancy showing
     // through a translucent shell (the renderer lightens its surfaces via the

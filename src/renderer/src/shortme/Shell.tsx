@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
+import { Logo } from './Logo'
 import { Home, FolderOpen, Palette, Cpu, Settings } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useStore, type NavId, type Screen } from './store'
@@ -24,7 +25,7 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
     <div className="sm-root">
       <div className="sm-ambient" style={{ backgroundImage: `url(${IMG.ambient})` }} />
       <div className="sm-titlebar">
-        <span className="sm-logo" />
+        <span className="sm-logo"><Logo size={16} /></span>
         <strong style={{ color: 'var(--text-1)', fontWeight: 600 }}>Shortme</strong>
       </div>
       <nav className="sm-nav sm-glass" aria-label="Hauptnavigation">
