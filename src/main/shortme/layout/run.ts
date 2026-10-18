@@ -1,5 +1,5 @@
 import type { ShortmeClip, ShortmeShot } from '@shared/shortme'
-import { analyzeClipASD, ASD_FPS } from '../../pipeline/asd'
+import { analyzeClipASD, ASD_FPS, type AsdAnalysis } from '../../pipeline/asd'
 import type { ProjectMeta } from '../project'
 import { facePenalty, faceRatio, planShots, type PlanInput, type PlanTrack } from './plan'
 
@@ -8,11 +8,11 @@ const STRIDE = ASD_FPS / 5 // Planungsraster 5 Ticks/s
 export interface ClipLayout { shots: ShortmeShot[]; faceRatio: number; penalty: number; /** Tracks/Schnitte für manuelle Korrekturen im Editor (szenenweise konsistent). */ input: PlanInput }
 
 /** LR-ASD-Analyse (Gesichter, Tracks, Sprecher-Werte) → Plan-Eingabe auf 5-Hz-Raster, relativ zum Clipbeginn. */
-export async function layoutForClip(meta: ProjectMeta, clip: Pick<ShortmeClip, 'start' | 'end'>, shotCuts: number[], signal?: AbortSignal): Promise<ClipLayout> {
+export async function layoutForClip(meta: ProjectMeta, clip: Pick<ShortmeClip, 'start' | 'end'>, shotCuts: number[], signal?: AbortSignal, pre?: AsdAnalysis | null): Promise<ClipLayout> {
   const dur = clip.end - clip.start
   const ticks = Math.max(1, Math.round(dur * 5))
   const dt = 1 / 5
-  const analysis = await analyzeClipASD(meta.sourcePath, clip.start, clip.end, signal).catch((e) => { if (signal?.aborted) throw e; return null })
+  const analysis = pre !== undefined ? pre : await analyzeClipASD(meta.sourcePath, clip.start, clip.end, signal).catch((e) => { if (signal?.aborted) throw e; return null })
   const tracks: PlanTrack[] = []
   const cuts = new Set<number>()
   for (const c of shotCuts) if (c > clip.start + 0.3 && c < clip.end - 0.3) cuts.add(Math.round((c - clip.start) * 5))

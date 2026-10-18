@@ -83,3 +83,9 @@ Rückmeldung: doppeltes Bild (oben/unten) ohne Not; nur 1 Clip; Sprecher halb/se
 Umgesetzt: (1) Split nur wenn nötig, mit Zoom (SPLIT_MAX_ZOOM 1.8). (2) Clip-Anzahl automatisch ≈ 1 je 2,5 min (4..30) + Option „Anzahl Clips“; Kandidatenpool größer, zweite Bewertung nur für obere Hälfte. (3) Tracking: Drift-Limit 0,06, Gesichtsanteil-Strafe. (4) Untertitel: einzeilige Gruppierung nach Zeichenbudget (Vorschau = Export = ASS), LLM-Korrekturlauf (proofread.md) als Standard-Korrekturen. (5) Editor: flexibler Quellmonitor, responsive Spalten.
 Geprüft: typecheck/lint sauber, Tests 841/842 (subscriptionVision flaky unter Last, einzeln grün); podcast-2p 5 Clips, solo 4 Clips PASS.
 Grenzen: LLM-Korrekturen können falsch sein (z. B. Eigennamen).
+
+## M11 – Profil-Problem Tracking, Schritt 1: Stufen-Diagnose (Status: Diagnose fertig, wartet auf Sichtprüfung)
+Werkzeug: `scripts/diag-tracking.ts` (Protokoll alle 0,5 s als TSV + Debug-Video `.tmp/diag/*.debug.mp4`: Farbe = Track, dick = aktiver Sprecher, gelb = 9:16-Ausschnitt). Stufen: A Gesichter · B Tracks · C ASD-Wert · D aktiver Sprecher · E Plan · F Ausschnitt vs. Gesichtsbox. Aufruf: `SHORTME_DATA=.tmp/fresh npx tsx --tsconfig tsconfig.node.json scripts/diag-tracking.ts test-videos/podcast-2p.mp4 [clipId|start-end]`.
+Ergebnis podcast-2p (5 Clips, 785 Zeilen, erste auffällige Stufe): A 89 (Sprache, aber kein Gesicht erkannt; bis ~33 % eines Clips) · C 148 (Sprache, aber alle ASD < 0 bei sichtbarem Gesicht) · D 16 · E 0 · F 82 (davon viele Fehlalarme: Split-Unterhälfte wird nicht geprüft).
+Erste falsche Stufe laut Heuristik: A/C – das Gesichtsmodell (YuNet) verliert seitliche Gesichter, und LR-ASD liefert für Profil/halb verdeckte Münder negative Werte; E (Planer) ist konsistent. Außerdem 44–67 Tracks je 80-s-Clip (starke Fragmentierung).
+Offen: Sichtprüfung der Debug-Videos durch Nutzer, dann Schritte 2–4 (Pose-Spuren, Kamera-Ziel aus LR-ASD, „Wer ist wer?“-Dialog).
