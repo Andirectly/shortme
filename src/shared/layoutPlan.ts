@@ -21,6 +21,8 @@ export interface PlanInput {
   /** Seitenverhältnis der Quelle (Breite/Höhe), z. B. 16/9. */
   sourceAspect: number
   targetAspect?: number
+  /** Sprache je Tick (VAD). Ohne Angabe gilt jeder Tick als Sprache. Gewechselt wird nur während Sprache. */
+  speech?: boolean[]
 }
 
 export interface PlanOptions {
@@ -33,6 +35,9 @@ export interface PlanOptions {
   pingPongSwitches: number
   pingPongWindowSec: number
 }
+
+/** Mindestvorsprung (Logit) des besten Tracks vor dem zweiten, damit ASD zählt (clips-studio `_ASD_LEAD`). */
+export const ASD_LEAD = 0.5
 
 export const PLAN_DEFAULTS: PlanOptions = { switchRatio: 1.25, minSpeakSec: 1, ignoreAreaRatio: 0.1, moveLimit: 0.06, noSpeakerSec: 3, minShotSec: 0.8, pingPongSwitches: 3, pingPongWindowSec: 6 }
 
@@ -55,6 +60,8 @@ const clampCx = (cx: number, w: number): number => Math.min(1 - w / 2, Math.max(
 
 interface Seg { start: number; end: number; track: number | null }
 
+const speechAt = (inp: PlanInput, i: number): boolean => inp.speech ? !!inp.speech[i] : true
+
 /** Aktiver Sprecher je Tick mit Hysterese: Wechsel nur bei ≥ 1,25× Score und ≥ 1 s Führung; Hintergrundgesichter (< 10 % der größten Fläche) zählen nicht. */
 export function activeSpeakers(inp: PlanInput, opt: PlanOptions = PLAN_DEFAULTS): Array<number | null> {
   const half = Math.max(1, Math.round(0.4 / inp.dt))
@@ -71,10 +78,12 @@ export function activeSpeakers(inp: PlanInput, opt: PlanOptions = PLAN_DEFAULTS)
     const cur = cands.find((c) => c.id === active)
     if (!cur) {
       // Neustart nach Kamerawechsel/Verlust: den Sprechenden, sonst das größte Gesicht
-      const speaking = best.s > 0 ? best : cands.reduce((a, b) => { const A = at(inp.tracks.find((t) => t.id === a.id)!, i)!.a; const B = at(inp.tracks.find((t) => t.id === b.id)!, i)!.a; return B > A ? b : a })
+      const second = cands.filter((c) => c.id !== best.id).reduce((m, c) => Math.max(m, c.s), -Infinity)
+      const clear = cands.length === 1 ? best.s > -0.5 : best.s - second > ASD_LEAD
+      const speaking = best.s > 0 || (clear && speechAt(inp, i)) ? best : cands.reduce((a, b) => { const A = at(inp.tracks.find((t) => t.id === a.id)!, i)!.a; const B = at(inp.tracks.find((t) => t.id === b.id)!, i)!.a; return B > A ? b : a })
       active = speaking.id
       lead = null
-    } else if (best.id !== cur.id && best.s > 0 && (cur.s <= 0 || best.s >= cur.s * opt.switchRatio)) {
+    } else if (best.id !== cur.id && speechAt(inp, i) && (best.s > 0 ? (cur.s <= 0 || best.s >= cur.s * opt.switchRatio) : false) && best.s - cur.s > ASD_LEAD) {
       if (!lead || lead.id !== best.id) lead = { id: best.id, since: i }
       if (i - lead.since + 1 >= needTicks) { active = best.id; lead = null }
     } else lead = null

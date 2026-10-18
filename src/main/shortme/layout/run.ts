@@ -1,6 +1,7 @@
 import type { ShortmeClip, ShortmeShot } from '@shared/shortme'
 import { analyzeClipASD, ASD_FPS, type AsdAnalysis } from '../../pipeline/asd'
 import type { ProjectMeta } from '../project'
+import { loadTranscript } from '../transcription'
 import { facePenalty, faceRatio, planShots, type PlanInput, type PlanTrack } from './plan'
 
 const STRIDE = ASD_FPS / 5 // Planungsraster 5 Ticks/s
@@ -26,7 +27,10 @@ export async function layoutForClip(meta: ProjectMeta, clip: Pick<ShortmeClip, '
       tracks.push({ id, start: first, centres: pick(t.centres), areas: pick(t.areas), scores: pick(t.scores) })
     })
   }
-  const input: PlanInput = { tracks, ticks, dt, cuts: [...cuts].filter((c) => c > 0 && c < ticks).sort((a, b) => a - b), sourceAspect: meta.width / meta.height }
+  // Sprache (VAD) je Tick: ASD zählt nur, wenn gesprochen wird
+  const tr = await loadTranscript(meta.hash).catch(() => null)
+  const speech = tr?.speech.length ? Array.from({ length: ticks }, (_, i) => { const t = clip.start + (i + 0.5) * dt; return tr.speech.some(([a, b]) => t >= a && t <= b) }) : undefined
+  const input: PlanInput = { tracks, ticks, dt, cuts: [...cuts].filter((c) => c > 0 && c < ticks).sort((a, b) => a - b), sourceAspect: meta.width / meta.height, speech }
   const shots = planShots(input)
   const ratio = faceRatio(shots, input)
   return { shots, faceRatio: ratio, penalty: facePenalty(ratio), input }

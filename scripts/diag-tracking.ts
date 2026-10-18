@@ -87,7 +87,10 @@ async function main(): Promise<void> {
       const spk = speech(t)
       const target = sp === null ? undefined : tk.find((x) => x.id === sp)
       const tb = target?.t.boxes?.[target.k]
-      const inside = tb ? Math.max(0, Math.min(c1, tb.x2) - Math.max(c0, tb.x1)) / (tb.x2 - tb.x1) : NaN
+      const ov = (lo: number, hi: number): number => (tb ? Math.max(0, Math.min(hi, tb.x2) - Math.max(lo, tb.x1)) / (tb.x2 - tb.x1) : NaN)
+      // Split: zwei Hälften (je halbe Ausschnittsbreite um cx bzw. cx2 bei Zoom 1) – Gesicht muss in einer ganz sein
+      const half = s.layout === 'split' ? Math.max(ov(s.cx - 0.5 * cw / s.zoom, s.cx + 0.5 * cw / s.zoom), s.cx2 !== undefined ? ov(s.cx2 - 0.5 * cw / s.zoom, s.cx2 + 0.5 * cw / s.zoom) : 0) : NaN
+      const inside = s.layout === 'split' ? half : ov(c0, c1)
       const best = sc.length ? sc.reduce((a, b) => (b.s > a.s ? b : a)) : null
       let flag = ''
       if (spk && tk.length === 0) { flag = 'A:Sprache ohne Gesicht'; tot.A++ }
