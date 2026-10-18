@@ -62,7 +62,7 @@ export function registerCaptionIpc(): void {
 /** Brennt die Untertitel mit @tscaps/engine in `input` → `output`. Wirft bei jedem Fehler (Aufrufer fällt auf ASS zurück). */
 export async function captionPass(job: CaptionJob, opts: { onProgress?: (f: number) => void; signal?: AbortSignal; timeoutMs?: number } = {}): Promise<void> {
   registerCaptionIpc()
-  const preset = job.style.font ? { ...job.preset, font: job.style.font } : job.preset
+  const preset = job.preset
   const fontCss = await embeddedFontCss(preset)
   if (active) throw new Error('Untertitel-Renderer ist belegt')
   const win = new BrowserWindow({ show: false, width: 1080, height: 1920, webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
@@ -79,7 +79,7 @@ export async function captionPass(job: CaptionJob, opts: { onProgress?: (f: numb
         ready: () => {
           win.webContents.send('captions:run', {
             input: job.input, output: job.output, vtt: buildVtt(groupWords(job.words, preset, job.style.scale ?? DEFAULT_CAPTION_SCALE)), css: `${fontCss}
-${captionCss(preset, job.style)}`,
+${captionCss(preset, { ...job.style, scale: job.style.scale ?? DEFAULT_CAPTION_SCALE })}`,
             y: job.style.y ?? job.preset.y, perLine: 12, width: job.width, height: job.height, taggers: tagWordlists(job.words)
           })
         }

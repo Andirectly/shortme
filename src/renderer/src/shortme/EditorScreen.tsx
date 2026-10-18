@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, Wand2, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { baseState, canRedo, canUndo, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
 import type { PreviewPlan, ShortmeShot } from '@shared/shortme'
-import { PRESETS, captionCss, groupWords, scopeCss } from '@shared/captions'
+import { PRESETS, captionCss, groupWords, isFiller, resolvePreset, scopeCss } from '@shared/captions'
 import { useStore } from './store'
 import { IMG, TRANSCRIPT } from './data'
 import { useClipList } from './clipData'
@@ -30,6 +30,7 @@ export function EditorScreen(): React.JSX.Element {
   const allReal = useProject((s) => s.clipsFile?.clips)
   const transcript = useProject((s) => s.transcript)
   const hasApi = useProject((s) => s.hasApi)
+  const styleDefaults = useProject((s) => s.style)
   const exportClips = useProject((s) => s.exportClips)
   const exportJob = useProject((s) => s.exportJob)
   const go = useStore((s) => s.go)
@@ -38,7 +39,7 @@ export function EditorScreen(): React.JSX.Element {
   // ---------- Nicht-destruktive Bearbeitung: Operationslog, Autosave ----------
   const origStart = real?.start ?? 0
   const D = real ? real.end - real.start : clip.duration
-  const baseSt = useMemo(() => baseState({ start: origStart, end: real?.end ?? clip.duration, hookText: clip.hook, corrections: real?.corrections }, useStore.getState().presetId), [origStart, real?.end, clip.duration, clip.hook, real?.corrections])
+  const baseSt = useMemo(() => baseState({ start: origStart, end: real?.end ?? clip.duration, hookText: clip.hook, corrections: real?.corrections }, useStore.getState().presetId, styleDefaults), [origStart, real?.end, clip.duration, clip.hook, real?.corrections, styleDefaults])
   const [log, setLog] = useState<EditLog>(emptyLog(clipId))
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(true)
@@ -89,7 +90,7 @@ export function EditorScreen(): React.JSX.Element {
   const [sizeDraft, setSizeDraft] = useState<number | null>(null)
   const [posDraft, setPosDraft] = useState<number | null>(null)
   const basePreset = PRESETS.find((p) => p.id === st.caption.presetId) ?? PRESETS[0]
-  const preset = st.caption.font ? { ...basePreset, font: st.caption.font } : basePreset
+  const preset = resolvePreset(basePreset, st.caption)
   const [fonts, setFonts] = useState<string[]>([])
   const [fontCss, setFontCss] = useState('')
   useEffect(() => { if (hasApi) void window.cutawan.listFonts().then((l) => setFonts(l.map((f) => f.family))).catch(() => undefined) }, [hasApi])
@@ -247,7 +248,7 @@ export function EditorScreen(): React.JSX.Element {
   }
   const caption = (patch: CaptionPatch): void => commit({ t: 'caption', patch })
   const curIdx = Math.max(0, words.findLastIndex((w) => w.t <= t))
-  const groups = useMemo(() => groupWords(words.filter((w) => !cut.includes(w.g)).map((w) => ({ w: w.w, start: w.t, end: w.e, g: w.g, hi: w.hi })), preset, size / 60), [words, cut, preset, size])
+  const groups = useMemo(() => groupWords(words.filter((w) => !cut.includes(w.g)).map((w) => ({ w: w.w, start: w.t, end: w.e, g: w.g, hi: w.hi, tag: w.hi ? ('emphasis' as const) : undefined })), preset, size / 60), [words, cut, preset, size])
   const cap = groups.find((gr) => gr.some((w) => w.g === words[curIdx]?.g)) ?? groups.find((gr) => gr[0].start >= t) ?? groups[groups.length - 1] ?? []
   const zn = ZONES[zone]
   const absT = origStart + t
@@ -317,7 +318,7 @@ export function EditorScreen(): React.JSX.Element {
             <style>{scopeCss(captionCss(preset, { scale: size / 60, highlight: st.caption.highlight }), '.sm-cap')}</style>
             <div className="sm-cap" style={{ position: 'absolute', left: 0, right: 0, top: `${pos}%`, transform: 'translateY(-50%)', padding: '0 4%' }}>
               <div className="segment"><div className="line">
-                {cap.map((x) => <span key={x.g} className={`word${x.g === words[curIdx]?.g ? ' word-being-narrated' : ''}${x.hi ? ' emphasis' : ''}`}>{x.w}</span>)}
+                {cap.map((x) => <span key={x.g} className={`word${x.g === words[curIdx]?.g ? ' word-being-narrated' : ''}${x.hi ? ' emphasis' : isFiller(x.w) ? ' filler' : ''}`}>{x.w}</span>)}
               </div></div>
             </div>
             {zn && <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${zn.top * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${zn.bottom * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', right: 0, top: `${zn.top * 100}%`, bottom: `${zn.bottom * 100}%`, width: `${zn.right * 100}%`, background: 'rgba(255,255,255,0.16)' }} /></div>}

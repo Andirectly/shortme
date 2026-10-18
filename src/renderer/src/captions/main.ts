@@ -12,7 +12,7 @@ interface Job {
   perLine: number
   width: number
   height: number
-  taggers: Record<'emphasis' | 'entity' | 'hook', string[]>
+  taggers: Record<string, string[]>
 }
 
 const api = window.cutawan.captions

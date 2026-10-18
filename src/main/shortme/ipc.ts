@@ -14,6 +14,8 @@ import { loadTranscript, runTranscription } from './transcription'
 import { loadClips, runAnalysis, layoutFile } from './clips/analysis'
 import { loadPersons, personsFile, replanWithPersons } from './clips/persons'
 import { writeFileAtomic } from './atomic'
+import { loadStyle, saveStyle, type StyleDefaults } from './styleDefaults'
+import { loadFeedback, saveFeedback } from './clips/feedback'
 import type { PersonsPatch, ShortmePersons } from '@shared/shortme'
 import { makeThumbs, thumbPath } from './clips/thumbs'
 import { existsSync } from 'node:fs'
@@ -64,6 +66,10 @@ export function registerShortmeIpc(): void {
     const otf = f.fileName.toLowerCase().endsWith('.otf')
     return `@font-face { font-family: '${family}'; font-weight: 400 900; src: url(data:font/${otf ? 'otf' : 'ttf'};base64,${(await readFile(f.path)).toString('base64')}) format('${otf ? 'opentype' : 'truetype'}'); }`
   })
+  ipcMain.handle('shortme:feedback', (_e, hash: string) => loadFeedback(hash))
+  ipcMain.handle('shortme:feedbackSet', (_e, hash: string, clipId: string, vote: number) => saveFeedback(hash, clipId, vote === 1 ? 1 : vote === -1 ? -1 : 0))
+  ipcMain.handle('shortme:styleGet', () => loadStyle())
+  ipcMain.handle('shortme:styleSet', (_e, style: StyleDefaults) => saveStyle(style))
   ipcMain.handle('shortme:persons', (_e, hash: string) => personsView(hash))
   /** Zuordnung speichern (gilt für das ganze Video) und alle Clips neu planen – ohne neue Analyse. */
   ipcMain.handle('shortme:personsSave', async (_e, hash: string, patch: PersonsPatch) => {
@@ -103,9 +109,9 @@ export function registerShortmeIpc(): void {
       const signals = await ensureSignals(meta)
       for (let i = 0; i < clips.length; i++) {
         // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
-        const st = stateOf(baseState(clips[i], opts?.presetId), await loadEdits(hash, clips[i].id))
+        const st = stateOf(baseState(clips[i], opts?.presetId, await loadStyle()), await loadEdits(hash, clips[i].id))
         const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
-        await exportClip(meta, eff, transcript, signals, { outDir, presetId: st.caption.presetId, srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, caption: { scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight, font: st.caption.font }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+        await exportClip(meta, eff, transcript, signals, { outDir, presetId: st.caption.presetId, srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, caption: { scale: st.caption.scale, y: st.caption.y, highlight: st.caption.highlight, font: st.caption.font, outline: st.caption.outline, upper: st.caption.upper, maxWords: st.caption.maxWords, anim: st.caption.anim }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
       }
       void shell.openPath(outDir)
     })
@@ -171,7 +177,7 @@ export function registerShortmeIpc(): void {
     const clip = file?.clips.find((c) => c.id === clipId)
     if (!meta || !clip || !transcript) throw new Error('Clip nicht gefunden')
     allowMediaPath(meta.sourcePath)
-    const st = stateOf(baseState(clip, presetId), sanitizeLog(rawLog, clipId))
+    const st = stateOf(baseState(clip, presetId, await loadStyle()), sanitizeLog(rawLog, clipId))
     const eff = effectiveClip(clip, transcript.words, st, (await loadLayoutInput(hash, clipId)) ?? (await ensureLayoutInput(meta, clip)))
     const signals = await ensureSignals(meta)
     const plan = planExport(eff, transcript, signals, true, eff.removed)
@@ -198,7 +204,7 @@ export async function runExportSelfTestIfRequested(): Promise<void> {
     if (!meta || !clip || !transcript) throw new Error('Projekt/Clip/Transkript fehlt')
     const signals = await ensureSignals(meta)
     const t0 = Date.now()
-    const r = await exportClip(meta, clip, transcript, signals, { outDir: join(process.cwd(), '.tmp', 'selftest-export'), engine: engine === 'ass' ? 'ass' : 'tscaps', hook: true })
+    const r = await exportClip(meta, clip, transcript, signals, { outDir: join(process.cwd(), '.tmp', 'selftest-export'), engine: engine === 'ass' ? 'ass' : 'tscaps', hook: true, presetId: process.env.SHORTME_SELFTEST_PRESET })
     console.log(`SELFTEST export engine=${r.captionEngine} path=${r.path} dur=${r.durationSec.toFixed(2)} took=${((Date.now() - t0) / 1000).toFixed(1)}s`)
   } catch (e) {
     console.log(`SELFTEST export error ${e instanceof Error ? e.message : e}`)

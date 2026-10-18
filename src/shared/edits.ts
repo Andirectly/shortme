@@ -2,17 +2,16 @@
 // Reine Funktionen – von Main (Export, Persistenz) und Renderer (Editor) gemeinsam genutzt.
 
 import type { ShortmeClip, ShortmeShot } from './shortme'
+import type { CaptionOverrides } from './captions'
 import { planShots, type PlanInput, type PlanTrack } from './layoutPlan'
 
-export interface CaptionPatch {
+export interface CaptionPatch extends CaptionOverrides {
   presetId?: string
   /** Schriftgröße-Faktor (1 = Preset). */
   scale?: number
   /** Vertikale Mitte 0..1. */
   y?: number
   highlight?: boolean
-  /** Schriftfamilie (eigene oder mitgelieferte); leer = Schrift des Stils. */
-  font?: string
   /** Sicherheitszone (nur Anzeige im Editor). */
   zone?: 'Aus' | 'TikTok' | 'Reels' | 'Shorts'
 }
@@ -41,7 +40,7 @@ export interface EditState {
   hook: { text: string; seconds: number; enabled: boolean }
   /** Globaler Wortindex → geänderter Untertitel-Text. */
   wordEdits: Record<number, string>
-  caption: Required<Pick<CaptionPatch, 'presetId' | 'scale' | 'y' | 'highlight' | 'zone'>> & { presetId: string; font?: string }
+  caption: Required<Pick<CaptionPatch, 'presetId' | 'scale' | 'y' | 'highlight' | 'zone'>> & { presetId: string } & CaptionOverrides
   layoutOps: Array<Extract<Op, { t: 'layout' | 'follow' | 'layoutClip' }>>
 }
 
@@ -50,8 +49,8 @@ export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops:
 /** Standard-Schriftgröße der Untertitel: Regler-Wert 25 (Regler = Skalierung × 60). */
 export const DEFAULT_CAPTION_SCALE = 25 / 60
 
-export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string> }, presetId = 'impact'): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: false }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId, scale: DEFAULT_CAPTION_SCALE, y: 0.68, highlight: true, zone: 'Aus' }, layoutOps: [] }
+export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string> }, presetId = 'impact', style: Partial<EditState['caption']> = {}): EditState {
+  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: false }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId, scale: DEFAULT_CAPTION_SCALE, y: 0.68, highlight: true, zone: 'Aus', ...Object.fromEntries(Object.entries(style).filter(([, v]) => v !== undefined)) } as EditState['caption'], layoutOps: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */

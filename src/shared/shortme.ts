@@ -55,6 +55,8 @@ export type ClipTagKind = 'emphasis' | 'entity' | 'hook'
 
 export interface ShortmeClip {
   id: string
+  /** „Most replayed“-Stärke 0..1 über den Clip (nur YouTube-Importe). */
+  heat?: number
   /** Sekunden im Quellvideo (nach dem Einrasten). */
   start: number
   end: number

@@ -1,4 +1,5 @@
 import type { ClipTagKind, ShortmeClip } from '@shared/shortme'
+import { heatBonus, heatScore, type HeatPoint } from './heat'
 import type { AsrWord } from '../../engines/asr/protocol'
 import type { Signals } from './signals'
 import { splitSentences, type Sentence } from './sentences'
@@ -7,6 +8,8 @@ import { topicClips } from './texttiling'
 import { chatJson, int, isObj, loadPrompt, str } from './llm'
 
 export interface SelectInput {
+  /** „Most replayed“-Kurve (YouTube), falls vorhanden – starkes Ranking-Signal. */
+  heat?: HeatPoint[] | null
   words: AsrWord[]
   durationSec: number
   signals: Signals
@@ -206,9 +209,9 @@ export function lengthPenalty(sec: number): number {
 export const critSum = (c: ShortmeClip['criteria']): number => c.hook + c.payoff + c.quotable + c.standalone + c.density
 
 /** Endwert: 60 % Raster, 40 % relative Rangfolge der Finalisten (+ bis 5 Punkte aus den Ton-Signalen). */
-export function finalScore(sum: number, rank: number, finalists: number, signalMean: number): number {
+export function finalScore(sum: number, rank: number, finalists: number, signalMean: number, heatBonusPts = 0): number {
   const rankScore = finalists <= 1 ? 100 : 100 - rank * (60 / (finalists - 1))
-  return Math.max(0, Math.min(100, Math.round(0.6 * sum + 0.4 * rankScore + 5 * signalMean)))
+  return Math.max(0, Math.min(100, Math.round(0.6 * sum + 0.4 * rankScore + 5 * signalMean + heatBonusPts)))
 }
 
 const queryLine = (q?: string): string => (q?.trim() ? `Der Nutzer sucht besonders nach: „${q.trim()}“. Bevorzuge passende Stellen, erfinde aber nichts.\n` : '')
@@ -341,7 +344,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   // E: nach Score wählen, Grenzen einrasten (Nachbarn verbieten Überlappung)
   console.info(`[select] bewertet: ${rated.length}, Finalisten: ${finalists.length}`)
   const pool = [...finalists, ...rated.filter((r) => !finalists.includes(r)).map((r) => { r.rank = finalists.length; return r })]
-  const scored = pool.map((f) => ({ f, score: Math.max(0, finalScore(f.sum, f.rank, pool.length, (secOf(signals.loudness, sentences[f.first].start, sentences[f.last].end) + secOf(signals.burst, sentences[f.first].start, sentences[f.last].end)) / 2) - lengthPenalty(dur(sentences, f.first, f.last))) }))
+  const scored = pool.map((f) => ({ f, score: Math.max(0, finalScore(f.sum, f.rank, pool.length, (secOf(signals.loudness, sentences[f.first].start, sentences[f.last].end) + secOf(signals.burst, sentences[f.first].start, sentences[f.last].end)) / 2, input.heat ? heatBonus(heatScore(input.heat, sentences[f.first].start, sentences[f.last].end)) : 0) - lengthPenalty(dur(sentences, f.first, f.last))) }))
   // Qualitätsschwelle: Clips mit schwachem Hook UND/ODER nicht eigenständigem Anfang erst nehmen, wenn zu wenige gute da sind
   const solid = (f: Rated): boolean => f.criteria.standalone >= 8 && f.criteria.hook >= 8
   scored.sort((a, b) => Number(solid(b.f)) - Number(solid(a.f)) || b.score - a.score)
@@ -360,7 +363,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
     for (let k = fw; k < words.length && words[k].end <= snapped.end + 0.06; k++) lw = k
     out.push({
       id: `clip-${Math.round(snapped.start * 10)}`, start: snapped.start, end: snapped.end, firstWord: fw, lastWord: lw, score, criteria: f.criteria,
-      title: f.title, hookText: f.hookText, reason: f.reason, tags: resolveTags(f.tags, sentences, words, f.first, f.last), source: 'llm', snap: snapped.path, extended: f.extended
+      title: f.title, hookText: f.hookText, reason: f.reason, tags: resolveTags(f.tags, sentences, words, f.first, f.last), ...(input.heat ? { heat: Math.round(heatScore(input.heat, snapped.start, snapped.end) * 100) / 100 } : {}), source: 'llm', snap: snapped.path, extended: f.extended
     })
   }
   // F: Untertitel-Korrektur je Clip (Zeichensetzung, Schreibweise, Erkennungsfehler) – als Vorbelegung, im Editor änderbar

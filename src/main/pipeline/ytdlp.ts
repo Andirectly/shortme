@@ -95,6 +95,8 @@ export interface UrlVideoMeta {
   webpageUrl: string
   /** Vorschaubild des Anbieters (z. B. YouTube-Thumbnail). */
   thumbnail?: string
+  /** „Most replayed“-Kurve (YouTube): Abschnitte mit Wiedergabe-Intensität 0..1. */
+  heatmap?: Array<{ start: number; end: number; value: number }>
 }
 
 export interface CookieAuthOptions {
@@ -266,6 +268,7 @@ interface YtDlpJson {
   webpage_url?: string
   thumbnail?: string
   url?: string
+  heatmap?: Array<{ start_time: number; end_time: number; value: number }>
   entries?: YtDlpJson[]
 }
 
@@ -308,7 +311,8 @@ export async function fetchUrlMeta(
     title: data.title ?? 'Imported video',
     durationSec: data.duration,
     webpageUrl: data.webpage_url ?? data.url ?? url,
-    thumbnail: data.thumbnail
+    thumbnail: data.thumbnail,
+    heatmap: Array.isArray(data.heatmap) ? data.heatmap.filter((h) => Number.isFinite(h.start_time) && Number.isFinite(h.end_time) && Number.isFinite(h.value)).map((h) => ({ start: h.start_time, end: h.end_time, value: h.value })) : undefined
   }
 }
 

@@ -12,6 +12,7 @@ import { selectClips } from './select'
 import { makeThumbs } from './thumbs'
 import { layoutForClip } from '../layout/run'
 import { applyPersons, buildPersons } from './persons'
+import { loadHeat } from './heat'
 import type { PlanInput } from '../../../shared/layoutPlan'
 
 export interface AnalysisOptions {
@@ -87,7 +88,9 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   const signals = await ensureSignals(meta)
   report('shots', 0, 'Kamerawechsel erkennen …')
   const cuts = await ensureShots(meta, opts.signal, (f) => report('shots', f, 'Kamerawechsel erkennen …'))
-  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts }
+  const heat = await loadHeat(meta.hash)
+  if (heat) report('signals', 1, 'Most-replayed-Kurve gefunden – fließt ins Ranking ein')
+  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat }
   const sel = { query: opts.query, wanted: opts.wanted, signal: opts.signal, report }
 
   let mode: ClipsFile['mode'] = 'llm'

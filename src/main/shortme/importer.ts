@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { saveHeat } from './clips/heat'
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
 import { freeDiskGb } from '../engines/hardware'
@@ -63,6 +64,7 @@ export async function importUrl(url: string, onProgress: (p: number, message: st
   }
   onProgress(1, 'Video wird geprüft und Vorschaubild erstellt …')
   const res = await importFile(target)
+  if (meta.heatmap?.length) await saveHeat(res.meta.hash, meta.heatmap).catch((e) => console.error('Heatmap speichern:', e))
   // YouTube & Co.: das Anbieter-Thumbnail ist als Projektbild besser als ein zufälliger Screenshot
   if (meta.thumbnail && !res.cached) {
     try {

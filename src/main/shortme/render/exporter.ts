@@ -1,4 +1,5 @@
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { resolvePreset, type CaptionOverrides } from '../../../shared/captions'
 import { DEFAULT_CAPTION_SCALE } from '../../../shared/edits'
 import { basename, dirname, join } from 'node:path'
 import type { ShortmeClip, ShortmeShot } from '@shared/shortme'
@@ -32,7 +33,7 @@ export interface ExportOptions {
   /** Herausgeschnittene Wörter (Quellzeit), aus den Editor-Operationen. */
   extraCuts?: Interval[]
   /** Untertitel-Anpassungen aus dem Editor. */
-  caption?: { scale?: number; y?: number; highlight?: boolean; font?: string }
+  caption?: { scale?: number; y?: number; highlight?: boolean } & CaptionOverrides
   hookSeconds?: number
   quality?: QualityTier
   encoder?: 'auto' | 'cpu' | 'gpu'
@@ -84,8 +85,8 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
   const plan = planExport(clip, t, signals, opts.removePauses ?? true, opts.extraCuts ?? [], opts.wordEdits ?? {})
   if (plan.pieces.length === 0) throw new Error('Clip enthält nichts zu exportieren')
   await mkdir(opts.outDir, { recursive: true })
-  const found = PRESETS.find((p) => p.id === opts.presetId) ?? PRESETS[0]
-  const preset: CaptionPreset = { ...found, font: opts.caption?.font || found.font, size: found.size * (opts.caption?.scale ?? DEFAULT_CAPTION_SCALE), y: opts.caption?.y ?? found.y, highlight: opts.caption?.highlight === false ? found.color : found.highlight }
+  const found = resolvePreset(PRESETS.find((p) => p.id === opts.presetId) ?? PRESETS[0], opts.caption)
+  const preset: CaptionPreset = { ...found, size: found.size * (opts.caption?.scale ?? DEFAULT_CAPTION_SCALE), y: opts.caption?.y ?? found.y, highlight: opts.caption?.highlight === false ? found.color : found.highlight }
 
   // libass: gebündelte + eigene Schriften in einem Ordner (ohne Electron, z. B. in Skripten: nur gebündelte)
   const fontsDirForRender = await renderFontsDir().catch(() => fontsDir())
@@ -136,7 +137,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
         const mid = join(work, 'mid.mp4')
         await render(mid, hook ? buildAss([], { width: OUT_W, height: OUT_H, preset, hook }) : null, 'high')
         report(0.5, 'Untertitel …')
-        await captionPass({ input: mid, output: tmp, words: capWords, preset: found, style: { scale: opts.caption?.scale, y: opts.caption?.y, highlight: opts.caption?.highlight, font: opts.caption?.font || undefined }, width: OUT_W, height: OUT_H },
+        await captionPass({ input: mid, output: tmp, words: capWords, preset: found, style: { scale: opts.caption?.scale, y: opts.caption?.y, highlight: opts.caption?.highlight }, width: OUT_W, height: OUT_H },
           { signal: opts.signal, onProgress: (f) => report(0.5 + f * 0.5, 'Untertitel …') })
         used = 'tscaps'
       } catch (e) {
