@@ -32,14 +32,14 @@ export function PresetBar({ preset, presetId, patch, titleEnabled, hasApi, canAp
   const snapshot = (): StylePreset => ({ ...preset, title: { ...preset.title, enabled: titleEnabled } })
   const mineSelected = !isBuiltin(presetId)
   return (
-    <div style={{ display: 'grid', gap: 10, padding: '12px 0', borderTop: '1px solid var(--edge)' }}>
+    <div style={{ display: 'grid', gap: 10, padding: '9px 0', borderTop: '1px solid var(--edge)' }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Pill onClick={() => setNaming(naming === null ? `${preset.name} (eigene)` : null)}><Save size={13} /> Als Preset speichern</Pill>
-        <Pill onClick={() => { if (mineSelected) void save(snapshot(), 'overwrite').then(() => flash('Preset überschrieben')) }}>Preset überschreiben</Pill>
-        <Pill onClick={() => void saveStyle({ presetId, style: patch, titleEnabled }).then(() => flash('Als Standard festgelegt'))}><Star size={13} /> Als Standard festlegen</Pill>
-        {onApplyAll && canApplyAll && <Pill onClick={onApplyAll}><Wand2 size={13} /> Auf alle Clips anwenden</Pill>}
-        <Pill onClick={() => void importFiles().then((ok) => flash(ok ? 'Preset importiert' : 'Nichts importiert'))}><Upload size={13} /> Importieren</Pill>
-        <Pill onClick={() => void exportOne(presetId).then((ok) => ok && flash('Preset exportiert'))}><Download size={13} /> Exportieren</Pill>
+        <Pill onClick={() => setNaming(naming === null ? `${preset.name} (eigene)` : null)}><Save size={13} /> Speichern als …</Pill>
+        <Pill onClick={() => { if (mineSelected) void save(snapshot(), 'overwrite').then(() => flash('Preset überschrieben')) }} disabled={!mineSelected}>Überschreiben</Pill>
+        <Pill onClick={() => void saveStyle({ presetId, style: patch, titleEnabled }).then(() => flash('Als Standard festgelegt'))}><Star size={13} /> Standard</Pill>
+        {onApplyAll && canApplyAll && <Pill onClick={onApplyAll}><Wand2 size={13} /> Alle Clips</Pill>}
+        <Pill onClick={() => void importFiles().then((ok) => flash(ok ? 'Preset importiert' : 'Nichts importiert'))}><Upload size={13} /> Import</Pill>
+        <Pill onClick={() => void exportOne(presetId).then((ok) => ok && flash('Preset exportiert'))}><Download size={13} /> Export</Pill>
       </div>
       {naming !== null && (
         <div style={{ display: 'flex', gap: 8 }}>
@@ -47,7 +47,7 @@ export function PresetBar({ preset, presetId, patch, titleEnabled, hasApi, canAp
           <Button variant="primary" disabled={!hasApi || !naming.trim()} onClick={() => void save({ ...snapshot(), name: naming.trim() }, 'new').then(() => { setNaming(null); flash('Preset gespeichert') })}>Speichern</Button>
         </div>
       )}
-      <small>{msg ? <span role="status"><Check size={12} style={{ verticalAlign: -1 }} /> {msg}</span> : mineSelected ? 'Eigenes Preset – „überschreiben“ ersetzt es.' : 'Eingebaute Presets lassen sich nicht überschreiben – „Als Preset speichern“ legt eine Kopie an.'}</small>
+      {msg && <small role="status"><Check size={12} style={{ verticalAlign: -1 }} /> {msg}</small>}
     </div>
   )
 }

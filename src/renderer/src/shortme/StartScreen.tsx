@@ -52,7 +52,7 @@ export function StartScreen(): React.JSX.Element {
         <div style={{ display: 'grid', gap: 10, justifyItems: 'center' }}>
           <UploadCloud size={44} strokeWidth={1.4} color="rgba(255,255,255,0.7)" />
           <h2>Video hierher ziehen</h2>
-          <small>{importing ? importMessage : 'oder klicken zum Auswählen · MP4, MOV, MKV'}</small>{importError && <small style={{ color: 'var(--warn)' }}>{importError}</small>}
+          {importing && <small>{importMessage}</small>}{importError && <small style={{ color: 'var(--warn)' }}>{importError}</small>}
         </div>
       </motion.div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -181,7 +181,7 @@ function CreateSheet(): React.JSX.Element {
                     <Segmented options={['Automatisch', 'Deutsch', 'Englisch']} value="Automatisch" onChange={() => undefined} />
                     <small>Modell</small>
                     <Segmented options={['Parakeet v3 + Qwen3-14B', 'Whisper turbo + Qwen3-14B']} value="Parakeet v3 + Qwen3-14B" onChange={() => undefined} />
-                    <small>Sprecher unterscheiden (langsamer, Stimmen-Erkennung)</small>
+                    <small>Sprecher unterscheiden</small>
                     <Switch on={diarize} onChange={setDiarize} label="Sprecher unterscheiden" />
                   </div>
                 )}

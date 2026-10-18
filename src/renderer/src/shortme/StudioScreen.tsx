@@ -82,7 +82,6 @@ export function StudioScreen(): React.JSX.Element {
             <TitleControls value={preset} onLive={setLive} onCommit={commit} />
           </div>
         )}
-        <small>„Als Standard festlegen“ gilt für alle Clips, bei denen du im Editor nichts anderes eingestellt hast – in Vorschau und Export.</small>
       </div>
     </div>
   )

@@ -27,7 +27,6 @@ function InfoBox({ m }: { m: ModelView | undefined }): React.JSX.Element {
           <span className="sm-tag">Laufzeit {me.runtimeSec} s</span>
           <span className="sm-tag">VRAM +{me.vramPeakMb >= 0 ? me.vramPeakMb : '?'} MB</span>
           {me.speechFaceShare !== null && <span className="sm-tag">Sprechzeit mit Gesicht {Math.round(me.speechFaceShare * 100)} %</span>}
-          <small style={{ alignSelf: 'center' }}>gemessen auf deinem Rechner</small>
         </div>
       )}
       {open && (
@@ -184,7 +183,7 @@ export function TestlabScreen(): React.JSX.Element {
   const optionsFor = (other: string): React.JSX.Element[] => models.map((m) => <option key={m.id} value={m.id} disabled={!m.integrated || m.id === other}>{m.name}{!m.integrated ? ' – noch nicht integriert' : m.id === other ? ' – schon auf der anderen Seite' : ` – ${STATUS_LABEL[m.effective]}${m.installed ? '' : ' (wird beim Start geladen)'}`}</option>)
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gap: 16, paddingTop: 12, paddingBottom: 40 }}>
-      <div><h1 style={{ display: 'flex', gap: 10, alignItems: 'center' }}><FlaskConical size={26} /> Testlab</h1><small>Zwei Modelle am selben Ausschnitt nebeneinander. Die Pipeline nutzt immer das aktive Modell des Platzes.</small></div>
+      <div><h1 style={{ display: 'flex', gap: 10, alignItems: 'center' }}><FlaskConical size={26} /> Testlab</h1></div>
       <div className="sm-glass" style={{ padding: 16, display: 'grid', gap: 14 }}>
         <label style={{ display: 'grid', gap: 6, maxWidth: 420 }}><small>Platz</small>
           <select aria-label="Platz" value={slot} onChange={(e) => { setSlot(e.target.value); setResults(null) }} style={sel}>
@@ -208,7 +207,7 @@ export function TestlabScreen(): React.JSX.Element {
           <label style={{ display: 'grid', gap: 6 }}><small>Dauer (s)</small><input className="sm-input" type="number" min={5} max={120} value={dur} onChange={(e) => setDur(Math.min(120, Math.max(5, +e.target.value)))} aria-label="Dauer in Sekunden" /></label>
           <Button variant="primary" disabled={running || !src || !aId || !bId || !comparable} onClick={() => void run()}>{running ? 'Läuft …' : 'Vergleich starten'}</Button>
         </div>
-        {!comparable && <small>Für diesen Platz gibt es noch kein Testverfahren – verfügbar ist der Vergleich bei „Gesichtserkennung“, „Personen-Tracking“ und „Untertitel-Renderer“.</small>}
+        {!comparable && <small>Für diesen Platz gibt es noch keinen Vergleich.</small>}
         {running && <small>A: {msgs.A} · B: {msgs.B}</small>}
         {err && <small style={{ color: 'var(--warn)' }}>{err}</small>}
       </div>

@@ -38,12 +38,16 @@ export interface PlanOptions {
   minShotSec: number
   pingPongSwitches: number
   pingPongWindowSec: number
+  /** Gesichtsfläche (Anteil am Bild), unter der die Person als „zu weit weg“ gilt → ganzes Bild statt Tracking. */
+  wideFaceArea?: number
+  /** Ab so vielen sichtbaren Personen, die nicht in einen 9:16-Ausschnitt passen, zeigt der Planer das ganze Bild. */
+  groupMinPersons?: number
 }
 
 /** Mindestvorsprung (Logit) des besten Tracks vor dem zweiten, damit ASD zählt (clips-studio `_ASD_LEAD`). */
 export const ASD_LEAD = 0.5
 
-export const PLAN_DEFAULTS: PlanOptions = { switchRatio: 1.25, minSpeakSec: 1, ignoreAreaRatio: 0.1, moveLimit: 0.06, noSpeakerSec: 3, minShotSec: 0.8, pingPongSwitches: 3, pingPongWindowSec: 6 }
+export const PLAN_DEFAULTS: PlanOptions = { switchRatio: 1.25, minSpeakSec: 1, ignoreAreaRatio: 0.1, moveLimit: 0.06, noSpeakerSec: 3, minShotSec: 0.8, pingPongSwitches: 3, pingPongWindowSec: 6, wideFaceArea: 0.004, groupMinPersons: 3 }
 
 const at = (t: PlanTrack, i: number): { c: number; a: number; s: number } | null => {
   const k = i - t.start
@@ -159,7 +163,32 @@ export function planShots(inp: PlanInput, opt: PlanOptions = PLAN_DEFAULTS): Sho
   const shots: ShortmeShot[] = []
   const push = (a: number, b: number, shot: Omit<ShortmeShot, 'start' | 'end'>): void => { shots.push({ start: a * inp.dt, end: (b + 1) * inp.dt, ...shot }) }
 
+  // Sichtbare Personen eines Abschnitts (in ≥ 60 % der Ticks vorhanden, nicht ignoriert): Mitte und Fläche (Median)
+  const visible = (a: number, b: number): Array<{ id: number; c: number; area: number }> => inp.tracks.filter((t) => !t_ignored(inp, t)).flatMap((t) => {
+    const cs: number[] = []
+    const as: number[] = []
+    for (let i = a; i <= b; i++) { const v = at(t, i); if (v) { cs.push(v.c); as.push(v.a) } }
+    return cs.length >= 0.6 * (b - a + 1) ? [{ id: t.id, c: median(cs), area: median(as) }] : []
+  })
+  const wideArea = opt.wideFaceArea ?? PLAN_DEFAULTS.wideFaceArea!
+  const groupMin = opt.groupMinPersons ?? PLAN_DEFAULTS.groupMinPersons!
+  /** Vollbild ist sinnvoller als Tracking: Person(en) winzig (Totale) oder Gruppe, die nicht in einen 9:16-Ausschnitt passt. */
+  const wantsFull = (seg: Seg): boolean => {
+    if (seg.end - seg.start + 1 < minTicks) return false
+    const vis = visible(seg.start, seg.end)
+    if (!vis.length) return false
+    const target = seg.track !== null && seg.track >= 0 ? vis.find((v) => v.id === seg.track) : undefined
+    if (target ? target.area < wideArea : vis.every((v) => v.area < wideArea)) return true
+    const span = Math.max(...vis.map((v) => v.c)) - Math.min(...vis.map((v) => v.c))
+    const tr = seg.track !== null && seg.track >= 0 ? inp.tracks.find((t) => t.id === seg.track) : undefined
+    const sc: number[] = []
+    if (tr) for (let i = seg.start; i <= seg.end; i++) { const v = at(tr, i); if (v) sc.push(v.s) }
+    const talking = sc.length > 0 && median(sc) > 0
+    return vis.length >= groupMin && span > w * 0.9 && !talking
+  }
+
   for (const s of merged) {
+    if (s.track !== -2 && wantsFull(s)) { push(s.start, s.end, { layout: 'fit', cx: 0.5, zoom: 1 }); continue }
     if (s.track === -2) {
       // Dialog-Fenster: zwei meistgezeigte Gesichter übereinander
       const ids = [...new Set(active.slice(s.start, s.end + 1).filter((x): x is number => x !== null))]

@@ -93,12 +93,12 @@ export function deepMerge<T>(base: T, patch: unknown): T {
 export const DEFAULT_ANIM: AnimSpec = { appear: 'fade', appearMs: 140, active: 'color', activeScale: 1.1, damping: 1, display: 'line', disappear: 'none', disappearMs: 120 }
 
 export const DEFAULT_TITLE: TitleStyle = {
-  enabled: false, variant: 'white', font: { family: 'TikTok Sans', weight: 700 }, sizePx: 72, y: 0.13, maxChars: 20, seconds: 3,
+  enabled: false, variant: 'white', font: { family: 'TikTok Sans', weight: 700 }, sizePx: 60, y: 0.13, maxChars: 20, seconds: 3,
   anim: { appear: 'pop', appearMs: 320, active: 'color', activeScale: 1, damping: 1, display: 'line', disappear: 'fade', disappearMs: 200 }
 }
 
 const base = (): CaptionStyle => ({
-  font: { family: 'Montserrat', weight: 800 }, sizePx: 100, lineHeight: 1.15, upper: false, color: '#FFFFFF', highlight: '#FFD60A', maxWords: 3, y: 0.68,
+  font: { family: 'Montserrat', weight: 800 }, sizePx: 75, lineHeight: 1.15, upper: false, color: '#FFFFFF', highlight: '#FFD60A', maxWords: 3, y: 0.68,
   outline: { enabled: true, widthPct: 8, color: '#000000' },
   shadow: { enabled: true, blurPct: 10, opacity: 0.6 },
   glow: { enabled: false, strength: 50, color: 'highlight', activeBoost: false },
@@ -110,14 +110,14 @@ const mk = (id: string, name: string, c: DeepPartial<CaptionStyle>, title: DeepP
 
 /** Eingebaute Presets (Gestaltungswerte A3: 90–110 px, Kontur 6–10 %, Schatten ohne Versatz ≈ 10 % Weichzeichnung bei 50–70 % Schwarz). */
 export const BUILTIN_PRESETS: StylePreset[] = [
-  mk('impact', 'Impact Gelb', { font: { family: 'Anton', weight: 400 }, sizePx: 108, upper: true, highlight: '#FFD400', maxWords: 3, outline: { widthPct: 9 }, anim: { appear: 'pop', appearMs: 160, active: 'colorScale', activeScale: 1.08, display: 'word' } }),
-  mk('clean', 'Clean Weiß', { font: { family: 'Poppins', weight: 700 }, sizePx: 96, highlight: '#A855F7', maxWords: 4, outline: { widthPct: 7 }, anim: { appear: 'fade', appearMs: 150, display: 'line' } }),
-  mk('box', 'Box Schwarz', { font: { family: 'Inter', weight: 700 }, sizePx: 92, highlight: '#4ADE80', maxWords: 3, outline: { enabled: false }, shadow: { enabled: false }, box: { enabled: true, color: '#000000', opacity: 0.72 }, anim: { appear: 'slideUp', appearMs: 200, display: 'line' } }),
-  mk('pop', 'Pop Pink', { font: { family: 'Montserrat', weight: 800 }, sizePx: 98, upper: true, highlight: '#FF5C8A', maxWords: 3, outline: { widthPct: 8 }, anim: { appear: 'pop', appearMs: 180, active: 'colorScale', activeScale: 1.12, display: 'word' } }),
-  mk('mono', 'Dezent', { font: { family: 'Inter', weight: 700 }, sizePx: 90, color: '#E5E7EB', highlight: '#FFFFFF', maxWords: 4, y: 0.7, outline: { widthPct: 6 }, anim: { appear: 'fade', appearMs: 120, display: 'line' } }),
-  mk('glow-karaoke', 'Glow Karaoke', { font: { family: 'Montserrat', weight: 800 }, sizePx: 100, color: '#FFFFFF', highlight: '#FFD60A', maxWords: 3, outline: { widthPct: 7 }, glow: { enabled: true, strength: 55, color: 'white', activeBoost: true }, anim: { appear: 'fade', appearMs: 120, active: 'color', display: 'line' } }),
-  mk('kinetic', 'Kinetisch', { font: { family: 'Anton', weight: 400 }, sizePx: 104, upper: true, highlight: '#FFD400', maxWords: 4, y: 0.66, outline: { widthPct: 8 }, template: 'kinetic', anim: { appear: 'pop', appearMs: 200, active: 'color', display: 'line' } }),
-  mk('glass', 'Glas', { font: { family: 'TikTok Sans', weight: 700 }, sizePx: 92, highlight: '#FFFFFF', maxWords: 4, y: 0.72, outline: { enabled: false }, template: 'glass', anim: { appear: 'blurIn', appearMs: 300, display: 'line' } })
+  mk('impact', 'Impact Gelb', { font: { family: 'Anton', weight: 400 }, sizePx: 81, upper: true, highlight: '#FFD400', maxWords: 3, outline: { widthPct: 9 }, anim: { appear: 'pop', appearMs: 160, active: 'colorScale', activeScale: 1.08, display: 'word' } }),
+  mk('clean', 'Clean Weiß', { font: { family: 'Poppins', weight: 700 }, sizePx: 72, highlight: '#A855F7', maxWords: 4, outline: { widthPct: 7 }, anim: { appear: 'fade', appearMs: 150, display: 'line' } }),
+  mk('box', 'Box Schwarz', { font: { family: 'Inter', weight: 700 }, sizePx: 69, highlight: '#4ADE80', maxWords: 3, outline: { enabled: false }, shadow: { enabled: false }, box: { enabled: true, color: '#000000', opacity: 0.72 }, anim: { appear: 'slideUp', appearMs: 200, display: 'line' } }),
+  mk('pop', 'Pop Pink', { font: { family: 'Montserrat', weight: 800 }, sizePx: 74, upper: true, highlight: '#FF5C8A', maxWords: 3, outline: { widthPct: 8 }, anim: { appear: 'pop', appearMs: 180, active: 'colorScale', activeScale: 1.12, display: 'word' } }),
+  mk('mono', 'Dezent', { font: { family: 'Inter', weight: 700 }, sizePx: 68, color: '#E5E7EB', highlight: '#FFFFFF', maxWords: 4, y: 0.7, outline: { widthPct: 6 }, anim: { appear: 'fade', appearMs: 120, display: 'line' } }),
+  mk('glow-karaoke', 'Glow Karaoke', { font: { family: 'Montserrat', weight: 800 }, sizePx: 75, color: '#FFFFFF', highlight: '#FFD60A', maxWords: 3, outline: { widthPct: 7 }, glow: { enabled: true, strength: 55, color: 'white', activeBoost: true }, anim: { appear: 'fade', appearMs: 120, active: 'color', display: 'line' } }),
+  mk('kinetic', 'Kinetisch', { font: { family: 'Anton', weight: 400 }, sizePx: 78, upper: true, highlight: '#FFD400', maxWords: 4, y: 0.66, outline: { widthPct: 8 }, template: 'kinetic', anim: { appear: 'pop', appearMs: 200, active: 'color', display: 'line' } }),
+  mk('glass', 'Glas', { font: { family: 'TikTok Sans', weight: 700 }, sizePx: 69, highlight: '#FFFFFF', maxWords: 4, y: 0.72, outline: { enabled: false }, template: 'glass', anim: { appear: 'blurIn', appearMs: 300, display: 'line' } })
 ]
 
 export const presetById = (id: string, extra: StylePreset[] = []): StylePreset => [...extra, ...BUILTIN_PRESETS].find((p) => p.id === id) ?? BUILTIN_PRESETS[0]

@@ -39,7 +39,7 @@ export function CaptionControls({ value, onLive, onCommit, fonts, onImportFonts,
   const families = [...new Set([...BUILTIN_FONTS, ...fonts])]
   return (
     <div>
-      <Row label="Schrift" hint="Eigene Schriften (.ttf / .otf)">
+      <Row label="Schrift">
         <div style={{ display: 'grid', gap: 8 }}>
           <select aria-label="Schrift" value={c.font.family} onChange={(e) => set({ font: { family: e.target.value, weight: e.target.value === 'Anton' ? 400 : e.target.value === 'Montserrat' ? 800 : 700 } })} style={selectStyle}>
             {families.map((f) => <option key={f} value={f}>{f}</option>)}
@@ -47,9 +47,9 @@ export function CaptionControls({ value, onLive, onCommit, fonts, onImportFonts,
           <Button variant="secondary" disabled={!hasApi} onClick={onImportFonts}>Schrift importieren …</Button>
         </div>
       </Row>
-      <Row label="Maße" hint="1080 × 1920 px">
-        <div style={{ display: 'grid', gap: 12 }}>
-          <Lv label="Größe (px)" value={c.sizePx} min={60} max={140} onLive={(v) => live({ sizePx: v })} onCommit={(v) => set({ sizePx: v })} />
+      <Row label="Maße">
+        <div style={{ display: 'grid', gap: 8 }}>
+          <Lv label="Größe (px)" value={c.sizePx} min={40} max={120} onLive={(v) => live({ sizePx: v })} onCommit={(v) => set({ sizePx: v })} />
           <Lv label="Zeilenabstand" value={c.lineHeight} scale={100} min={100} max={140} onLive={(v) => live({ lineHeight: v })} onCommit={(v) => set({ lineHeight: v })} />
           <Lv label="Wörter/Zeile" value={c.maxWords} min={1} max={5} onLive={(v) => live({ maxWords: v })} onCommit={(v) => set({ maxWords: v })} />
           <Lv label="Position" value={c.y * 100} min={10} max={90} onLive={(v) => live({ y: v / 100 })} onCommit={(v) => set({ y: v / 100 })} />
@@ -61,28 +61,24 @@ export function CaptionControls({ value, onLive, onCommit, fonts, onImportFonts,
           <Color label="Hervorhebung" value={c.highlight} onCommit={(v) => set({ highlight: v })} />
         </div>
       </Row>
-      <Row label="Großbuchstaben"><Switch on={c.upper} onChange={(b) => set({ upper: b })} label="Großbuchstaben" /></Row>
-      <Row label="Kontur" hint="% der Schriftgröße">
-        <Switch on={c.outline.enabled} onChange={(b) => set({ outline: { enabled: b } })} label="Kontur" />
+      <Row label="Großbuchstaben" toggle={<Switch on={c.upper} onChange={(b) => set({ upper: b })} label="Großbuchstaben" />} />
+      <Row label="Kontur" toggle={<Switch on={c.outline.enabled} onChange={(b) => set({ outline: { enabled: b } })} label="Kontur" />}>
         {c.outline.enabled && <Lv label="Breite" value={c.outline.widthPct} min={2} max={14} onLive={(v) => live({ outline: { widthPct: v } })} onCommit={(v) => set({ outline: { widthPct: v } })} />}
       </Row>
-      <Row label="Schatten" hint="ohne Versatz">
-        <Switch on={c.shadow.enabled} onChange={(b) => set({ shadow: { enabled: b } })} label="Schatten" />
+      <Row label="Schatten" toggle={<Switch on={c.shadow.enabled} onChange={(b) => set({ shadow: { enabled: b } })} label="Schatten" />}>
         {c.shadow.enabled && <>
           <Lv label="Weichzeichnung" value={c.shadow.blurPct} min={2} max={30} onLive={(v) => live({ shadow: { blurPct: v } })} onCommit={(v) => set({ shadow: { blurPct: v } })} />
           <Lv label="Deckkraft" value={c.shadow.opacity * 100} min={10} max={100} onLive={(v) => live({ shadow: { opacity: v / 100 } })} onCommit={(v) => set({ shadow: { opacity: v / 100 } })} />
         </>}
       </Row>
-      <Row label="Glow">
-        <Switch on={c.glow.enabled} onChange={(b) => set({ glow: { enabled: b } })} label="Glow" />
+      <Row label="Glow" toggle={<Switch on={c.glow.enabled} onChange={(b) => set({ glow: { enabled: b } })} label="Glow" />}>
         {c.glow.enabled && <>
           <Lv label="Stärke" value={c.glow.strength} min={0} max={100} onLive={(v) => live({ glow: { strength: v } })} onCommit={(v) => set({ glow: { strength: v } })} />
           <Segmented options={['Weiß', 'Gelb', 'Folgt Hervorhebung']} value={c.glow.color === 'white' ? 'Weiß' : c.glow.color === 'yellow' ? 'Gelb' : 'Folgt Hervorhebung'} onChange={(n) => set({ glow: { color: (n === 'Weiß' ? 'white' : n === 'Gelb' ? 'yellow' : 'highlight') as GlowColor } })} />
-          <Row label="Stärker auf aktivem Wort"><Switch on={c.glow.activeBoost} onChange={(b) => set({ glow: { activeBoost: b } })} label="Stärker auf aktivem Wort" /></Row>
+          <Row label="Stärker auf aktivem Wort" toggle={<Switch on={c.glow.activeBoost} onChange={(b) => set({ glow: { activeBoost: b } })} label="Stärker auf aktivem Wort" />} />
         </>}
       </Row>
-      <Row label="Box" hint="Innenabstand 0,25×, Ecken 0,15×">
-        <Switch on={c.box.enabled} onChange={(b) => set({ box: { enabled: b } })} label="Box" />
+      <Row label="Box" toggle={<Switch on={c.box.enabled} onChange={(b) => set({ box: { enabled: b } })} label="Box" />}>
         {c.box.enabled && <Lv label="Deckkraft" value={c.box.opacity * 100} min={10} max={100} onLive={(v) => live({ box: { opacity: v / 100 } })} onCommit={(v) => set({ box: { opacity: v / 100 } })} />}
       </Row>
     </div>
@@ -109,7 +105,7 @@ export function AnimControls({ kind, anim, onLive, onCommit }: { kind: 'caption'
           {anim.active === 'colorScale' && <Lv label="Vergrößerung (×)" value={anim.activeScale} scale={100} min={100} max={130} onLive={(v) => live({ activeScale: v })} onCommit={(v) => set({ activeScale: v })} />}
         </Row>
       )}
-      <Row label="Bewegungsgefühl" hint={anim.damping >= 0.97 ? 'weich, kein Überschwingen' : anim.damping <= 0.75 ? 'federnd' : ''}>
+      <Row label="Bewegungsgefühl">
         <Lv label="Dämpfung (1,0 = weich)" value={anim.damping} scale={100} min={70} max={100} onLive={(v) => live({ damping: v })} onCommit={(v) => set({ damping: v })} />
       </Row>
       {kind === 'caption' && (
@@ -132,8 +128,8 @@ export function TitleControls({ value, onLive, onCommit }: ControlProps): React.
     <div>
       <Row label="Variante"><Segmented options={['Weiße Box', 'Schwarze Box']} value={t.variant === 'white' ? 'Weiße Box' : 'Schwarze Box'} onChange={(n) => set({ variant: n === 'Weiße Box' ? 'white' : 'black' })} /></Row>
       <Row label="Maße">
-        <div style={{ display: 'grid', gap: 12 }}>
-          <Lv label="Größe (px)" value={t.sizePx} min={40} max={120} onLive={(v) => live({ sizePx: v })} onCommit={(v) => set({ sizePx: v })} />
+        <div style={{ display: 'grid', gap: 8 }}>
+          <Lv label="Größe (px)" value={t.sizePx} min={32} max={100} onLive={(v) => live({ sizePx: v })} onCommit={(v) => set({ sizePx: v })} />
           <Lv label="Position" value={t.y * 100} min={4} max={50} onLive={(v) => live({ y: v / 100 })} onCommit={(v) => set({ y: v / 100 })} />
           <Lv label="Umbruch (Zeichen)" value={t.maxChars} min={10} max={34} onLive={(v) => live({ maxChars: v })} onCommit={(v) => set({ maxChars: v })} />
         </div>

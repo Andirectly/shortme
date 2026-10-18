@@ -286,7 +286,7 @@ export function EditorScreen(): React.JSX.Element {
         <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportNow()}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'clamp(260px, 17vw, 380px) minmax(0, 1fr) clamp(280px, 17vw, 360px)', gap: 14, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'clamp(230px, 14vw, 320px) minmax(0, 1fr) clamp(360px, 26vw, 500px)', gap: 14, minHeight: 0 }}>
         {/* Transkript */}
         <div className="sm-glass" style={{ padding: 16, overflowY: 'auto' }}>
           <h3 style={{ marginBottom: 10 }}>Transkript</h3>
@@ -305,7 +305,6 @@ export function EditorScreen(): React.JSX.Element {
             <Pill onClick={() => { const w = words.find((x) => x.g === sel); if (w) startEdit(w.g, w.w) }}>Text ändern</Pill>
             <Pill onClick={() => { if (sel !== null) toggleCut(sel) }}>{sel !== null && cut.includes(sel) ? 'Wieder einfügen' : 'Herausschneiden'}</Pill>
           </div>
-          <small style={{ display: 'block', marginTop: 10 }}>Wort anklicken = auswählen und springen · Doppelklick oder „Text ändern“ = Untertitel-Text korrigieren (Enter bestätigt) · Entf = herausschneiden (im Export entfernt, beim Abspielen übersprungen).</small>
         </div>
 
         {/* Bühne: Quellmonitor + vertikale Vorschau */}
@@ -319,7 +318,6 @@ export function EditorScreen(): React.JSX.Element {
               {rects.map((r, i) => <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${r.x * 100}%`, width: `${r.w * 100}%`, border: '2px solid var(--accent)', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none', boxShadow: 'var(--accent-glow)' }} />)}
               <span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)' }}>Quelle · Person anklicken</span>
             </div>
-            <small>Heller Rahmen = aktueller Ausschnitt im Export</small>
           </div>
           <div style={{ position: 'relative', flex: 'none', height: '100%', maxHeight: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px var(--edge-highlight)', containerType: 'size' }}>
             {srcUrl
@@ -341,7 +339,7 @@ export function EditorScreen(): React.JSX.Element {
               <Row label="Vorlage"><PresetPicker presetId={st.caption.presetId} onPick={(id, p) => { setLive(null); caption({ presetId: id, resetStyle: true, style: {} }); if (!isBuiltin(id)) commit({ t: 'hook', enabled: p.title.enabled }) }} /></Row>
               <PresetBar preset={preset} presetId={st.caption.presetId} patch={st.caption.style} titleEnabled={st.hook.enabled} hasApi={hasApi} canApplyAll={(allReal?.length ?? 0) > 1} onApplyAll={() => void applyAll()} />
               <CaptionControls value={preset} onLive={(p) => setLive(p)} onCommit={styleCommit} fonts={fonts} onImportFonts={() => void importFonts()} hasApi={hasApi} />
-              <Row label="Hervorhebung (KI-Tags)"><Switch on={st.caption.highlight} onChange={(b) => caption({ highlight: b })} label="Hervorhebung" /></Row>
+              <Row label="Hervorhebung (KI-Tags)" toggle={<Switch on={st.caption.highlight} onChange={(b) => caption({ highlight: b })} label="Hervorhebung" />} />
               <Row label="Sicherheitszonen"><Segmented options={['Aus', 'TikTok', 'Reels', 'Shorts']} value={zone} onChange={setZone} /></Row>
             </div>
           )}
@@ -351,26 +349,21 @@ export function EditorScreen(): React.JSX.Element {
               <AnimControls kind="caption" anim={preset.caption.anim} onLive={setLive} onCommit={styleCommit} />
               <h3 style={{ marginTop: 18 }}>Titel</h3>
               <AnimControls kind="title" anim={preset.title.anim} onLive={setLive} onCommit={styleCommit} />
-              <small style={{ display: 'block', marginTop: 10 }}>Änderungen gelten sofort in der Vorschau und genauso im Export. Standard: weich (Dämpfung 1,0), kein Überschwingen.</small>
             </div>
           )}
           {tab === 'Titel' && (
             <div>
-              <Row label="Titel einblenden" hint="im Erstellen-Dialog als Standard einstellbar"><Switch on={st.hook.enabled} onChange={(b) => commit({ t: 'hook', enabled: b })} label="Titel einblenden" /></Row>
-              <Row label="Text" hint="vom LLM vorgeschlagen"><input className="sm-input" value={hook} onChange={(e) => setHookDraft(e.target.value)} onBlur={() => { if (hookDraft !== null && hookDraft !== st.hook.text) commit({ t: 'hook', text: hookDraft }); setHookDraft(null) }} /></Row>
+              <Row label="Titel einblenden" toggle={<Switch on={st.hook.enabled} onChange={(b) => commit({ t: 'hook', enabled: b })} label="Titel einblenden" />} />
+              <Row label="Text"><input className="sm-input" value={hook} onChange={(e) => setHookDraft(e.target.value)} onBlur={() => { if (hookDraft !== null && hookDraft !== st.hook.text) commit({ t: 'hook', text: hookDraft }); setHookDraft(null) }} /></Row>
               <Row label="Dauer"><Slider label="Sekunden" value={st.hook.seconds} min={1} max={8} onChange={() => undefined} onCommit={(v) => commit({ t: 'hook', text: st.hook.text, seconds: v })} /></Row>
               <TitleControls value={preset} onLive={setLive} onCommit={styleCommit} />
-              <small style={{ display: 'block', marginTop: 10 }}>Der Titel lässt sich in der Vorschau verschieben (ziehen). Schrift: TikTok Sans (SIL OFL 1.1).</small>
             </div>
           )}
           {tab === 'Bildausschnitt' && (
             <div>
-              <Row label="Aktueller Ausschnitt" hint={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''}><small>Layout ändern gilt ab der Abspielposition bis zum Ende der Einstellung.</small></Row>
-              <Row label="Ganzer Clip" hint="Smart folgt dem Sprecher, Vollbild = feste Mitte"><Segmented options={['Smart', 'Vollbild', 'Ganzes Bild']} value={clipLayout} onChange={(n) => commit({ t: 'layoutClip', layout: LAYOUTS[n] })} /></Row>
+              <Row label="Ganzer Clip"><Segmented options={['Smart', 'Vollbild', 'Ganzes Bild']} value={clipLayout} onChange={(n) => commit({ t: 'layoutClip', layout: LAYOUTS[n] })} /></Row>
               <Row label="Diese Einstellung"><Segmented options={Object.keys(LAYOUTS)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} /></Row>
-              <Row label="Kamera folgt" hint="ab hier"><small>Im Quellmonitor auf eine Person klicken – der Ausschnitt springt als fester Schnitt dorthin.</small></Row>
-              <Row label="Quelle anzeigen"><Switch on={showSource} onChange={setShowSource} label="Quelle anzeigen" /></Row>
-              <small>Gesichtsquote {Math.round(clip.faceRatio * 100)} % · {st.layoutOps.length} Änderung(en) am Ausschnitt</small>
+              <Row label="Quelle anzeigen" toggle={<Switch on={showSource} onChange={setShowSource} label="Quelle anzeigen" />} />
             </div>
           )}
         </div>
@@ -478,7 +471,6 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
           <span style={{ position: 'absolute', top: -2, left: -5, width: 12, height: 12, background: '#fff', borderRadius: '3px 3px 6px 6px' }} />
         </div>
       </div>
-      <small>Griffe rasten an Wortgrenzen ein · rot schraffiert = wird im Export entfernt · Leertaste: Abspielen · ←/→: 1 s (Shift 5 s)</small>
     </div>
   )
 }

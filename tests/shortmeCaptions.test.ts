@@ -68,8 +68,8 @@ describe('Gestaltungswerte (A3) für alle Presets', () => {
     const fonts = ['TikTok Sans', 'Montserrat', 'Inter', 'Poppins', 'Anton']
     for (const p of BUILTIN_PRESETS) {
       const c = p.caption
-      expect(c.sizePx, p.id).toBeGreaterThanOrEqual(90)
-      expect(c.sizePx, p.id).toBeLessThanOrEqual(110)
+      expect(c.sizePx, p.id).toBeGreaterThanOrEqual(66)
+      expect(c.sizePx, p.id).toBeLessThanOrEqual(84)
       if (c.outline.enabled) { expect(c.outline.widthPct, p.id).toBeGreaterThanOrEqual(6); expect(c.outline.widthPct, p.id).toBeLessThanOrEqual(10) }
       expect(c.lineHeight, p.id).toBeGreaterThanOrEqual(1.1)
       expect(c.lineHeight, p.id).toBeLessThanOrEqual(1.25)
@@ -86,7 +86,7 @@ describe('Untertitel-CSS (gemeinsam für Export und Vorschau)', () => {
   it('Schrift, Größe in cqh (px/19,2), Kontur in em, Schatten ohne Versatz, Tag-Klassen', () => {
     const css = captionCss(P('impact').caption)
     expect(css).toContain("'Anton'")
-    expect(css).toContain('font-size: 5.625cqh') // 108 px
+    expect(css).toContain('font-size: 4.219cqh') // 81 px
     expect(css).toContain('text-transform: uppercase')
     expect(css).toContain('-webkit-text-stroke: 0.180em') // 9 % → 2 × 9 %
     expect(css).toContain('0 0 0.100em rgba(0,0,0,0.600)')

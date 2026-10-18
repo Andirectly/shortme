@@ -77,7 +77,7 @@ export function ModelsScreen(): React.JSX.Element {
       </div>
       {other.length > 0 && (
         <div style={{ display: 'grid', gap: 8 }}>
-          <button onClick={() => setMore(!more)} style={{ background: 'none', border: 0, cursor: 'pointer', textAlign: 'left', padding: 0 }}><small>{more ? '▾' : '▸'} Weitere Modelle ({other.length}) – Alternativen, optional</small></button>
+          <button onClick={() => setMore(!more)} style={{ background: 'none', border: 0, cursor: 'pointer', textAlign: 'left', padding: 0 }}><small>{more ? '▾' : '▸'} Weitere Modelle ({other.length})</small></button>
           {more && <div className="sm-card" style={{ padding: 0, overflow: 'hidden' }}>{other.map((spec) => <Row key={spec.id} spec={spec} st={status[spec.id]} recommended={false} />)}</div>}
         </div>
       )}
@@ -102,7 +102,7 @@ export function SetupWizard(): React.JSX.Element | null {
       <motion.div key="wiz" role="dialog" aria-label="Einrichtung" className="sm-glass" initial={{ opacity: 0, scale: 0.94, filter: 'blur(8px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} transition={base}
         style={{ position: 'fixed', zIndex: 81, left: 'calc(50% - 300px)', top: '12vh', width: 600, padding: 26, background: 'rgba(24,24,32,0.95)', display: 'grid', gap: 16 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><Sparkles color="var(--accent)" /><h2>Einrichtung</h2></div>
-        <small>Shortme arbeitet komplett lokal. Für diese Hardware ({hw?.gpuName ?? 'ohne GPU'}, {hw ? (hw.vramTotalMb / 1024).toFixed(0) : 0} GB VRAM) werden {fmtBytes(total)} geladen.</small>
+        <small>({hw?.gpuName ?? 'ohne GPU'}, {hw ? (hw.vramTotalMb / 1024).toFixed(0) : 0} GB VRAM) · {fmtBytes(total)} werden geladen</small>
         <div style={{ display: 'grid', gap: 8 }}>
           {items.map(({ spec, st }) => (
             <div key={spec.id} style={{ display: 'grid', gridTemplateColumns: '24px 1fr 90px', gap: 10, alignItems: 'center', fontSize: 14 }}>

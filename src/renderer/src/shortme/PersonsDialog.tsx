@@ -32,7 +32,7 @@ export function PersonsDialog(): React.JSX.Element | null {
             style={{ position: 'fixed', zIndex: 81, left: '50%', top: '10vh', translate: '-50% 0', width: 'min(720px, 92vw)', maxHeight: '80vh', overflow: 'auto', padding: 24, display: 'grid', gap: 16, background: 'rgba(20,20,20,0.96)' }}>
             <div>
               <h2>Wer ist wer?</h2>
-              <small>{persons.needsReview ? `Die Erkennung ist nur zu ${Math.round(persons.confidence * 100)} % sicher.` : 'Erkannte Personen dieses Videos.'} Hauptperson: wird bei unklarem Sprecher bevorzugt. Ignorieren: wird nie gefilmt. Gilt für das ganze Video.</small>
+              <small>{persons.needsReview ? `Die Erkennung ist nur zu ${Math.round(persons.confidence * 100)} % sicher.` : 'Erkannte Personen dieses Videos.'}</small>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
               {persons.persons.map((p) => (

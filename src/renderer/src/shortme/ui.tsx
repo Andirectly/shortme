@@ -13,10 +13,10 @@ export function Button({ variant = 'secondary', children, className = '', ...res
   )
 }
 
-export function Pill({ pressed, onClick, children, role }: { pressed?: boolean; onClick?: () => void; children: ReactNode; role?: string }): React.JSX.Element {
+export function Pill({ pressed, onClick, children, role, disabled }: { pressed?: boolean; onClick?: () => void; children: ReactNode; role?: string; disabled?: boolean }): React.JSX.Element {
   const { base, reduced } = useSprings()
   return (
-    <motion.button role={role} aria-pressed={role ? undefined : pressed} aria-checked={role ? pressed : undefined} whileTap={reduced ? undefined : press} transition={base} className="sm-pill" onClick={onClick}>
+    <motion.button role={role} aria-pressed={role ? undefined : pressed} aria-checked={role ? pressed : undefined} whileTap={reduced ? undefined : press} transition={base} className="sm-pill" disabled={disabled} style={disabled ? { opacity: 0.4 } : undefined} onClick={onClick}>
       {children}
     </motion.button>
   )
@@ -41,10 +41,11 @@ export function Switch({ on, onChange, label }: { on: boolean; onChange: (b: boo
 
 export const Score = ({ v }: { v: number }): React.JSX.Element => <span className="sm-score">{v}</span>
 
-export function Row({ label, children, hint }: { label: string; children: ReactNode; hint?: string }): React.JSX.Element {
+/** Zeile mit Titel; toggle steht rechts in der Titelzeile (z. B. Schalter). hint wird bewusst nicht angezeigt (keine Erklärtexte). */
+export function Row({ label, children, toggle }: { label: string; children?: ReactNode; hint?: string; toggle?: ReactNode }): React.JSX.Element {
   return (
-    <div style={{ display: 'grid', gap: 8, padding: '14px 0', borderTop: '1px solid var(--edge)' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}><h3>{label}</h3>{hint && <small>{hint}</small>}</div>
+    <div style={{ display: 'grid', gap: 8, padding: '9px 0', borderTop: '1px solid var(--edge)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 26 }}><h3 style={{ flex: 1 }}>{label}</h3>{toggle}</div>
       {children}
     </div>
   )
