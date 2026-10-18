@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import { CLIPS } from './data'
 import { allClips } from './clipData'
 
-export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'settings' | 'processing' | 'clips' | 'editor'
-export type NavId = 'start' | 'projects' | 'studio' | 'models' | 'settings'
+export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'settings' | 'processing' | 'clips' | 'editor'
+export type NavId = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'settings'
 
 interface Op { label: string; undo: () => void; redo: () => void }
 
@@ -28,6 +28,9 @@ interface State {
   toggleSelect: (id: string) => void
   setView: (v: 'grid' | 'list') => void
   setPreset: (id: string) => void
+  /** Navigationspunkt „Testlab“ (in den Einstellungen ein-/ausblendbar). */
+  testlab: boolean
+  setTestlab: (b: boolean) => void
   openSheet: (b: boolean) => void
   setProgress: (p: number) => void
   setPaused: (b: boolean) => void
@@ -49,6 +52,7 @@ export const useStore = create<State>((set, get) => ({
   selected: [],
   activeClip: CLIPS[0].id,
   presetId: load('sm.preset', 'impact'),
+  testlab: load('sm.testlab', false),
   progress: 0,
   paused: false,
   opts: load('sm.opts', { format: '9:16', frame: 'Smart', length: 'Automatisch', captions: 'preset', removePauses: true, workflow: 'Prüfen & Bearbeiten', query: '', count: 'Auto' }),
@@ -60,6 +64,7 @@ export const useStore = create<State>((set, get) => ({
   setOpts: (o) => { const opts = { ...get().opts, ...o }; save('sm.opts', opts); set({ opts }) },
   toggleSelect: (id) => set((s) => ({ selected: s.selected.includes(id) ? s.selected.filter((x) => x !== id) : [...s.selected, id] })),
   setView: (view) => { save('sm.view', view); set({ view }) },
+  setTestlab: (testlab) => { save('sm.testlab', testlab); set((s) => ({ testlab, screen: !testlab && s.screen === 'testlab' ? 'settings' : s.screen })) },
   setPreset: (presetId) => { save('sm.preset', presetId); set({ presetId }) },
   openSheet: (sheetOpen) => set({ sheetOpen }),
   setProgress: (progress) => set({ progress }),

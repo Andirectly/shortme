@@ -91,6 +91,10 @@
       {
         "from": "resources/yt-dlp-plugins",
         "to": "yt-dlp-plugins"
+      },
+      {
+        "from": "resources/models-catalog.json",
+        "to": "models-catalog.json"
       }
     ],
     "win": {

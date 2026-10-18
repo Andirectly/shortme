@@ -100,6 +100,15 @@ export const CATALOG: AssetSpec[] = [
     recommendedFromVramMb: 0
   },
   {
+    id: 'scrfd-10g',
+    name: 'SCRFD-10G (Gesichtserkennung, Test)',
+    kind: 'vision',
+    note: 'Robuster bei Profil/kleinen Gesichtern – Alternative zu YuNet im Testlab (17 MB)',
+    files: [{ url: `${HF}/immich-app/buffalo_l/resolve/main/detection/model.onnx`, name: 'det_10g.onnx', size: 16923827, sha256: '5838f7fe053675b1c7a08b633df49e7af5495cee0493c7dcf6697200b85b5b91' }],
+    expect: ['det_10g.onnx'],
+    recommendedFromVramMb: 0
+  },
+  {
     id: 'speaker-segmentation',
     name: 'pyannote Segmentierung 3.0',
     kind: 'vad',

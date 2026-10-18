@@ -22,6 +22,7 @@ import type {
 import type { OpenRouterCatalog } from '@shared/openrouter'
 import type { AssetSpec, AssetStatus, CheckItem, HardwareInfo } from '@shared/engines'
 import type { CaptionPatch, EditLog } from '@shared/edits'
+import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
 import type { PersonsPatch, PreviewPlan, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
 const api = {
@@ -184,6 +185,17 @@ const api = {
     styleSet: (style: Record<string, unknown>): Promise<Record<string, unknown>> => ipcRenderer.invoke('shortme:styleSet', style),
     feedback: (hash: string): Promise<Record<string, -1 | 0 | 1>> => ipcRenderer.invoke('shortme:feedback', hash),
     feedbackSet: (hash: string, clipId: string, vote: -1 | 0 | 1): Promise<Record<string, -1 | 0 | 1>> => ipcRenderer.invoke('shortme:feedbackSet', hash, clipId, vote),
+    testlab: {
+      models: (): Promise<ModelsView> => ipcRenderer.invoke('testlab:models'),
+      sources: (): Promise<LabSource[]> => ipcRenderer.invoke('testlab:sources'),
+      run: (req: LabRunRequest): Promise<{ a: LabResult; b: LabResult }> => ipcRenderer.invoke('testlab:run', req),
+      decide: (slot: string, keep: string, drop: string): Promise<ModelsView> => ipcRenderer.invoke('testlab:decide', slot, keep, drop),
+      onProgress: (cb: (p: { side: 'A' | 'B'; message: string }) => void): (() => void) => {
+        const l = (_e: Electron.IpcRendererEvent, p: { side: 'A' | 'B'; message: string }): void => cb(p)
+        ipcRenderer.on('testlab:progress', l)
+        return () => ipcRenderer.removeListener('testlab:progress', l)
+      }
+    },
     fontCss: (family: string): Promise<string> => ipcRenderer.invoke('shortme:fontCss', family),
     deleteProject: (hash: string): Promise<boolean> => ipcRenderer.invoke('shortme:deleteProject', hash),
     persons: (hash: string): Promise<ShortmePersons | null> => ipcRenderer.invoke('shortme:persons', hash),

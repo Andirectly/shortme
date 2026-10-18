@@ -9,6 +9,8 @@ import { FaceCropStore } from './faceCropStore'
 import { runFfmpeg, streamRawFrames, probeVideo } from './ffmpeg'
 import { computeMfcc, MFCC_COEFFS } from './mfcc'
 import { cropFaceForEmbed, embedAvailable, embedFace, normalize } from './faceEmbed'
+import { detectFacesScrfd, scrfdAvailable } from './scrfd'
+import { activeModelId } from '../testlab/registry'
 import { detectPose, mergeFacesAndHeads, poseAvailable } from './pose'
 import { buildFaceTracks, type FaceTrack } from './facetracks'
 import { detectFaces, frameDifference, modelsDir, MODEL_W, MODEL_H } from './detect'
@@ -124,7 +126,7 @@ export interface AsdAnalysis {
   faceFrameRatio: number
   /** Actual decoded dimensions used for the mouth crops, for framing safety. */
   cropSize?: { width: number; height: number }
-  detector?: 'yunet' | 'ultraface'
+  detector?: 'yunet' | 'ultraface' | 'scrfd'
 }
 
 interface FaceSample { f: number; box: FaceBox; emb: Float32Array; crop: Buffer }
@@ -188,11 +190,13 @@ export async function runDetectionPass(
   signal?: AbortSignal,
   highResolution?: { width: number; height: number },
   stride = DETECT_STRIDE,
-  adaptive = true
+  adaptive = true,
+  faceDetector: 'yunet' | 'scrfd' = 'yunet'
 ): Promise<DetectionPass> {
   const facesPerFrame: Array<FaceBox[] | null> = []
   let lastFull = -Infinity, fullCount = 0, allLarge = false
   const detectHigh = async (frame: Buffer, f: number, cut: boolean): Promise<FaceBox[]> => {
+    if (faceDetector === 'scrfd') return detectFacesScrfd(frame, width, height, signal)
     const halfOk = adaptive && !cut && allLarge && f - lastFull < FULL_DETECT_EVERY
     if (halfOk) {
       const half = halveRgb(frame, width, height)
@@ -489,19 +493,23 @@ export async function analyzeClipASD(
   startSec: number,
   endSec: number,
   signal?: AbortSignal,
-  comparison?: { detector?: 'ultraface' | 'yunet'; cropWidth?: number; detectStride?: number; fixedResolution?: boolean }
+  comparison?: { detector?: 'ultraface' | 'yunet' | 'scrfd'; cropWidth?: number; detectStride?: number; fixedResolution?: boolean }
 ): Promise<AsdAnalysis | null> {
   if (!(await asdAvailable())) return null
 
   const duration = Math.max(0.1, endSec - startSec)
   const info = await probeVideo(videoPath)
-  let useYuNet = comparison?.detector !== 'ultraface' && yunetAvailable()
+  // Platz „Gesichtserkennung“: aktives Modell aus dem Testlab (Standard YuNet); ausdrücklich angefordert hat Vorrang
+  const wanted = comparison?.detector ?? ((await activeModelId('face')) === 'scrfd_10g' ? 'scrfd' : 'yunet')
+  if (wanted === 'scrfd' && !scrfdAvailable() && comparison?.detector === 'scrfd') throw new Error('SCRFD-Modell fehlt')
+  const faceDetector: 'yunet' | 'scrfd' = wanted === 'scrfd' && scrfdAvailable() ? 'scrfd' : 'yunet'
+  let useYuNet = (comparison?.detector !== 'ultraface' && yunetAvailable()) || faceDetector === 'scrfd'
   if (comparison?.detector === 'yunet' && !useYuNet) throw new Error('YuNet comparison model is unavailable')
   let detection: DetectionPass
   try {
     detection = await timed('asd/detect', () => runDetectionPass(videoPath, startSec, duration, signal,
       useYuNet ? faceDetectionSize(info.width, info.height) : undefined, comparison?.detectStride,
-      !comparison?.fixedResolution), { duration })
+      !comparison?.fixedResolution, faceDetector), { duration })
   } catch (error) {
     if (!useYuNet || signal?.aborted || comparison?.detector === 'yunet') throw error
     console.error('High-resolution face detection failed; retrying with UltraFace:', error)
@@ -579,6 +587,6 @@ export async function analyzeClipASD(
     fps: ASD_FPS,
     faceFrameRatio: detection.faceFrameRatio,
     cropSize: { width: cropW, height: cropH },
-    detector: useYuNet ? 'yunet' : 'ultraface'
+    detector: faceDetector === 'scrfd' ? 'scrfd' : useYuNet ? 'yunet' : 'ultraface'
   }
 }

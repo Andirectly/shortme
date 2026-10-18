@@ -14,6 +14,9 @@ import { loadTranscript, runTranscription } from './transcription'
 import { loadClips, runAnalysis, layoutFile } from './clips/analysis'
 import { loadPersons, personsFile, replanWithPersons } from './clips/persons'
 import { writeFileAtomic } from './atomic'
+import { modelsView, decide } from '../testlab/registry'
+import { labSources, runLab } from '../testlab/lab'
+import type { LabRunRequest } from '../../shared/models'
 import { loadStyle, saveStyle, type StyleDefaults } from './styleDefaults'
 import { loadFeedback, saveFeedback } from './clips/feedback'
 import type { PersonsPatch, ShortmePersons } from '@shared/shortme'
@@ -68,6 +71,11 @@ export function registerShortmeIpc(): void {
   })
   ipcMain.handle('shortme:feedback', (_e, hash: string) => loadFeedback(hash))
   ipcMain.handle('shortme:feedbackSet', (_e, hash: string, clipId: string, vote: number) => saveFeedback(hash, clipId, vote === 1 ? 1 : vote === -1 ? -1 : 0))
+  // Testlab: Modell-Plätze, Quellen, Vergleich, Entscheidung
+  ipcMain.handle('testlab:models', () => modelsView())
+  ipcMain.handle('testlab:sources', async () => { const l = await labSources(); for (const s of l) allowMediaPath(s.path); return l })
+  ipcMain.handle('testlab:run', (_e, req: LabRunRequest) => runLab(req, (p) => broadcast('testlab:progress', p)))
+  ipcMain.handle('testlab:decide', (_e, slot: string, keep: string, drop: string) => decide(slot, keep, drop))
   ipcMain.handle('shortme:styleGet', () => loadStyle())
   ipcMain.handle('shortme:styleSet', (_e, style: StyleDefaults) => saveStyle(style))
   ipcMain.handle('shortme:persons', (_e, hash: string) => personsView(hash))

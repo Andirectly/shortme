@@ -27,7 +27,8 @@ async function run(request: InferenceRequest): Promise<InferenceResponse> {
       }
       // TransNetV2 (Kamerawechsel) ist auf der CPU der Engpass (≈ 150 ms je Fenster): DirectML ist ≈ 25× schneller (6 ms);
       // ohne passende GPU/Treiber fällt ORT automatisch auf die CPU zurück.
-      const gpu = request.modelPath.toLowerCase().endsWith('transnetv2.onnx') && process.platform === 'win32'
+      // größere Netze (TransNetV2, SCRFD-10G, YOLOv8-Pose) laufen auf der GPU deutlich schneller; die kleinen (YuNet, LR-ASD, VAD) bleiben auf der CPU
+      const gpu = /(transnetv2|det_10g|yolov8n-pose).onnx$/i.test(request.modelPath) && process.platform === 'win32'
       try {
         session = await ort.InferenceSession.create(request.modelPath, gpu ? { ...options, executionProviders: ['dml', 'cpu'] } : options)
       } catch (e) {

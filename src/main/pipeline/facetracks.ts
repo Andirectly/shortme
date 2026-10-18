@@ -21,7 +21,7 @@ const MATCH_IOU = 0.25
 /** Detections may drop out briefly (blur, profile turn); bridge gaps up to this. */
 const MAX_GAP_SEC = 0.6
 /** Discard tracks shorter than this — too little context for a speech score. */
-const MIN_TRACK_SEC = 0.4
+const MIN_TRACK_SEC = 0.6
 const MIN_DETECTIONS = 3
 /** Median smoothing window for box centre/size, in seconds. */
 const SMOOTH_SEC = 0.5

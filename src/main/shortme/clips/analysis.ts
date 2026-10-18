@@ -95,7 +95,12 @@ async function ensureEvents(meta: ProjectMeta, speech: Array<[number, number]>, 
 }
 
 export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {}): Promise<ClipsFile> {
-  const report = opts.onProgress ?? (() => undefined)
+  // Zeit je Stufe mitschreiben ([perf]-Zeile am Ende) – Grundlage für Tempo-Optimierung
+  const userReport = opts.onProgress ?? (() => undefined)
+  const stageSec: Record<string, number> = {}
+  let curStage = 'start'
+  let curAt = Date.now()
+  const report: typeof userReport = (stage, f, m) => { if (stage !== curStage) { const n = Date.now(); stageSec[curStage] = (stageSec[curStage] ?? 0) + (n - curAt) / 1000; curStage = stage; curAt = n } userReport(stage, f, m) }
   const t = await loadTranscript(meta.hash)
   if (!t) throw new Error('Transkript fehlt – erst transkribieren')
   report('signals', 0, 'Signale berechnen …')
@@ -122,14 +127,23 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     }
   }
   // Tracking & Layouts (M5): Gesichtsquote fließt ins Ranking ein
-  const layouts: Awaited<ReturnType<typeof layoutForClip>>[] = []
-  for (let i = 0; i < clips.length; i++) {
-    report('layout', i / clips.length, `Bildausschnitt planen (${i + 1}/${clips.length}) …`)
-    const l = await layoutForClip(meta, clips[i], cuts, opts.signal)
-    layouts.push(l)
-    await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(l.input))
-    clips[i] = { ...clips[i], shots: l.shots, faceRatio: l.faceRatio, score: Math.max(0, clips[i].score - l.penalty) }
+  // Layout-Analyse (Gesichter, Spuren, Sprecher) je Clip – zwei Clips gleichzeitig: Decodieren (FFmpeg) und Inferenz überlappen sich
+  const layouts: Awaited<ReturnType<typeof layoutForClip>>[] = new Array(clips.length)
+  let nextClip = 0
+  let doneClips = 0
+  const layoutWorker = async (): Promise<void> => {
+    for (;;) {
+      const i = nextClip++
+      if (i >= clips.length) return
+      const l = await layoutForClip(meta, clips[i], cuts, opts.signal)
+      layouts[i] = l
+      await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(l.input))
+      clips[i] = { ...clips[i], shots: l.shots, faceRatio: l.faceRatio, score: Math.max(0, clips[i].score - l.penalty) }
+      report('layout', ++doneClips / clips.length, `Bildausschnitt planen (${doneClips}/${clips.length}) …`)
+    }
   }
+  report('layout', 0, `Bildausschnitt planen (0/${clips.length}) …`)
+  await Promise.all([layoutWorker(), layoutWorker()])
   // Personen über das ganze Video (Wiedererkennung) → persons.json; Plan-Eingaben tragen die Personen
   if (layouts.some((l) => l.identities.length)) {
     const pf = await buildPersons(meta, clips, layouts).catch((e) => { console.error('Personen-Zuordnung fehlgeschlagen:', e); return null })
@@ -141,5 +155,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, clips }
   await writeFileAtomic(projectFile(meta.hash, 'clips.json'), JSON.stringify(file, null, 1))
   await markStage(meta.hash, 'clips', true)
+  stageSec[curStage] = (stageSec[curStage] ?? 0) + (Date.now() - curAt) / 1000
+  console.info(`[perf] Analyse ${Math.round(meta.durationSec / 60)} min Video: ${Object.entries(stageSec).map(([k, v]) => `${k} ${v.toFixed(0)} s`).join(' · ')}`)
   return file
 }

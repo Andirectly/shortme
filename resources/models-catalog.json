@@ -1,0 +1,364 @@
+{
+  "_info": "Katalog für das Testlab. Pro Modell: Platz, Kurzbeschreibung, Vorteile, Nachteile, Größe/Tempo, Lizenz, geeignet für. 'status': aktiv = aktuell in Shortme, kandidat = noch zu integrieren. Werte aus der Recherche vom Oktober 2026; eigene Testlab-Messungen haben Vorrang. Ergänzt: 'integrated' (true = im Code eingebunden und im Testlab wählbar), Status 'test' (integrierte Alternative) und 'entfernen' (zum Entfernen); Entscheidungen aus dem Testlab werden hier und in docs/MODELS.md nachgetragen.",
+  "slots": [
+    {
+      "id": "face",
+      "name": "Gesichtserkennung"
+    },
+    {
+      "id": "tracking",
+      "name": "Personen-Tracking"
+    },
+    {
+      "id": "asd",
+      "name": "Sprechererkennung (wer spricht im Bild)"
+    },
+    {
+      "id": "diarization",
+      "name": "Sprechertrennung (Tonspur)"
+    },
+    {
+      "id": "audio_events",
+      "name": "Ton-Ereignisse (Lachen, Applaus)"
+    },
+    {
+      "id": "emotion",
+      "name": "Stimm-Emotion"
+    },
+    {
+      "id": "llm",
+      "name": "Clip-Auswahl (LLM)"
+    }
+  ],
+  "models": [
+    {
+      "id": "yunet",
+      "slot": "face",
+      "status": "aktiv",
+      "name": "YuNet",
+      "short": "Sehr kleiner, schneller Gesichtserkenner.",
+      "pros": [
+        "Extrem klein und schnell",
+        "Geringer VRAM-Bedarf"
+      ],
+      "cons": [
+        "Verliert Gesichter im Profil, klein oder teilverdeckt",
+        "In einem Vergleich nur 47,5 % erkannte Gesichter (SCRFD-10G: 68,7 %)"
+      ],
+      "size": "< 1 MB, wenige ms pro Bild",
+      "license": "MIT",
+      "bestFor": "Schwache Hardware, frontale Einzelpersonen",
+      "integrated": true
+    },
+    {
+      "id": "scrfd_10g",
+      "slot": "face",
+      "status": "test",
+      "name": "SCRFD-10G (InsightFace Buffalo_L)",
+      "short": "Starker Gesichtserkenner, deutlich robuster bei schwierigen Winkeln.",
+      "pros": [
+        "WIDER FACE schwer: 82,8 (kleine, verdeckte, gedrehte Gesichter)",
+        "Liefert Gesichtspunkte für LR-ASD und Gesichts-Identität",
+        "Im selben Paket wie ArcFace (Personen-Identität über das ganze Video)"
+      ],
+      "cons": [
+        "Größer und langsamer als YuNet",
+        "Reine Profile werden in Benchmarks nicht separat gemessen"
+      ],
+      "size": "ca. 17 MB, ca. 5 ms pro Bild",
+      "license": "InsightFace, nicht-kommerziell (privat ok)",
+      "bestFor": "Podcasts, Interviews, alle Fälle mit seitlichen Gesichtern",
+      "integrated": true
+    },
+    {
+      "id": "scrfd_2_5g",
+      "slot": "face",
+      "status": "kandidat",
+      "name": "SCRFD-2.5G",
+      "short": "Leichte SCRFD-Variante als Mittelweg.",
+      "pros": [
+        "Schneller als SCRFD-10G",
+        "Deutlich besser als YuNet"
+      ],
+      "cons": [
+        "WIDER FACE schwer: 77,1 statt 82,8 bei SCRFD-10G"
+      ],
+      "size": "ca. 3 MB, ca. 4 ms pro Bild",
+      "license": "InsightFace, nicht-kommerziell (privat ok)",
+      "bestFor": "Lange Videos, wenn Tempo wichtiger ist",
+      "integrated": false
+    },
+    {
+      "id": "iou_tracks",
+      "slot": "tracking",
+      "status": "aktiv",
+      "name": "IoU-Tracks (aktuell)",
+      "short": "Verbindet Erkennungen über Überlappung der Boxen.",
+      "pros": [
+        "Einfach, schnell, keine Zusatzmodelle"
+      ],
+      "cons": [
+        "Spur reißt ab, sobald der Erkenner eine Person verliert (z. B. im Profil)",
+        "Kein Wiedererkennen nach Lücken"
+      ],
+      "size": "kein Modell",
+      "license": "-",
+      "bestFor": "Ruhige Aufnahmen mit frontalen Gesichtern",
+      "integrated": true
+    },
+    {
+      "id": "bytetrack",
+      "slot": "tracking",
+      "status": "kandidat",
+      "name": "ByteTrack",
+      "short": "Bewährter Tracker, nutzt auch unsichere Erkennungen.",
+      "pros": [
+        "Robuster bei kurzen Erkennungslücken",
+        "Schnell, kein Zusatzmodell"
+      ],
+      "cons": [
+        "Kein Aussehensvergleich: lange Lücken führen zu neuer ID"
+      ],
+      "size": "kein Modell",
+      "license": "MIT",
+      "bestFor": "Mittelweg ohne zusätzliche Rechenlast",
+      "integrated": false
+    },
+    {
+      "id": "botsort_reid",
+      "slot": "tracking",
+      "status": "kandidat",
+      "name": "BoT-SORT-ReID (BoxMOT + OSNet x0.25)",
+      "short": "Erkennt Personen am Körper-Aussehen (Kleidung, Statur) wieder.",
+      "pros": [
+        "Hält die Person, auch wenn das Gesicht fehlt",
+        "Wiedererkennung nach Verdeckung"
+      ],
+      "cons": [
+        "Zusätzliches Modell, mehr Rechenzeit",
+        "Auf Straßen-Benchmark MOT17 nur +0,7 IDF1 gegenüber ohne ReID",
+        "Nutzen bei Podcasts nicht belegt, nur plausibel"
+      ],
+      "size": "OSNet x0.25 ca. 1 MB",
+      "license": "BoxMOT AGPL (privat ok)",
+      "bestFor": "Vlogs, Bewegung, lange Gesichtslücken",
+      "integrated": false
+    },
+    {
+      "id": "lr_asd",
+      "slot": "asd",
+      "status": "aktiv",
+      "name": "LR-ASD",
+      "short": "Prüft Lippenbewegung gegen Tonspur.",
+      "pros": [
+        "Sehr klein (0,84 Mio. Parameter)",
+        "Nahe am Stand der Forschung (94,5 % mAP)",
+        "In deinen Shortly-Tests 92–100 % richtig, wenn eine Spur existiert"
+      ],
+      "cons": [
+        "Braucht ein sichtbares Gesicht",
+        "Schwächer bei kleinen Gesichtern und Profil"
+      ],
+      "size": "ca. 3 MB",
+      "license": "MIT",
+      "bestFor": "Standard für alle Typen mit mehreren Personen",
+      "integrated": true
+    },
+    {
+      "id": "fabulight_asd",
+      "slot": "asd",
+      "status": "kandidat",
+      "name": "FabuLight-ASD",
+      "short": "Wie Light-ASD, zusätzlich mit Körperpose.",
+      "pros": [
+        "94,3 % statt 93,7 % mAP gegenüber Light-ASD",
+        "Besser bei verdeckten Gesichtern und Sprachüberlagerung"
+      ],
+      "cons": [
+        "Gesamtgewinn klein",
+        "Kein fertiger ONNX-Export, müsste selbst gebaut werden"
+      ],
+      "size": "ca. 27 % größer als Light-ASD",
+      "license": "siehe Repository prüfen",
+      "bestFor": "Erst testen, wenn Tracking-Spuren stabil sind",
+      "integrated": false
+    },
+    {
+      "id": "pyannote_seg3",
+      "slot": "diarization",
+      "status": "aktiv",
+      "name": "pyannote Segmentation 3.0 + WeSpeaker",
+      "short": "Bisherige Sprechertrennung (standardmäßig aus).",
+      "pros": [
+        "Klein, als ONNX verfügbar",
+        "Keine Sprecher-Obergrenze"
+      ],
+      "cons": [
+        "Übersegmentiert Dialoge (4 statt 2 Sprecher in deinen Tests)",
+        "Ältere Pipeline als pyannote Community-1"
+      ],
+      "size": "ca. 9 MB + Embedding-Modell",
+      "license": "MIT / Apache-2.0",
+      "bestFor": "Runden mit mehr als 4 Personen",
+      "integrated": true
+    },
+    {
+      "id": "sortformer",
+      "slot": "diarization",
+      "status": "kandidat",
+      "name": "NVIDIA Sortformer (offline)",
+      "short": "Moderne Sprechertrennung, erkennt überlappende Sprache.",
+      "pros": [
+        "Deutsch, echte Gespräche: 8,13 % Fehler statt 20,22 % bei pyannote Community-1",
+        "Berücksichtigt gleichzeitiges Sprechen"
+      ],
+      "cons": [
+        "Maximal 4 Sprecher",
+        "ONNX-Verfügbarkeit noch zu prüfen",
+        "Bestimmt trotzdem nie direkt das Kamera-Ziel"
+      ],
+      "size": "noch zu messen",
+      "license": "NVIDIA Open Model License prüfen",
+      "bestFor": "Podcasts und Interviews mit 2–4 Personen",
+      "integrated": false
+    },
+    {
+      "id": "yamnet",
+      "slot": "audio_events",
+      "status": "aktiv",
+      "integrated": true,
+      "name": "YAMNet (AudioSet)",
+      "short": "Aktuelles Modell: erkennt Lachen, Applaus und laute Stimme in 521 Klassen.",
+      "pros": [
+        "Klein, schnell (12 min Audio in unter 2 s)",
+        "Mehrere Ereignisarten auf einmal",
+        "Apache-2.0"
+      ],
+      "cons": [
+        "Nicht auf Podcast-Gespräche spezialisiert",
+        "In den Testvideos erkannte es kein Lachen (kein echter Beleg)"
+      ],
+      "size": "16 MB",
+      "license": "Apache-2.0",
+      "bestFor": "Standard für alle Typen"
+    },
+    {
+      "id": "zencastr_laughter",
+      "slot": "audio_events",
+      "status": "kandidat",
+      "name": "Zencastr Laughter Detection",
+      "short": "Lachen-Erkennung, speziell für Podcast-Audio trainiert.",
+      "pros": [
+        "Auf Gesprächsaufnahmen mit Nahmikrofon optimiert",
+        "ONNX-Datei verfügbar"
+      ],
+      "cons": [
+        "Nur Lachen, keine anderen Ereignisse",
+        "Für laute Umgebungen (Vlogs) weniger geeignet"
+      ],
+      "size": "noch zu messen",
+      "license": "Model Card prüfen",
+      "bestFor": "Podcast / Interview",
+      "integrated": false
+    },
+    {
+      "id": "sensevoice",
+      "slot": "audio_events",
+      "status": "kandidat",
+      "name": "SenseVoice (nur Ereignisse/Emotion)",
+      "short": "Erkennt Lachen, Applaus, Musik und Emotion in einem Durchgang.",
+      "pros": [
+        "Mehrere Ereignisarten auf einmal",
+        "Sehr schnell (ca. 170× Echtzeit auf GPU)",
+        "234 MB"
+      ],
+      "cons": [
+        "Transkription nicht für Deutsch, Text wird verworfen",
+        "Lachen-Erkennung bei Podcasts evtl. schwächer als Zencastr"
+      ],
+      "size": "234 MB",
+      "license": "Model Card prüfen",
+      "bestFor": "Vlog, Stream/Gaming, Vortrag",
+      "integrated": false
+    },
+    {
+      "id": "audeering_emotion",
+      "slot": "emotion",
+      "status": "kandidat",
+      "name": "audeering wav2vec2 Emotion (MSP-Podcast)",
+      "short": "Misst Erregung, Dominanz und Valenz der Stimme.",
+      "pros": [
+        "Auf Podcast-Aufnahmen trainiert",
+        "ONNX-Export verfügbar",
+        "Erfasst Begeisterung, Ärger, Aufregung"
+      ],
+      "cons": [
+        "Auf Englisch trainiert, Übertragung auf Deutsch zu prüfen",
+        "Lizenz nicht-kommerziell"
+      ],
+      "size": "ca. 650 MB (12 Schichten)",
+      "license": "CC-BY-NC-SA 4.0 (privat ok)",
+      "bestFor": "Alle Typen, als Zusatzsignal",
+      "integrated": false
+    },
+    {
+      "id": "qwen3_14b",
+      "slot": "llm",
+      "status": "aktiv",
+      "name": "Qwen3-14B Q4_K_M",
+      "short": "Aktuelles Modell für die Clip-Auswahl.",
+      "pros": [
+        "Stärkstes dichtes 14B-Modell, das gut passt",
+        "In Shortme erprobt",
+        "Apache-2.0"
+      ],
+      "cons": [
+        "Nur Text",
+        "Bei 16k Kontext knapp im VRAM"
+      ],
+      "size": "ca. 9 GB Datei",
+      "license": "Apache-2.0",
+      "bestFor": "Standard",
+      "integrated": true
+    },
+    {
+      "id": "gemma4_12b",
+      "slot": "llm",
+      "status": "kandidat",
+      "name": "Gemma 4 12B QAT Q4_0",
+      "short": "Neueres Modell, versteht Text, Bild und Audio.",
+      "pros": [
+        "Könnte den Ton eines Clips direkt hören (Lachen, Tonfall)",
+        "Sparsamer: ca. 7,8 GB VRAM bei 16k Kontext",
+        "Apache-2.0"
+      ],
+      "cons": [
+        "Audio-Unterstützung in llama.cpp noch zu prüfen",
+        "Auswahlqualität auf Deutsch gegen Qwen3-14B noch unbekannt"
+      ],
+      "size": "ca. 6,5 GB Datei",
+      "license": "Apache-2.0",
+      "bestFor": "Multimodale Bewertung der Finalisten",
+      "integrated": false
+    },
+    {
+      "id": "qwen3_8_27b_iq3",
+      "slot": "llm",
+      "status": "kandidat",
+      "name": "Qwen3.8 27B (3-Bit)",
+      "short": "Größeres Modell, stark komprimiert.",
+      "pros": [
+        "Laut einer Quelle das stärkste Modell, das in 12 GB passt"
+      ],
+      "cons": [
+        "Nur eine Quelle",
+        "3-Bit-Kompression kostet Qualität",
+        "Langsamer"
+      ],
+      "size": "ca. 9,4 GB Datei",
+      "license": "Apache-2.0",
+      "bestFor": "Test, ob mehr Modellgröße die Auswahl verbessert",
+      "integrated": false
+    }
+  ]
+}
