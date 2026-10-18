@@ -160,7 +160,7 @@ const overlaps = (a: Cand, b: Cand): number => {
 }
 
 const NOTE = { type: 'integer', minimum: 0, maximum: 4 }
-const RATE_SCHEMA = {
+export const RATE_SCHEMA = {
   type: 'object', additionalProperties: false,
   required: ['hook_quote', 'payoff_quote', 'missing_context', 'hook', 'payoff', 'quotable', 'standalone', 'emotion', 'title', 'hook_text', 'reason', 'tags'],
   properties: {
@@ -173,7 +173,7 @@ const RATE_SCHEMA = {
 
 interface RateRaw { notes: { hook: number; payoff: number; quotable: number; standalone: number; emotion: number }; hookQuote: string; payoffQuote: string; missing: string[]; title: string; hookText: string; reason: string; tags: Rated['tags'] }
 
-function validateRate(x: unknown): RateRaw {
+export function validateRate(x: unknown): RateRaw {
   if (!isObj(x)) throw new Error('Objekt erwartet')
   const notes = { hook: int(x.hook, 0, 4, 'hook'), payoff: int(x.payoff, 0, 4, 'payoff'), quotable: int(x.quotable, 0, 4, 'quotable'), standalone: int(x.standalone, 0, 4, 'standalone'), emotion: int(x.emotion, 0, 4, 'emotion') }
   const tags = Array.isArray(x.tags) ? x.tags.filter(isObj).map((t) => ({ sentence: int(t.sentence, 0, 1e9, 'sentence'), word: String(t.word ?? ''), kind: (['emphasis', 'entity', 'hook'].includes(String(t.kind)) ? t.kind : 'emphasis') as ClipTagKind })) : []

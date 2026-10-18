@@ -50,3 +50,20 @@ Testmaterial: `podcast-2p.mp4` = „Tattoo“-Video (12:09, 2 Personen, viele Sc
 1. CLAUDE.md-Stack: Parakeet v3 und Qwen3-14B festschreiben (erledigt).
 2. Install-Skripte (electron, onnxruntime-node, ffmpeg-static) für Installer/CI via `allowScripts` freigeben.
 3. Offene Entscheidungen für dich: (a) Modell-Profil für 12-GB-Karten, (b) Fork heißt intern noch „cutawan“ – Umbenennung in M1 miterledigen?
+
+# M13 – Modell-Spike: Qwen3-14B vs. Gemma 4 12B vs. Qwen3.8-27B (2026-10-18, RTX 5090 32 GB)
+Skripte: `scripts/spike-llm.ts` (Auswahl, VRAM, Zeit), `spike-judge.ts` (blinde Gegenbewertung), `spike-audio.ts` (Gemma-Audio). Ergebnisse: `spikes/out/`. Gleiche Pipeline (Themenkarte, Kandidaten, Bewertung, Paarvergleich, Einrasten), nur das Modell wechselt; llama.cpp b11711 (mitgeliefert) lädt beide neuen Modelle ohne Update. Dateien: Gemma `google/gemma-4-12b-it-qat-q4_0-gguf` (7,0 GB + mmproj 0,2 GB), Qwen `byteshape/Qwen3.8-27B-GGUF` IQ3_S 3,23 bpw (11,0 GB + mmproj 0,9 GB), Basis Qwen3-14B Q4_K_M. Kontext 16k, `-fa on`.
+
+| | Qwen3-14B Q4_K_M | Gemma 4 12B QAT Q4_0 | Qwen3.8 27B IQ3_S |
+|---|---|---|---|
+| VRAM (Modell + KV) | 11,4 GB | **8,3 GB** | 12,7 GB |
+| Auswahl podcast-2p / solo | **110 s / 68 s** | 144 s / 129 s | 162 s / 145 s |
+| Ø Cliplänge podcast / solo | 43 s / 30 s | **72 s / 75 s** | 25 s / 26 s |
+| Gegenbewertung Ø (2 Richter, 0–100) podcast / solo | 47,5 / 44,5 | 50,1 / 45,5 | **56,1** / 40,3 |
+| Überschneidung mit den Clips der anderen (podcast / solo) | 3/5, 3/5 · 3/4, 2/4 | 3/5, 3/5 · 3/4, 3/4 | 3/5, 3/5 · 2/4, 3/4 |
+
+**Einordnung (ehrlich):** 5 + 4 Clips je Modell, Richter = zwei der Kandidaten (Eigen-Bias), keine Ground-Truth (kein „Most replayed“ für die Testvideos). Kein Modell ist klar besser: Qwen3.8 gewinnt bei podcast-2p (beide Richter), verliert bei solo (Qwen-Richter 34,5 vs. 43,0 für Qwen3-14B); Gesamtmittel 46,0 / 47,8 / 48,2 – innerhalb des Rauschens. Etwa 60 % der Clips stimmen zwischen den Modellen überein (Mindestüberlappung 50 %). Beobachtungen: Gemma wählt sehr lange Clips (bis 82 s, über dem Sweetspot 22–50 s) und scheitert öfter am Korrekturlauf („Wortzahl 219 ≠ 220“ → übersprungen); Qwen3.8 wählt sehr kurze Clips (16–26 s) und ist am langsamsten; Qwen3-14B lief einmal mit nur 1 Clip (Fallback nach LLM-Fehler, beim zweiten Lauf 5 Clips) – Run-zu-Run-Streuung ist also ein Thema für alle.
+
+**Gemma-4-Audio über llama-server (`--mmproj`, `input_audio` im OpenAI-Format): funktioniert.** Die Aufnahme wird gehört (60 s Ton ≈ 1 s Antwortzeit): Auf „Was hörst du?“ gibt Gemma den Satzanfang wörtlich wieder, zählt Stimmen und erkennt Lachen; bei reiner Stille (Kontrolle) antwortet es „Stille/leises Rauschen“. **Aber:** in der Bewertungsfrage mit Transkript lieferten echter Ton und Stille praktisch dieselben Noten (3/3/3 vs. 3/3/3; 4× fast identisch) – das Modell bewertet nach dem Text, nicht nach dem Ton. Nutzbar wäre Audio nur über gezielte Wahrnehmungsfragen (Lachen? Zahl der Stimmen? Betonung?) statt Gesamtnote; ob diese Wahrnehmung treffsicher ist, ist nicht gemessen (Lachen wurde in beiden Clips „gehört“, YAMNet fand keines > 0,35).
+
+**Empfehlung (Entscheidung bleibt bei dir):** Qwen3-14B bleibt Standard (schnellster, Längen passen zum Sweetspot, bewährt). Gemma 4 12B als wählbare Alternative im Modell-Manager, vor allem für Karten mit < 12 GB VRAM (8,3 GB) und falls Audio-Wahrnehmung gewünscht ist – dann mit Längenbegrenzung stärker erzwingen. Qwen3.8 27B (IQ3) bringt für den Mehraufwand (12,7 GB, +50 % Zeit) keinen belegten Vorteil. Belastbarer wird der Vergleich erst mit Ground Truth: YouTube-Videos mit „Most replayed“ importieren und `scripts/eval-heat.ts` je Modell laufen lassen.

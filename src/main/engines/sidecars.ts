@@ -73,7 +73,7 @@ export function freePort(): Promise<number> {
   })
 }
 
-export interface LlamaOptions { model: string; ctx?: number; kvQuant?: boolean; gpuLayers?: number }
+export interface LlamaOptions { model: string; ctx?: number; kvQuant?: boolean; gpuLayers?: number; /** Multimodal-Projektor (Bild/Audio), z. B. für Gemma 4. */ mmproj?: string }
 
 /** llama-server als Kindprozess (OpenAI-kompatible API auf localhost). */
 export class LlamaServer {
@@ -82,12 +82,15 @@ export class LlamaServer {
   private tail = ''
 
   static exe(): string { return join(assetDir('llama-server'), process.platform === 'win32' ? 'llama-server.exe' : 'llama-server') }
+  /** Letzte Ausgabe des Servers (Diagnose). */
+  get log(): string { return this.tail }
   get running(): boolean { return !!this.child && this.child.exitCode === null }
 
   async start(opts: LlamaOptions, signal?: AbortSignal): Promise<string> {
     if (this.running && this.baseUrl) return this.baseUrl
     const port = await freePort()
     const args = ['-m', opts.model, '-c', String(opts.ctx ?? 16384), '-ngl', String(opts.gpuLayers ?? 99), '-fa', 'on', '--host', '127.0.0.1', '--port', String(port), '--jinja', '-np', '1']
+    if (opts.mmproj) args.push('--mmproj', opts.mmproj)
     if (opts.kvQuant) args.push('--cache-type-k', 'q8_0', '--cache-type-v', 'q8_0')
     const exe = LlamaServer.exe()
     const child = spawn(exe, args, { cwd: assetDir('llama-server'), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
