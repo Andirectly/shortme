@@ -249,7 +249,8 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   // A: Kandidaten je Fenster (Satznummern)
   const windows = buildWindows(sentences)
   let cands: Cand[] = []
-  const maxCands = Math.max(10, Math.ceil(wanted * 3))
+  // höchstens 48 Kandidaten: bei langen Videos wächst sonst die Bewertungszeit linear weiter (je Kandidat 3–5 LLM-Aufrufe)
+  const maxCands = Math.min(48, Math.max(10, Math.ceil(wanted * 3)))
   for (let w = 0; w < windows.length; w++) {
     report('candidates', w / windows.length, `Kandidaten suchen (${w + 1}/${windows.length}) …`)
     const win = windows[w]
