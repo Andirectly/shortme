@@ -8,7 +8,7 @@ import { projectFile } from '../project'
 import type { Sentence } from './sentences'
 
 /** Audio-Ereignisse aus YAMNet (AudioSet, 521 Klassen) + Sprechpausen aus der VAD – als Markierungen im Transkript für das LLM. */
-export type EventKind = 'laugh' | 'applause' | 'loud' | 'pause'
+export type EventKind = 'laugh' | 'applause' | 'loud' | 'pause' | 'chat'
 export interface AudioEvent { kind: EventKind; start: number; end: number; score: number }
 
 export const YAMNET_ASSET = 'yamnet'
@@ -16,12 +16,12 @@ export const yamnetPath = (): string => join(assetDir(YAMNET_ASSET), 'yamnet.onn
 export const yamnetAvailable = (): boolean => existsSync(yamnetPath())
 
 /** AudioSet-Klassenindizes aus yamnet_class_map.csv. */
-const CLASSES: Record<Exclude<EventKind, 'pause'>, number[]> = { laugh: [13, 14, 15, 17, 18], applause: [58, 61, 62], loud: [6, 9, 11] }
-const THRESHOLD: Record<Exclude<EventKind, 'pause'>, number> = { laugh: 0.35, applause: 0.35, loud: 0.3 }
-const MIN_SEC: Record<EventKind, number> = { laugh: 0.45, applause: 0.9, loud: 0.9, pause: 2 }
+const CLASSES: Record<Exclude<EventKind, 'pause' | 'chat'>, number[]> = { laugh: [13, 14, 15, 17, 18], applause: [58, 61, 62], loud: [6, 9, 11] }
+const THRESHOLD: Record<Exclude<EventKind, 'pause' | 'chat'>, number> = { laugh: 0.35, applause: 0.35, loud: 0.3 }
+const MIN_SEC: Record<EventKind, number> = { laugh: 0.45, applause: 0.9, loud: 0.9, pause: 2, chat: 0 }
 const HOP = 0.48
 const CHUNK_SEC = 120
-export const MARK: Record<EventKind, string> = { laugh: '[lacht]', applause: '[Applaus]', loud: '[laut]', pause: '[Pause]' }
+export const MARK: Record<EventKind, string> = { laugh: '[lacht]', applause: '[Applaus]', loud: '[laut]', pause: '[Pause]', chat: '[Chat lacht]' }
 
 /** Rohe Frame-Werte → zusammenhängende Ereignisse (Lücken ≤ 1 Frame überbrückt, Mindestlänge je Art). */
 export function framesToEvents(scores: Float32Array, frames: number): AudioEvent[] {

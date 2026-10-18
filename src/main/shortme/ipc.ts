@@ -39,7 +39,7 @@ const dataUrl = async (path: string): Promise<string | null> => {
   try { return `data:image/jpeg;base64,${(await readFile(path)).toString('base64')}` } catch { return null }
 }
 
-async function withStills(r: ImportResult): Promise<ImportResult & { poster: string | null; ambient: string | null }> {
+export async function withStills(r: ImportResult): Promise<ImportResult & { poster: string | null; ambient: string | null }> {
   return { ...r, poster: await dataUrl(projectFile(r.meta.hash, 'poster.jpg')), ambient: await dataUrl(projectFile(r.meta.hash, 'ambient.jpg')) }
 }
 
@@ -51,12 +51,12 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('shortme:importFile', async (_e, path: string) => withStills(await importFile(path)))
   ipcMain.handle('shortme:importUrl', async (_e, url: string) => withStills(await importUrl(url, (p, message) => broadcast('shortme:importProgress', { progress: p, message }))))
   /** Verarbeitung: Transkription (0–55 %), dann Analyse + Clip-Auswahl (55–100 %). */
-  ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number }) => {
+  ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: 'auto' | 'stream' }) => {
     const meta = await loadMeta(hash)
     if (!meta) throw new Error('Projekt nicht gefunden')
     return jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
       await runTranscription(meta, { diarize: !!opts?.diarize, signal, onProgress: (p) => report(p.stage, p.fraction, p.message) })
-      await runAnalysis(meta, { query: opts?.query, wanted: opts?.wanted, signal, onProgress: report })
+      await runAnalysis(meta, { query: opts?.query, contentType: opts?.contentType, wanted: opts?.wanted, signal, onProgress: report })
     }, () => discardProject(hash))
   })
   const personsView = async (hash: string): Promise<ShortmePersons | null> => {

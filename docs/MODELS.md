@@ -60,3 +60,12 @@ Wird vom Testlab bzw. `scripts/sync-models-docs.ts` erzeugt – nicht von Hand �
 |---|---|---|
 | tscaps (@tscaps/engine) | Aktueller Renderer: CSS-Vorlagen, Bilder per SVG im versteckten Fenster, Export direkt als Video. | aktiv |
 | Remotion | React-Komposition, Bilder per Headless-Chrome, Overlay wird mit FFmpeg über das Video gelegt. | Test |
+
+## Werkzeuge (Twitch)
+
+| Werkzeug | Lizenz | Quelle | Nutzung |
+|---|---|---|---|
+| yt-dlp | Unlicense | github.com/yt-dlp/yt-dlp | Import von VODs, Clips, Links |
+| Streamlink | BSD-2-Clause | github.com/streamlink/streamlink (Windows-Build: streamlink/windows-builds) | Live-Puffer (Mitschnitt in Segmenten) |
+| TwitchDownloaderCLI | MIT | github.com/lay295/TwitchDownloader | Chat als JSON (nur wenn der Chat-Schalter an ist) |
+| Ganymede | nur Logik-Vorlage (nachgelesen, nicht eingebunden) | github.com/Zibbp/ganymede | Live-Archivierung |

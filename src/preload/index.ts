@@ -24,6 +24,7 @@ import type { AssetSpec, AssetStatus, CheckItem, HardwareInfo } from '@shared/en
 import type { CaptionPatch, EditLog } from '@shared/edits'
 import type { StylePreset } from '@shared/preset'
 import type { StyleDefaults } from '@shared/edits'
+import type { LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twitch'
 import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
 import type { PersonsPatch, PreviewPlan, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
@@ -167,7 +168,7 @@ const api = {
   shortme: {
     importFile: (path: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importFile', path),
     importUrl: (url: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importUrl', url),
-    transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
+    transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: 'auto' | 'stream' }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
     jobs: (): Promise<ShortmeJob[]> => ipcRenderer.invoke('shortme:jobs'),
     pause: (id: string): Promise<void> => ipcRenderer.invoke('shortme:pause', id),
     resume: (id: string): Promise<void> => ipcRenderer.invoke('shortme:resume', id),
@@ -201,6 +202,19 @@ const api = {
         ipcRenderer.on('testlab:progress', l)
         return () => ipcRenderer.removeListener('testlab:progress', l)
       }
+    },
+    twitch: {
+      status: (): Promise<TwitchStatus> => ipcRenderer.invoke('twitch:status'),
+      settings: (): Promise<{ chatSignal: boolean; bufferMinutes: number }> => ipcRenderer.invoke('twitch:settings'),
+      setSettings: (patch: { chatSignal?: boolean; bufferMinutes?: number }): Promise<{ chatSignal: boolean; bufferMinutes: number }> => ipcRenderer.invoke('twitch:setSettings', patch),
+      setToken: (token: string): Promise<boolean> => ipcRenderer.invoke('twitch:setToken', token),
+      inspect: (url: string): Promise<TwitchInfo | null> => ipcRenderer.invoke('twitch:inspect', url),
+      import: (url: string, opts: { section?: [number, number]; lastMinutes?: number; analyze?: boolean }): Promise<ShortmeImport> => ipcRenderer.invoke('twitch:import', url, opts),
+      liveStart: (channel: string): Promise<LiveStatus> => ipcRenderer.invoke('twitch:liveStart', channel),
+      liveStop: (): Promise<LiveStatus> => ipcRenderer.invoke('twitch:liveStop'),
+      liveStatus: (): Promise<LiveStatus> => ipcRenderer.invoke('twitch:liveStatus'),
+      liveSaves: (): Promise<LiveSave[]> => ipcRenderer.invoke('twitch:liveSaves'),
+      liveSave: (minutes: number): Promise<{ hash: string; title: string; seconds: number }> => ipcRenderer.invoke('twitch:liveSave', minutes)
     },
     fontCss: (family: string): Promise<string> => ipcRenderer.invoke('shortme:fontCss', family),
     deleteProject: (hash: string): Promise<boolean> => ipcRenderer.invoke('shortme:deleteProject', hash),

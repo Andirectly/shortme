@@ -3,6 +3,7 @@ import { open, readFile, rm, stat, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { dataRoot } from '../engines/paths'
 import { writeFileAtomic } from './atomic'
+import type { TwitchMeta } from '../../shared/twitch'
 
 export interface ProjectMeta {
   hash: string
@@ -17,6 +18,8 @@ export interface ProjectMeta {
   created: string
   /** Fertige Stufen (Checkpoints) → Wiederaufnahme nach Absturz. */
   stages: Record<string, { done: boolean; at?: string }>
+  /** Nur bei Twitch-Importen. */
+  twitch?: TwitchMeta
 }
 
 const SAMPLE = 4 * 1024 * 1024

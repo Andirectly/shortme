@@ -7,6 +7,7 @@ import { allowMediaPath } from '../mediaAccess'
 import { dataRoot } from '../engines/paths'
 import { probeVideo, runFfmpeg } from '../pipeline/ffmpeg'
 import { downloadUrlVideo, ensureYtDlp, fetchUrlMeta } from '../pipeline/ytdlp'
+import { sectionArg } from '../../shared/twitch'
 import { fileHash, loadMeta, projectDir, projectFile, saveMeta, type ProjectMeta } from './project'
 import { preflight, type PreflightResult } from './preflight'
 
@@ -47,19 +48,20 @@ function blankMeta(hash: string, path: string, info: Awaited<ReturnType<typeof p
 }
 
 /** URL importieren (yt-dlp, gebündelt/selbst-aktualisierend); Download landet im Datenordner, danach wie eine Datei. */
-export async function importUrl(url: string, onProgress: (p: number, message: string) => void): Promise<ImportResult> {
+export async function importUrl(url: string, onProgress: (p: number, message: string) => void, opts: { section?: [number, number]; extraArgs?: string[]; urlLabel?: string } = {}): Promise<ImportResult> {
   onProgress(0, 'Downloader wird vorbereitet …')
   const bin = await ensureYtDlp((p) => onProgress(p.progress, p.message))
   onProgress(0, 'Video-Infos werden abgerufen …')
-  const meta = await fetchUrlMeta(bin, url)
+  const meta = await fetchUrlMeta(bin, url, {}, opts.extraArgs ?? [])
   const dir = join(dataRoot(), 'downloads')
   await mkdir(dir, { recursive: true })
   const safe = meta.id.replace(/[^\w.-]/g, '_')
-  const target = join(dir, `${safe}.mp4`)
+  const tag = opts.section ? `_${opts.section[0]}-${opts.section[1]}` : ''
+  const target = join(dir, `${safe}${tag}.mp4`)
   if (!existsSync(target)) {
-    const part = join(dir, `${safe}.part.mp4`)
+    const part = join(dir, `${safe}${tag}.part.mp4`)
     onProgress(0, `„${meta.title}“ wird heruntergeladen …`)
-    await downloadUrlVideo(bin, meta.webpageUrl, part, (p) => onProgress(p.progress, p.message))
+    await downloadUrlVideo(bin, meta.webpageUrl, part, (p) => onProgress(p.progress, p.message), {}, [...(opts.section ? ['--download-sections', sectionArg(opts.section)] : []), ...(opts.extraArgs ?? [])])
     await rename(part, target)
   }
   onProgress(1, 'Video wird geprüft und Vorschaubild erstellt …')

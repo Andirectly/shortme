@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { PresetTile } from './PresetUI'
 import { usePresets } from './presets'
 import { motion, AnimatePresence, useMotionValue, animate, type PanInfo } from 'motion/react'
-import { UploadCloud, Link2, Sparkles, ChevronDown } from 'lucide-react'
+import { UploadCloud, Link2, Sparkles, ChevronDown, AlertTriangle } from 'lucide-react'
 import { useStore } from './store'
+import { isTwitchUrl } from '@shared/twitch'
+import { TwitchPanel, useTwitchInspect, type Section } from './TwitchPanel'
+import { useTwitch } from './twitchStore'
 import { useProject } from './projectStore'
 import { IMG } from './data'
 import { Button, Pill, Segmented, Switch, Row } from './ui'
@@ -21,13 +24,26 @@ export function StartScreen(): React.JSX.Element {
   const importError = useProject((s) => s.importError)
   const importPath = useProject((s) => s.importPath)
   const importUrl = useProject((s) => s.importUrl)
+  const twitchImport = useProject((s) => s.twitchImport)
+  const go = useStore((s) => s.go)
+  const tw = useTwitchInspect(link)
+  const [section, setSection] = useState<Section>(null)
+  const setChannelDraft = useTwitch((s) => s.setChannelDraft)
   useEffect(() => { useProject.getState().init() }, [])
   const open = async (path?: string): Promise<void> => {
     if (!hasApi) { openSheet(true); return }
     const p = path ?? (await window.cutawan.selectVideo())
     if (p && (await importPath(p))) openSheet(true)
   }
-  const openLink = async (): Promise<void> => { if (!link.trim()) return; if (!hasApi) { openSheet(true); return } if (await importUrl(link.trim())) openSheet(true) }
+  const openLink = async (): Promise<void> => {
+    if (!link.trim()) return
+    if (!hasApi) { openSheet(true); return }
+    if (isTwitchUrl(link)) { if (await twitchImport(link.trim(), { section: section ?? undefined })) openSheet(true); return }
+    if (await importUrl(link.trim())) openSheet(true)
+  }
+  /** „Letzte N Min“: laufendes VOD laden und direkt in die Clip-Analyse. */
+  const lastMinutes = async (minutes: number): Promise<void> => { if (await twitchImport(link.trim(), { lastMinutes: minutes, analyze: true })) go('processing') }
+  const liveBuffer = (): void => { if (tw.info?.channel) setChannelDraft(tw.info.channel); go('live') }
   const { base } = useSprings()
   return (
     <div style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gap: 28, paddingTop: 12 }}>
@@ -62,6 +78,7 @@ export function StartScreen(): React.JSX.Element {
         </div>
         <Button variant="secondary" disabled={importing} onClick={() => void openLink()}>Laden</Button>
       </div>
+      {isTwitchUrl(link) && <TwitchPanel info={tw.info} error={tw.error} loading={tw.loading} section={section} setSection={setSection} busy={importing} onLast={(m) => void lastMinutes(m)} onLiveBuffer={liveBuffer} />}
       {(importing || importError) && (
         <div className="sm-card" role="status" aria-live="polite" style={{ padding: 14, display: 'grid', gap: 8 }}>
           {importing && (
@@ -92,6 +109,9 @@ function CreateSheet(): React.JSX.Element {
   const go = useStore((s) => s.go)
   const imported = useProject((s) => s.imported)
   const startTranscribe = useProject((s) => s.startTranscribe)
+  const contentType = useProject((s) => s.contentType)
+  const setContentType = useProject((s) => s.setContentType)
+  const silentSec = (imported?.meta.twitch?.silent ?? []).reduce((n, r) => n + (r[1] - r[0]), 0)
   const hasApi = useProject((s) => s.hasApi)
   const style = useProject((s) => s.style)
   const saveStyle = useProject((s) => s.saveStyle)
@@ -149,11 +169,13 @@ function CreateSheet(): React.JSX.Element {
               <div style={{ display: 'grid', alignContent: 'center', gap: 4 }}>
                 <h2>{imported?.meta.title ?? 'Tattoo-Folge (Sidequests)'}</h2>
                 <small>{imported ? `${fmtDur(imported.meta.durationSec)} · ${imported.meta.width}×${imported.meta.height}${imported.cached ? ' · schon bekannt (Cache)' : ''}` : '12:09 · 1920×1080 · Deutsch erkannt'}</small>
+                {silentSec > 0 && <small style={{ color: 'var(--warn)' }} title="Twitch hat diese Abschnitte wegen geschützter Musik stumm geschaltet. Sie werden aus der Clip-Auswahl ausgeschlossen. Der Live-Puffer ist davon nicht betroffen."><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> {imported!.meta.twitch!.silent.length} stumme Abschnitte ({fmtDur(silentSec)}) – werden nicht als Clip vorgeschlagen. Der Live-Puffer ist davon nicht betroffen.</small>}
                 {imported?.preflight.errors.map((e) => <small key={e} style={{ color: 'var(--warn)' }}>{e}</small>)}
                 {imported?.preflight.warnings.map((e) => <small key={e}>{e}</small>)}
               </div>
             </div>
             <div style={{ overflowY: 'auto', padding: '0 24px 12px' }} {...stop}>
+              {imported?.meta.twitch && <Row label="Inhalt"><Segmented options={['Automatisch', 'Stream/Gaming']} value={contentType === 'stream' ? 'Stream/Gaming' : 'Automatisch'} onChange={(n) => setContentType(n === 'Stream/Gaming' ? 'stream' : 'auto')} /></Row>}
               <Row label="Format"><Segmented options={['9:16', '1:1', '16:9']} value={opts.format} onChange={(format) => setOpts({ format })} /></Row>
               <Row label="Bildausschnitt"><Segmented options={['Smart', 'Ganzes Bild', 'Split', 'Fest']} value={opts.frame} onChange={(frame) => setOpts({ frame })} /></Row>
               <Row label="Cliplänge"><Segmented options={['Automatisch', '≤ 30 s', '30–60 s', '60–90 s']} value={opts.length} onChange={(length) => setOpts({ length })} /></Row>

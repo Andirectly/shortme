@@ -25,6 +25,11 @@ interface ProjectState {
   init: () => void
   importPath: (path: string) => Promise<boolean>
   importUrl: (url: string) => Promise<boolean>
+  /** Twitch (VOD, Clip, laufendes VOD): mit `analyze` startet danach direkt die Clip-Analyse. */
+  twitchImport: (url: string, opts: { section?: [number, number]; lastMinutes?: number; analyze?: boolean }) => Promise<boolean>
+  /** Inhaltstyp für die Clip-Auswahl; Twitch-Importe schlagen „Stream/Gaming“ vor. */
+  contentType: 'auto' | 'stream'
+  setContentType: (c: 'auto' | 'stream') => void
   clearImport: () => void
   startTranscribe: (diarize: boolean, query?: string, wanted?: number) => Promise<boolean>
   exportClips: (clipIds: string[], presetId: string, srt: boolean) => Promise<boolean>
@@ -143,12 +148,27 @@ export const useProject = create<ProjectState>((set, get) => ({
       return false
     }
   },
-  clearImport: () => set({ imported: null, importError: '' }),
+  contentType: 'auto',
+  setContentType: (contentType) => set({ contentType }),
+  twitchImport: async (url, opts) => {
+    const a = api()
+    if (!a) return false
+    set({ importing: true, importError: '', importProgress: 0, importMessage: 'Twitch-Link wird geprüft …' })
+    try {
+      const r = await a.twitch.import(url, opts)
+      set({ imported: r, importing: false, contentType: 'stream' })
+      return true
+    } catch (e) {
+      set({ importing: false, importError: e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e) })
+      return false
+    }
+  },
+  clearImport: () => set({ imported: null, importError: '', contentType: 'auto' }),
   startTranscribe: async (diarize, query, wanted) => {
     const a = api()
     const imp = get().imported
     if (!a || !imp) return false
-    const job = await a.transcribe(imp.meta.hash, { diarize, query, wanted })
+    const job = await a.transcribe(imp.meta.hash, { diarize, query, wanted, contentType: get().contentType })
     set({ job, clipsFile: null, transcript: null })
     return true
   },

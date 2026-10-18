@@ -14,6 +14,7 @@ Regeln
 - Ende erst, wenn der Gedanke abgeschlossen ist – nie mitten in einer Erklärung.
 - Bereiche dürfen sich nicht überlappen.
 - Markierungen wie (laut) oder (Lachen?) zeigen auffällige Stellen im Ton; sie sind nur ein Hinweis.
+- [Chat lacht] bedeutet: Der Twitch-Chat hat hier mit Lach-Emotes (LUL, KEKW, OMEGALUL, ICANT) reagiert; die Stelle ist bereits auf den auslösenden Moment zurückgerechnet. Das ist ein starkes Zeichen für einen lustigen Moment.
 - Erfinde nichts. Nutze nur Satznummern, die im Transkript vorkommen.
 {{query}}
 Gib höchstens {{max}} Kandidaten zurück, die besten zuerst. Wenn nichts Gutes dabei ist, gib weniger zurück.

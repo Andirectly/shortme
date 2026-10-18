@@ -7,6 +7,7 @@ import { LlamaServer } from './sidecars'
 import { dataRoot } from './paths'
 import { FFMPEG_PATH } from '../pipeline/ffmpeg'
 import { ytDlpPath } from '../pipeline/ytdlp'
+import { toolVersion } from '../twitch/tools'
 import { modelsDir } from '../pipeline/detect'
 
 const MIN_RESERVE_GB = 1
@@ -26,6 +27,11 @@ export async function runSystemCheck(mgr: AssetManager, hw: HardwareInfo): Promi
 
   const yt = existsSync(ytDlpPath()) ? await tryRun(ytDlpPath(), ['--version']) : null
   items.push({ id: 'yt-dlp', name: 'yt-dlp', ok: !!yt, detail: yt ? `${yt} · selbst-aktualisierend` : 'noch nicht geladen (wird im Assistenten installiert)' })
+
+  for (const [id, name] of [['streamlink', 'Streamlink'], ['twitchdownloader', 'TwitchDownloaderCLI']] as const) {
+    const v = await toolVersion(id)
+    items.push({ id, name, ok: !!v, detail: v ? v : 'wird beim ersten Twitch-Import geladen' })
+  }
 
   const llamaInstalled = await mgr.isInstalled('llama-server')
   const llamaVer = llamaInstalled ? await tryRun(LlamaServer.exe(), ['--version']) : null

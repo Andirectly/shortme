@@ -13,18 +13,25 @@ import { makeThumbs } from './thumbs'
 import { layoutForClip } from '../layout/run'
 import { applyPersons, buildPersons } from './persons'
 import { loadHeat } from './heat'
+import { loadChatSignal } from '../../twitch/chat'
+import { overlapsSilence } from '../../twitch/silence'
 import { detectAudioEvents, loadEvents, saveEvents, yamnetAvailable, type AudioEvent } from './audioEvents'
 import { loadTopics, saveTopics, type TopicMap } from './topics'
 import type { PlanInput } from '../../../shared/layoutPlan'
 
 export interface AnalysisOptions {
   query?: string
+  /** 'stream' = Stream/Gaming (Twitch-Importe schlagen das vor): Auswahl achtet auf Reaktionen und Highlights. */
+  contentType?: 'auto' | 'stream'
   wanted?: number
   signal?: AbortSignal
   /** Erzwingt den Fallback ohne LLM (Tests / kein Modell). */
   noLlm?: boolean
   onProgress?: (stage: string, fraction: number, message: string) => void
 }
+
+const STREAM_HINT = 'Das ist ein Stream/Gaming-Video: starke Reaktionen und Ausbrüche, überraschende Wendungen, Highlights im Spiel (Siege, Fails, knappe Szenen), witzige Sprüche. Ruhiges Spielgeschehen ohne Kommentar ist uninteressant.'
+export const effectiveQuery = (o: Pick<AnalysisOptions, 'query' | 'contentType'>): string | undefined => (o.contentType === 'stream' ? `${STREAM_HINT} ${o.query ?? ''}`.trim() : o.query)
 
 export const layoutFile = (hash: string, clipId: string): string => projectFile(hash, `layout/${clipId.replace(/[^\w.-]/g, '_')}.json`)
 
@@ -109,10 +116,13 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   const cuts = await ensureShots(meta, opts.signal, (f) => report('shots', f, 'Kamerawechsel erkennen …'))
   const heat = await loadHeat(meta.hash)
   report('signals', 0.5, 'Audio-Ereignisse erkennen (Lachen, Applaus, Pausen) …')
-  const events = await ensureEvents(meta, t.speech, opts.signal)
+  const events0 = await ensureEvents(meta, t.speech, opts.signal)
+  const chat = meta.twitch?.chat ? await loadChatSignal(meta.hash) : null
+  const events = chat?.laughs.length ? [...(events0 ?? []), ...chat.laughs].sort((a, b) => a.start - b.start) : events0
+  if (chat) report('signals', 1, `Chat-Signal gefunden (${chat.messages} Nachrichten) – fließt ins Ranking ein`)
   if (heat) report('signals', 1, 'Most-replayed-Kurve gefunden – fließt ins Ranking ein')
-  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat, events }
-  const sel = { query: opts.query, wanted: opts.wanted, signal: opts.signal, report, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
+  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat, events, chat: chat?.heat ?? null }
+  const sel = { query: effectiveQuery(opts), wanted: opts.wanted, signal: opts.signal, report, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
 
   let mode: ClipsFile['mode'] = 'llm'
   let clips: ShortmeClip[]
@@ -126,6 +136,9 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
       clips = await selectClips(input, { ...sel, baseUrl: null })
     }
   }
+  // Twitch: von Twitch stumm geschaltete Abschnitte (geschützte Musik) nie als Clip vorschlagen
+  const silent = meta.twitch?.silent ?? []
+  if (silent.length) clips = clips.filter((c) => !overlapsSilence(silent, c.start, c.end))
   // Tracking & Layouts (M5): Gesichtsquote fließt ins Ranking ein
   // Layout-Analyse (Gesichter, Spuren, Sprecher) je Clip – zwei Clips gleichzeitig: Decodieren (FFmpeg) und Inferenz überlappen sich
   const layouts: Awaited<ReturnType<typeof layoutForClip>>[] = new Array(clips.length)

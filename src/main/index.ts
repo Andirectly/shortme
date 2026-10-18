@@ -2,6 +2,7 @@ import { app, BrowserWindow, nativeTheme, protocol, screen, shell } from 'electr
 import { release } from 'node:os'
 import { registerEngineIpc, installEngineLifecycle, runSelfTestIfRequested } from './engines'
 import { registerShortmeIpc, runExportSelfTestIfRequested } from './shortme/ipc'
+import { registerTwitchIpc, shutdownTwitch } from './twitch/ipc'
 import { initLog } from './log'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -325,6 +326,7 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   registerEngineIpc()
   registerShortmeIpc()
+  registerTwitchIpc()
   installEngineLifecycle()
   runSelfTestIfRequested()
   void runExportSelfTestIfRequested()
@@ -340,4 +342,4 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', stopInference)
+app.on('before-quit', () => { stopInference(); void shutdownTwitch() })

@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import { CLIPS } from './data'
 import { allClips } from './clipData'
 
-export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'settings' | 'processing' | 'clips' | 'editor'
-export type NavId = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'settings'
+export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'live' | 'settings' | 'processing' | 'clips' | 'editor'
+export type NavId = 'start' | 'projects' | 'studio' | 'live' | 'models' | 'testlab' | 'settings'
 
 interface Op { label: string; undo: () => void; redo: () => void }
 

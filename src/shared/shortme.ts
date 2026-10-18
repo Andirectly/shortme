@@ -1,4 +1,5 @@
 // Shortme: Typen zwischen Main und Renderer (Import, Jobs, Transkript).
+import type { TwitchMeta } from './twitch'
 
 export interface ShortmeMeta {
   hash: string
@@ -12,6 +13,7 @@ export interface ShortmeMeta {
   hasAudio: boolean
   created: string
   stages: Record<string, { done: boolean; at?: string }>
+  twitch?: TwitchMeta
 }
 
 export interface ShortmePreflight { ok: boolean; errors: string[]; warnings: string[]; peakGb: number }
@@ -57,6 +59,8 @@ export interface ShortmeClip {
   id: string
   /** „Most replayed“-Stärke 0..1 über den Clip (nur YouTube-Importe). */
   heat?: number
+  /** Chat-Aktivität 0..1 über den Clip (nur Twitch mit Chat-Schalter). */
+  chat?: number
   /** Sekunden im Quellvideo (nach dem Einrasten). */
   start: number
   end: number

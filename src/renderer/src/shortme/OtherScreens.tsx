@@ -1,8 +1,35 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTwitch } from './twitchStore'
 import { CheckCircle2, XCircle, RefreshCw } from 'lucide-react'
 import { useEngines } from './engines'
 import { useStore } from './store'
 import { Button, Pill, Row, Segmented, Switch } from './ui'
+
+function TwitchSettings(): React.JSX.Element {
+  const status = useTwitch((s) => s.status)
+  const refresh = useTwitch((s) => s.refreshStatus)
+  const [token, setToken] = useState('')
+  const [minutes, setMinutes] = useState(15)
+  const [msg, setMsg] = useState('')
+  const api = typeof window !== 'undefined' ? window.cutawan?.shortme?.twitch : undefined
+  useEffect(() => { void refresh(); void api?.settings().then((s) => setMinutes(s.bufferMinutes)) }, [refresh, api])
+  if (!api) return <></>
+  const saveToken = async (value: string): Promise<void> => { await api.setToken(value); setToken(''); setMsg(value ? 'Token gespeichert' : 'Token entfernt'); void refresh() }
+  return (
+    <div className="sm-glass" style={{ padding: '4px 22px 16px' }}>
+      <Row label="Twitch-Chat als Ranking-Signal nutzen" toggle={<Switch on={!!status?.chatSignal} onChange={(b) => void api.setSettings({ chatSignal: b }).then(refresh)} label="Twitch-Chat als Ranking-Signal nutzen" />} />
+      <Row label="Live-Puffer (Minuten)"><Segmented options={['5', '15', '30', '60']} value={String(minutes)} onChange={(v) => { setMinutes(Number(v)); void api.setSettings({ bufferMinutes: Number(v) }) }} /></Row>
+      <Row label="Twitch-Token (optional)">
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input className="sm-input" type="password" autoComplete="off" aria-label="Twitch-Token" placeholder={status?.hasToken ? 'Token gespeichert' : 'auth-token des eigenen Kontos'} value={token} onChange={(e) => setToken(e.target.value)} />
+          <Button variant="secondary" disabled={!token.trim()} onClick={() => void saveToken(token)}>Speichern</Button>
+          {status?.hasToken && <Button variant="ghost" onClick={() => void saveToken('')}>Entfernen</Button>}
+        </div>
+        {msg && <small role="status">{msg}</small>}
+      </Row>
+    </div>
+  )
+}
 
 export function SettingsScreen(): React.JSX.Element {
   const [profile, setProfile] = useState('TikTok')
@@ -27,6 +54,8 @@ export function SettingsScreen(): React.JSX.Element {
         <Row label="Dateinamen nach KI-Titel"><Switch on={names} onChange={setNames} label="Dateinamen nach KI-Titel" /></Row>
         <Row label="Zielordner"><div style={{ display: 'flex', gap: 10 }}><input className="sm-input" defaultValue="C:\Users\Andirectly\Videos\Shortme" aria-label="Zielordner" /><Button variant="secondary">Ändern</Button></div></Row>
       </div>
+      <h3 style={{ marginTop: 8 }}>Twitch</h3>
+      <TwitchSettings />
       <div className="sm-glass" style={{ padding: '14px 22px', display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}><h3>Systemcheck</h3><div style={{ display: 'flex', gap: 8 }}><Pill onClick={() => void refreshCheck()}><RefreshCw size={13} className={checking ? 'sm-spin' : ''} /> Neu prüfen</Pill><Pill onClick={() => void window.cutawan?.shortme?.openLogs()}>Logs öffnen</Pill></div></div>
         {check.map((c) => (

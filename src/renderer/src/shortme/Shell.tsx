@@ -1,15 +1,18 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Logo } from './Logo'
-import { Home, FolderOpen, Palette, Cpu, Settings, FlaskConical } from 'lucide-react'
+import { Home, FolderOpen, Palette, Cpu, Settings, FlaskConical, Radio } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useStore, type NavId, type Screen } from './store'
 import { IMG } from './data'
 import { useSprings } from './motion'
+import { useTwitch } from './twitchStore'
+import { useEffect } from 'react'
 
 const NAV: { id: NavId; label: string; icon: ReactNode }[] = [
   { id: 'start', label: 'Start', icon: <Home size={20} /> },
   { id: 'projects', label: 'Projekte', icon: <FolderOpen size={20} /> },
   { id: 'studio', label: 'Stil-Studio', icon: <Palette size={20} /> },
+  { id: 'live', label: 'Live', icon: <Radio size={20} /> },
   { id: 'models', label: 'Modelle', icon: <Cpu size={20} /> },
   { id: 'testlab', label: 'Testlab', icon: <FlaskConical size={20} /> },
   { id: 'settings', label: 'Einstellungen', icon: <Settings size={20} /> }
@@ -23,6 +26,10 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
   const testlab = useStore((s) => s.testlab)
   const { base } = useSprings()
   const active = parentNav(screen)
+  const liveOn = useTwitch((s) => s.live.running)
+  const refreshLive = useTwitch((s) => s.refreshLive)
+  // Der Puffer läuft im Hintergrund weiter; der Status wird alle 3 s abgefragt (Badge am Live-Tab)
+  useEffect(() => { void refreshLive(); const t = setInterval(() => void refreshLive(), 3000); return () => clearInterval(t) }, [refreshLive])
   return (
     <div className="sm-root">
       <div className="sm-ambient" style={{ backgroundImage: `url(${IMG.ambient})` }} />
@@ -35,6 +42,7 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
           <button key={n.id} className="sm-nav-item" aria-current={active === n.id ? 'page' : undefined} aria-label={n.label} title={n.label} onClick={() => go(n.id)}>
             {active === n.id && <motion.span layoutId="nav-glow" className="sm-nav-glow" transition={base} />}
             {n.icon}
+            {n.id === 'live' && liveOn && <span aria-label="Live-Puffer läuft" className="sm-live-dot" />}
           </button>
         ))}
       </nav>

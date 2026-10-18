@@ -28,6 +28,9 @@ export const heatScore = (points: HeatPoint[], start: number, end: number): numb
 /** Bonus/Malus in Punkten für den Endscore (Mitte ≈ durchschnittlicher Clip → 0). */
 export const heatBonus = (score: number): number => Math.max(-8, Math.min(16, 24 * (score - 0.35)))
 
+/** Chat-Signal (Twitch): stärker als die Wiedergabekurve, weil es direkt Reaktionen der Zuschauer misst. */
+export const chatBonus = (score: number): number => Math.max(-10, Math.min(24, 36 * (score - 0.3)))
+
 /** Lokale Maxima ≥ `min` (Spitzen), absteigend nach Wert. */
 export function heatPeaks(points: HeatPoint[], min = 0.75): HeatPoint[] {
   return points.filter((p, i) => p.value >= min && p.value >= (points[i - 1]?.value ?? 0) && p.value >= (points[i + 1]?.value ?? 0)).sort((a, b) => b.value - a.value)

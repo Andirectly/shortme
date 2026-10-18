@@ -9,6 +9,7 @@ import { EditorScreen } from './EditorScreen'
 import { SettingsScreen } from './OtherScreens'
 import { StudioScreen } from './StudioScreen'
 import { TestlabScreen } from './TestlabScreen'
+import { LiveScreen } from './LiveScreen'
 import { ModelsScreen, SetupWizard } from './ModelsScreen'
 import { PersonsDialog } from './PersonsDialog'
 import './tokens.css'
@@ -27,6 +28,7 @@ export default function ShortmeApp(): React.JSX.Element {
       {screen === 'studio' && <StudioScreen />}
       {screen === 'models' && <ModelsScreen />}
       {screen === 'testlab' && <TestlabScreen />}
+      {screen === 'live' && <LiveScreen />}
       {screen === 'settings' && <SettingsScreen />}
       <SetupWizard />
       <PersonsDialog />

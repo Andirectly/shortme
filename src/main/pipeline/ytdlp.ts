@@ -193,7 +193,7 @@ export function cookieCopyErrorHint(browser: BrowserCookieSource, hasCookiesFile
   return parts.join(' ')
 }
 
-function runYtDlp(
+export function runYtDlp(
   binPath: string,
   args: string[],
   onLine?: (line: string) => void
@@ -279,13 +279,15 @@ function baseArgs(cookieOpts: CookieAuthOptions): string[] {
 export async function fetchUrlMeta(
   binPath: string,
   url: string,
-  cookieOpts: CookieAuthOptions = {}
+  cookieOpts: CookieAuthOptions = {},
+  extraArgs: string[] = []
 ): Promise<UrlVideoMeta> {
   const out = await runYtDlp(binPath, [
     '-J',
     '--no-playlist',
     '--no-warnings',
     ...baseArgs(cookieOpts),
+    ...extraArgs,
     url
   ])
   let data = JSON.parse(out) as YtDlpJson
@@ -323,7 +325,8 @@ export async function downloadUrlVideo(
   url: string,
   outPath: string,
   onProgress: ProgressFn,
-  cookieOpts: CookieAuthOptions = {}
+  cookieOpts: CookieAuthOptions = {},
+  extraArgs: string[] = []
 ): Promise<void> {
   await runYtDlp(
     binPath,
@@ -335,6 +338,7 @@ export async function downloadUrlVideo(
       '--no-warnings',
       '--newline',
       ...baseArgs(cookieOpts),
+      ...extraArgs,
       '-o', outPath,
       url
     ],

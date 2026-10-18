@@ -78,6 +78,11 @@ export function modelsMarkdown(cat: Catalog, st: State): string {
     for (const m of cat.models.filter((x) => x.slot === s.id)) out.push(`| ${m.name} | ${m.short} | ${STATUS_DE[effectiveStatus(m, st.active, st.remove, cat.models)]} |`)
     out.push('')
   }
+  out.push('## Werkzeuge (Twitch)', '', '| Werkzeug | Lizenz | Quelle | Nutzung |', '|---|---|---|---|',
+    '| yt-dlp | Unlicense | github.com/yt-dlp/yt-dlp | Import von VODs, Clips, Links |',
+    '| Streamlink | BSD-2-Clause | github.com/streamlink/streamlink (Windows-Build: streamlink/windows-builds) | Live-Puffer (Mitschnitt in Segmenten) |',
+    '| TwitchDownloaderCLI | MIT | github.com/lay295/TwitchDownloader | Chat als JSON (nur wenn der Chat-Schalter an ist) |',
+    '| Ganymede | nur Logik-Vorlage (nachgelesen, nicht eingebunden) | github.com/Zibbp/ganymede | Live-Archivierung |', '')
   return out.join('\n')
 }
 
