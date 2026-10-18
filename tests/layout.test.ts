@@ -144,3 +144,39 @@ describe('Gesichtsquote', () => {
     expect(facePenalty(0.1)).toBe(20)
   })
 })
+
+describe('Split nur wenn nötig', () => {
+  const turn = ticks(1.5)
+  const pair = (cxa: number, cxb: number): PlanInput => {
+    const a = track(1, cxa, 0, 30, (i) => (Math.floor(i / turn) % 2 === 0 ? 5 : -5))
+    const b = track(2, cxb, 0, 30, (i) => (Math.floor(i / turn) % 2 === 1 ? 5 : -5))
+    return base([a, b], 30)
+  }
+  it('dicht beieinander stehende Personen: ein gemeinsamer Ausschnitt statt doppeltem Bild', () => {
+    const shots = planShots(pair(0.45, 0.65))
+    expect(shots.some((s) => s.layout === 'split')).toBe(false)
+    expect(shots.length).toBeLessThanOrEqual(2)
+    expect(shots.some((s) => s.layout === 'smart' && s.cx > 0.5 && s.cx < 0.6)).toBe(true)
+  })
+  it('mittlerer Abstand: weiterhin kein Split (Hälften würden sich überlappen)', () => {
+    expect(planShots(pair(0.35, 0.65)).some((s) => s.layout === 'split')).toBe(false)
+  })
+  it('weit auseinander: Split, jede Hälfte hineingezoomt, Hälften überlappen nicht', () => {
+    const shots = planShots(pair(0.2, 0.8))
+    const sp = shots.find((s) => s.layout === 'split')!
+    expect(sp).toBeTruthy()
+    const halfW = (1.125 / (16 / 9)) / sp.zoom
+    // keine Hälfte zeigt die andere Person
+    expect(Math.abs(0.8 - sp.cx)).toBeGreaterThan(halfW / 2)
+    expect(Math.abs(0.2 - sp.cx2!)).toBeGreaterThan(halfW / 2)
+    expect(sp.zoom).toBeGreaterThanOrEqual(1)
+    expect(sp.zoom).toBeLessThanOrEqual(1.8)
+  })
+  it('Sprecher bleibt vollständig im Ausschnitt: Drift > 6 % ergibt einen neuen festen Ausschnitt', () => {
+    const n = ticks(12)
+    const t: PlanTrack = { id: 1, start: 0, centres: Array.from({ length: n }, (_, i) => 0.4 + (i / n) * 0.2), areas: Array(n).fill(0.1), scores: Array(n).fill(3) }
+    const shots = planShots(base([t], 12))
+    expect(shots.length).toBeGreaterThanOrEqual(2)
+    for (const s of shots) expect(s.layout).toBe('smart')
+  })
+})

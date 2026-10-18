@@ -34,7 +34,7 @@ export interface PlanOptions {
   pingPongWindowSec: number
 }
 
-export const PLAN_DEFAULTS: PlanOptions = { switchRatio: 1.25, minSpeakSec: 1, ignoreAreaRatio: 0.1, moveLimit: 0.12, noSpeakerSec: 3, minShotSec: 0.8, pingPongSwitches: 3, pingPongWindowSec: 6 }
+export const PLAN_DEFAULTS: PlanOptions = { switchRatio: 1.25, minSpeakSec: 1, ignoreAreaRatio: 0.1, moveLimit: 0.06, noSpeakerSec: 3, minShotSec: 0.8, pingPongSwitches: 3, pingPongWindowSec: 6 }
 
 const at = (t: PlanTrack, i: number): { c: number; a: number; s: number } | null => {
   const k = i - t.start
@@ -93,7 +93,9 @@ function samePerson(tracks: PlanTrack[], a: number, b: number, i: number): boole
   return !!va && !!vb && Math.abs(va.c - vb.c) < SAME_PERSON
 }
 const SAME_PERSON = 0.15
-const SPLIT_MIN_SEP = 0.2
+/** Breite einer Split-Hälfte (Seitenverhältnis 1080:960) als Anteil der Quellbreite bei Zoom 1. */
+export const splitHalfFrac = (sourceAspect: number): number => 1.125 / sourceAspect
+const SPLIT_MAX_ZOOM = 1.8
 
 export function pingPongWindows(active: Array<number | null>, dt: number, opt: PlanOptions = PLAN_DEFAULTS, tracks: PlanTrack[] = []): Array<[number, number]> {
   const sw: number[] = []
@@ -149,8 +151,14 @@ export function planShots(inp: PlanInput, opt: PlanOptions = PLAN_DEFAULTS): Sho
       if (pick.length === 2) {
         const cxs = pick.map((t) => { const cs: number[] = []; for (let i = s.start; i <= s.end; i++) { const v = at(t, i); if (v) cs.push(v.c) } return median(cs.length ? cs : [0.5]) })
         const [left, right] = cxs[0] <= cxs[1] ? [cxs[0], cxs[1]] : [cxs[1], cxs[0]]
-        if (right - left >= SPLIT_MIN_SEP) { push(s.start, s.end, { layout: 'split', cx: clampCx(left, w), cx2: clampCx(right, w), zoom: 1 }); continue }
-        push(s.start, s.end, { layout: 'smart', cx: clampCx((left + right) / 2, w), zoom: 1, track: pick[0].id })
+        // Split nur, wenn ein einzelner 9:16-Ausschnitt nicht beide trägt. Jede Hälfte ist breiter als ein 9:16-Ausschnitt
+        // (Seitenverhältnis 9:8) → bei dichten Personen würde jede Hälfte beide zeigen (doppeltes Bild): dann je Hälfte hineinzoomen.
+        const sep = right - left
+        if (sep <= w * 0.9) { push(s.start, s.end, { layout: 'smart', cx: clampCx((left + right) / 2, w), zoom: 1, track: pick[0].id }); continue }
+        const z = Math.max(1, splitHalfFrac(inp.sourceAspect) / (0.95 * sep))
+        if (z > SPLIT_MAX_ZOOM) { push(s.start, s.end, { layout: 'smart', cx: clampCx((left + right) / 2, w), zoom: 1, track: pick[0].id }); continue }
+        const hw = splitHalfFrac(inp.sourceAspect) / z
+        push(s.start, s.end, { layout: 'split', cx: clampCx(left, hw), cx2: clampCx(right, hw), zoom: z })
         continue
       }
     }
@@ -237,7 +245,8 @@ export function faceRatio(shots: ShortmeShot[], inp: PlanInput): number {
     if (!shot) continue
     const faces = inp.tracks.map((tr) => at(tr, i)).filter((v): v is NonNullable<typeof v> => !!v)
     if (shot.layout === 'fit') { if (faces.length) hit++; continue }
-    const inCrop = (cx: number | undefined, c: number): boolean => cx !== undefined && Math.abs(c - cx) <= w / 2
+    const half = shot.layout === 'split' ? splitHalfFrac(inp.sourceAspect) / shot.zoom : w / shot.zoom
+    const inCrop = (cx: number | undefined, c: number): boolean => cx !== undefined && Math.abs(c - cx) <= half / 2
     if (faces.some((f) => inCrop(shot.cx, f.c) || inCrop(shot.cx2, f.c))) hit++
   }
   return hit / inp.ticks

@@ -78,6 +78,8 @@ export interface ShortmeClip {
   /** Gesichtsquote 0..1 und Shots (feste Ausschnitte je Einstellung), nach M5. */
   faceRatio?: number
   shots?: ShortmeShot[]
+  /** Korrigierte Untertitel-Texte (globaler Wortindex → Text): Zeichensetzung, Groß-/Kleinschreibung, erkannte Fehler. */
+  corrections?: Record<number, string>
 }
 
 /** Eine Einstellung: fester Ausschnitt, keine Kamerabewegung. Zeiten relativ zum Clipbeginn (Sekunden). */

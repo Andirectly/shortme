@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { fontsDir } from '../../pipeline/captions'
 import { join } from 'node:path'
 import { BrowserWindow, ipcMain } from 'electron'
-import { buildVtt, captionCss, tagWordlists, type CaptionPreset, type CaptionStyleOptions, type CaptionWord } from '@shared/captions'
+import { buildVtt, captionCss, groupWords, tagWordlists, type CaptionPreset, type CaptionStyleOptions, type CaptionWord } from '@shared/captions'
 
 const FONT_FILES: Record<string, [string, number]> = { Anton: ['Anton-Regular.ttf', 400], Poppins: ['Poppins-Bold.ttf', 700], 'Poppins Medium': ['Poppins-Medium.ttf', 500] }
 
@@ -68,9 +68,9 @@ export async function captionPass(job: CaptionJob, opts: { onProgress?: (f: numb
         resolve: () => { clearTimeout(timeout); resolve() }, reject: (e) => { clearTimeout(timeout); reject(e) },
         ready: () => {
           win.webContents.send('captions:run', {
-            input: job.input, output: job.output, vtt: buildVtt(job.words, job.preset.wordsPerLine), css: `${fontCss}
+            input: job.input, output: job.output, vtt: buildVtt(groupWords(job.words, job.preset, job.style.scale ?? 1)), css: `${fontCss}
 ${captionCss(job.preset, job.style)}`,
-            y: job.style.y ?? job.preset.y, perLine: job.preset.wordsPerLine, width: job.width, height: job.height, taggers: tagWordlists(job.words)
+            y: job.style.y ?? job.preset.y, perLine: 12, width: job.width, height: job.height, taggers: tagWordlists(job.words)
           })
         }
       }

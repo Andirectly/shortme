@@ -23,7 +23,7 @@ interface ProjectState {
   importPath: (path: string) => Promise<boolean>
   importUrl: (url: string) => Promise<boolean>
   clearImport: () => void
-  startTranscribe: (diarize: boolean, query?: string) => Promise<boolean>
+  startTranscribe: (diarize: boolean, query?: string, wanted?: number) => Promise<boolean>
   exportClips: (clipIds: string[], presetId: string, srt: boolean) => Promise<boolean>
   exportJob: ShortmeJob | null
   pause: () => Promise<void>
@@ -105,11 +105,11 @@ export const useProject = create<ProjectState>((set, get) => ({
     }
   },
   clearImport: () => set({ imported: null, importError: '' }),
-  startTranscribe: async (diarize, query) => {
+  startTranscribe: async (diarize, query, wanted) => {
     const a = api()
     const imp = get().imported
     if (!a || !imp) return false
-    const job = await a.transcribe(imp.meta.hash, { diarize, query })
+    const job = await a.transcribe(imp.meta.hash, { diarize, query, wanted })
     set({ job, clipsFile: null, transcript: null })
     return true
   },

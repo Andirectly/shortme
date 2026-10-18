@@ -24,7 +24,7 @@ api.onRun(async (raw) => {
     let builder = new RenderPipelineBuilder()
       .withInputVideo(video)
       .withTranscriber(new VttTranscriber(job.vtt))
-      .withSegmentSplitter(new LimitByWordsSegmentSplitter({ maxWords: job.perLine }))
+      .withSegmentSplitter(new LimitByWordsSegmentSplitter({ maxWords: Math.max(job.perLine, 12) }))
       .withDefaultLineSplitterConfig({ maxLines: 1 })
       .withCss(job.css)
       .withAlignment({ verticalAlign: 'center', verticalOffset: job.y, horizontalAlign: 'center', horizontalOffset: 0.5 })

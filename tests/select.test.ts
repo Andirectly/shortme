@@ -41,11 +41,11 @@ describe('Länge', () => {
     expect(s[f.last].end - s[f.first].start).toBeGreaterThanOrEqual(15)
     expect(fitLength({ first: 38, last: 38 }, s, 15, 60, 38)).toBeNull()
   })
-  it('Zielanzahl wächst mit der Dauer, begrenzt auf 3–20', () => {
-    expect(defaultWanted(100)).toBe(3)
-    expect(defaultWanted(729)).toBe(3)
-    expect(defaultWanted(3600)).toBe(15)
-    expect(defaultWanted(100000)).toBe(20)
+  it('Zielanzahl wächst mit der Dauer (≈ 1 je 2,5 Min), begrenzt auf 4–30', () => {
+    expect(defaultWanted(100)).toBe(4)
+    expect(defaultWanted(729)).toBe(5)
+    expect(defaultWanted(3600)).toBe(24)
+    expect(defaultWanted(100000)).toBe(30)
   })
 })
 
@@ -126,5 +126,21 @@ describe('Auswahl-Qualität (Beleg-Prüfung, Proben, Anfang, Länge)', () => {
   })
   it('weiche Längenvorgabe: Sweetspot 22–50 s ohne Abzug', () => {
     expect([10, 18, 30, 50, 60, 75, 90].map(lengthPenalty)).toEqual([6, 3, 0, 0, 2, 5, 8])
+  })
+})
+
+describe('Untertitel-Korrektur: nur sichere Änderungen', () => {
+  it('nimmt Zeichensetzung, Schreibweise und kleine Wortfehler an', async () => {
+    const { acceptCorrection } = await import('../src/main/shortme/clips/select')
+    expect(acceptCorrection('season', 'Season,')).toBe(true)
+    expect(acceptCorrection('tattoo', 'Tattoo.')).toBe(true)
+    expect(acceptCorrection('Tatoo', 'Tattoo')).toBe(true)
+  })
+  it('lehnt erfundene Wörter, Mehrwort-Einträge und Leeres ab', async () => {
+    const { acceptCorrection } = await import('../src/main/shortme/clips/select')
+    expect(acceptCorrection('Haus', 'Schmetterling')).toBe(false)
+    expect(acceptCorrection('Haus', 'das Haus')).toBe(false)
+    expect(acceptCorrection('Haus', '')).toBe(false)
+    expect(acceptCorrection('Haus', 'Haus')).toBe(false)
   })
 })

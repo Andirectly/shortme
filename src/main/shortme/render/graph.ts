@@ -13,8 +13,8 @@ export function videoChain(p: Piece, k: number, src: SourceDims, base: number): 
     return `${trim},fps=30,split=2[bs${k}][fs${k}];[bs${k}]scale=${OUT_W}:${OUT_H}:force_original_aspect_ratio=increase,crop=${OUT_W}:${OUT_H},gblur=sigma=36[bg${k}];[fs${k}]scale=${OUT_W}:-2[fg${k}];[bg${k}][fg${k}]overlay=(W-w)/2:(H-h)/2,setsar=1[v${k}]`
   }
   if (sh.layout === 'split' && sh.cx2 !== undefined) {
-    const a = cropBox(src, sh.cx, OUT_W / (OUT_H / 2), p.zoom)
-    const b = cropBox(src, sh.cx2, OUT_W / (OUT_H / 2), p.zoom)
+    const a = cropBox(src, sh.cx, OUT_W / (OUT_H / 2), p.zoom * sh.zoom)
+    const b = cropBox(src, sh.cx2, OUT_W / (OUT_H / 2), p.zoom * sh.zoom)
     return `${trim},fps=30,split=2[sa${k}][sb${k}];[sa${k}]crop=${a.w}:${a.h}:${a.x}:${a.y},scale=${OUT_W}:${OUT_H / 2}:flags=lanczos[ta${k}];[sb${k}]crop=${b.w}:${b.h}:${b.x}:${b.y},scale=${OUT_W}:${OUT_H / 2}:flags=lanczos[tb${k}];[ta${k}][tb${k}]vstack,setsar=1[v${k}]`
   }
   const c = cropBox(src, sh.cx, OUT_W / OUT_H, p.zoom)

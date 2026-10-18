@@ -34,12 +34,56 @@ interface Rated extends Cand {
   tags: Array<{ sentence: number; word: string; kind: ClipTagKind }>
   extended: number
   rank: number
+  /** Proben/Kontext für die adaptive zweite Bewertung (nur Top-Kandidaten). */
+  samples?: RateRaw[]
+  text?: string
+  ctx?: string
 }
 
 export const MAX_CLIP_SEC = 90
+
+const lev = (a: string, b: string): number => {
+  const m = a.length
+  const n = b.length
+  let prev = Array.from({ length: n + 1 }, (_, j) => j)
+  for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur }
+  return prev[n]
+}
+
+/** Korrektur annehmen? Nur Zeichensetzung/Schreibweise oder kleine Wortänderung – nie frei erfundene Wörter. */
+export function acceptCorrection(orig: string, next: string): boolean {
+  if (!next.trim() || /\s/.test(next.trim()) || next === orig) return false
+  const a = squash(orig)
+  const b = squash(next)
+  if (a === b) return true
+  const d = lev(a, b)
+  return b.length > 2 && d <= Math.max(2, Math.floor(0.4 * Math.max(a.length, b.length)))
+}
+
+/** LLM-Korrekturlauf (Zeichensetzung, Schreibweise, offensichtliche Erkennungsfehler); index-treu, Abweichungen werden verworfen. */
+export async function proofreadWords(url: string, words: string[], signal?: AbortSignal): Promise<Record<number, string>> {
+  if (words.length === 0) return {}
+  const prompt = await loadPrompt('proofread', { words: words.map((w, i) => `${i}: ${w}`).join('\n') })
+  try {
+    const out = await chatJson(url, prompt, {
+      signal, maxTokens: Math.min(4000, words.length * 8 + 200), temperature: 0.1,
+      schema: { type: 'object', additionalProperties: false, required: ['words'], properties: { words: { type: 'array', items: { type: 'string' } } } },
+      validate: (x) => { if (!isObj(x) || !Array.isArray(x.words)) throw new Error('words fehlt'); if (x.words.length !== words.length) throw new Error(`Wortzahl ${x.words.length} ≠ ${words.length}`); return x.words.map(String) }
+    })
+    const res: Record<number, string> = {}
+    out.forEach((w, i) => { if (acceptCorrection(words[i], w.trim())) res[i] = w.trim() })
+    return res
+  } catch (e) {
+    if (signal?.aborted) throw e
+    console.error('Untertitel-Korrektur übersprungen:', e)
+    return {}
+  }
+}
+export const MAX_CLIPS = 30
 const WINDOW_WORDS = 3000
 
-export const defaultWanted = (durationSec: number): number => Math.max(3, Math.min(20, Math.round(durationSec / 240)))
+/** Automatische Clip-Anzahl: etwa ein Clip je 2,5 Minuten Material (mindestens 4, höchstens 30). */
+export const defaultWanted = (durationSec: number): number => Math.max(4, Math.min(MAX_CLIPS, Math.round(durationSec / 150)))
 
 /** Transkript in LLM-Fenster teilen (Satzgrenzen, ≈ `maxWords` Wörter, 6 Sätze Überlappung). */
 export function buildWindows(sentences: Sentence[], maxWords = WINDOW_WORDS, overlap = 6): Array<{ from: number; to: number }> {
@@ -185,7 +229,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   // A: Kandidaten je Fenster (Satznummern)
   const windows = buildWindows(sentences)
   let cands: Cand[] = []
-  const maxCands = Math.max(8, Math.ceil(wanted * 3.5))
+  const maxCands = Math.max(10, Math.ceil(wanted * 3))
   for (let w = 0; w < windows.length; w++) {
     report('candidates', w / windows.length, `Kandidaten suchen (${w + 1}/${windows.length}) …`)
     const win = windows[w]
@@ -201,6 +245,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
     }
   }
   cands = cands.slice(0, maxCands)
+  console.info(`[select] Kandidaten: ${cands.length} (Ziel ${wanted}, max ${maxCands}), Fenster: ${windows.length}`)
   if (cands.length === 0) return fallbackClips(input, sentences, wanted, minSec, maxSec, cuts, report)
 
   // B: Anfang prüfen (Kontext davor) → C: Bewertung (2 Proben, Belege) → D: Ende prüfen
@@ -228,11 +273,11 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
     }
     const textNow = (): string => clipText(sentences, first, last)
     const ctx = (): string => `[Kontext] ${first > 0 ? sentences[first - 1].text : '–'}\n${textNow()}\n[Kontext] ${last < sentences.length - 1 ? sentences[last + 1].text : '–'}`
-    // C: zwei Proben (Median), Belege prüfen
+    // C: erste Probe (die Besten bekommen später eine zweite → Median)
     const samples: RateRaw[] = []
-    for (const temperature of [0.2, 0.5]) {
+    {
       const rp = await loadPrompt('rate', { query: queryLine(opts.query), clip: ctx() })
-      samples.push(await chatJson(url, rp, { signal, schema: RATE_SCHEMA, validate: validateRate, maxTokens: 800, temperature }))
+      samples.push(await chatJson(url, rp, { signal, schema: RATE_SCHEMA, validate: validateRate, maxTokens: 800, temperature: 0.2 }))
     }
     let merged = mergeRatings(samples, textNow())
     // D: Ende prüfen; bei Verlängerung nicht neu bewerten, Beleg-Prüfung bleibt
@@ -248,7 +293,20 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
       if (extended > 0) merged = { ...merged, criteria: { ...merged.criteria, payoff: Math.max(merged.criteria.payoff, 10) } }
     }
     const m = merged.meta
-    rated.push({ first, last, criteria: merged.criteria, title: m.title, hookText: m.hookText, reason: m.reason, tags: m.tags, sum: critSum(merged.criteria), extended: extended + startExt, rank: 0 })
+    rated.push({ first, last, criteria: merged.criteria, title: m.title, hookText: m.hookText, reason: m.reason, tags: m.tags, sum: critSum(merged.criteria), extended: extended + startExt, rank: 0, samples, text: textNow(), ctx: ctx() })
+  }
+
+  // C2: zweite Probe für die obere Hälfte (bessere Trennschärfe dort, wo es um die Plätze geht)
+  rated.sort((x, y) => y.sum - x.sum)
+  const second = rated.slice(0, Math.max(wanted + 2, Math.ceil(rated.length * 0.6)))
+  for (let i = 0; i < second.length; i++) {
+    report('rate', 0.8 + 0.2 * (i / second.length), `Zweite Bewertung (${i + 1}/${second.length}) …`)
+    const r = second[i]
+    const rp = await loadPrompt('rate', { query: queryLine(opts.query), clip: r.ctx ?? '' })
+    r.samples = [...(r.samples ?? []), await chatJson(url, rp, { signal, schema: RATE_SCHEMA, validate: validateRate, maxTokens: 800, temperature: 0.5 })]
+    const mg = mergeRatings(r.samples, r.text ?? '')
+    r.criteria = mg.criteria
+    r.sum = critSum(mg.criteria)
   }
 
   // E1: Finalisten paarweise vergleichen (beide Reihenfolgen; Uneinigkeit = Unentschieden) – weniger Positions-Bias als eine Gesamt-Rangliste
@@ -281,7 +339,9 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   }
 
   // E: nach Score wählen, Grenzen einrasten (Nachbarn verbieten Überlappung)
-  const scored = finalists.map((f) => ({ f, score: Math.max(0, finalScore(f.sum, f.rank, finalists.length, (secOf(signals.loudness, sentences[f.first].start, sentences[f.last].end) + secOf(signals.burst, sentences[f.first].start, sentences[f.last].end)) / 2) - lengthPenalty(dur(sentences, f.first, f.last))) }))
+  console.info(`[select] bewertet: ${rated.length}, Finalisten: ${finalists.length}`)
+  const pool = [...finalists, ...rated.filter((r) => !finalists.includes(r)).map((r) => { r.rank = finalists.length; return r })]
+  const scored = pool.map((f) => ({ f, score: Math.max(0, finalScore(f.sum, f.rank, pool.length, (secOf(signals.loudness, sentences[f.first].start, sentences[f.last].end) + secOf(signals.burst, sentences[f.first].start, sentences[f.last].end)) / 2) - lengthPenalty(dur(sentences, f.first, f.last))) }))
   // Qualitätsschwelle: Clips mit schwachem Hook UND/ODER nicht eigenständigem Anfang erst nehmen, wenn zu wenige gute da sind
   const solid = (f: Rated): boolean => f.criteria.standalone >= 8 && f.criteria.hook >= 8
   scored.sort((a, b) => Number(solid(b.f)) - Number(solid(a.f)) || b.score - a.score)
@@ -292,14 +352,25 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   for (const { f, score } of scored) {
     if (out.length >= wanted) break
     const snapped = snapClip({ start: sentences[f.first].start, end: sentences[f.last].end }, { ...sctx, neighbors: taken, maxLen: MAX_CLIP_SEC })
-    if (snapped.end - snapped.start < minSec * 0.6 || taken.some((t) => snapped.start < t.end && snapped.end > t.start)) continue
+    if (snapped.end - snapped.start < minSec * 0.6 || taken.some((t) => snapped.start < t.end && snapped.end > t.start)) { console.info(`[select] verworfen (Überlappung/zu kurz): ${snapped.start.toFixed(1)}–${snapped.end.toFixed(1)}`); continue }
     taken.push({ start: snapped.start, end: snapped.end })
-    const fw = words.findIndex((w) => w.start >= sentences[f.first].start - 1e-6)
-    const lw = sentences[f.last].last
+    // Wortgrenzen aus dem EINGERASTETEN Bereich (Nachbarn/Länge können den Kandidaten kürzen)
+    const fw = Math.max(0, words.findIndex((w) => w.start >= snapped.start - 0.06))
+    let lw = fw
+    for (let k = fw; k < words.length && words[k].end <= snapped.end + 0.06; k++) lw = k
     out.push({
       id: `clip-${Math.round(snapped.start * 10)}`, start: snapped.start, end: snapped.end, firstWord: fw, lastWord: lw, score, criteria: f.criteria,
       title: f.title, hookText: f.hookText, reason: f.reason, tags: resolveTags(f.tags, sentences, words, f.first, f.last), source: 'llm', snap: snapped.path, extended: f.extended
     })
+  }
+  // F: Untertitel-Korrektur je Clip (Zeichensetzung, Schreibweise, Erkennungsfehler) – als Vorbelegung, im Editor änderbar
+  for (let i = 0; i < out.length; i++) {
+    report('proofread', i / out.length, `Untertitel prüfen (${i + 1}/${out.length}) …`)
+    const c = out[i]
+    const local = await proofreadWords(url, words.slice(c.firstWord, c.lastWord + 1).map((w) => w.w), signal)
+    const abs: Record<number, string> = {}
+    for (const [k, v] of Object.entries(local)) abs[c.firstWord + Number(k)] = v
+    if (Object.keys(abs).length) out[i] = { ...c, corrections: abs }
   }
   report('done', 1, `${out.length} Clips`)
   return out.sort((a, b) => b.score - a.score)

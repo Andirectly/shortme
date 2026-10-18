@@ -98,7 +98,7 @@ function CreateSheet(): React.JSX.Element {
     if (projected > 260 || info.velocity.y > 800) openSheet(false)
     else animate(y, 0, { type: 'spring', duration: 0.3, bounce: 0.2, velocity: info.velocity.y })
   }
-  const start = async (): Promise<void> => { if (hasApi && !(await startTranscribe(diarize, opts.query))) return; openSheet(false); go('processing') }
+  const start = async (): Promise<void> => { if (hasApi && !(await startTranscribe(diarize, opts.query, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined))) return; openSheet(false); go('processing') }
   const stop = { onPointerDownCapture: (e: React.PointerEvent) => e.stopPropagation() }
 
   return (
@@ -154,6 +154,7 @@ function CreateSheet(): React.JSX.Element {
                   </button>
                 </div>
               </Row>
+              <Row label="Anzahl Clips" hint="Auto ≈ 1 je 2,5 Min"><Segmented options={['Auto', '5', '10', '15', '20', '30']} value={opts.count ?? 'Auto'} onChange={(count) => setOpts({ count })} /></Row>
               <Row label="Sprechpausen entfernen"><Switch on={opts.removePauses} onChange={(removePauses) => setOpts({ removePauses })} label="Sprechpausen entfernen" /></Row>
               <Row label="Workflow"><Segmented options={['Automatisch', 'Prüfen & Bearbeiten']} value={opts.workflow} onChange={(workflow) => setOpts({ workflow })} /></Row>
               <Row label="Wonach suchen?" hint="optional">

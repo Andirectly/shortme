@@ -14,7 +14,7 @@ export interface Ctx2D {
  * Zeichnet ein Vorschaubild exakt wie der Export (gleiche Geometrie aus shared/framing.ts):
  * smart/fixed = fester 9:16-Ausschnitt, fit = 16:9 mittig auf unscharfer Kopie, split = zwei Personen übereinander.
  */
-export function drawLayout(ctx: Ctx2D, video: unknown, src: { width: number; height: number }, shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2'>, zoom: number, W: number, H: number): void {
+export function drawLayout(ctx: Ctx2D, video: unknown, src: { width: number; height: number }, shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2'> & { zoom?: number }, zoom: number, W: number, H: number): void {
   ctx.clearRect(0, 0, W, H)
   if (shot.layout === 'fit') {
     const cover = Math.max(W / src.width, H / src.height)
@@ -31,21 +31,21 @@ export function drawLayout(ctx: Ctx2D, video: unknown, src: { width: number; hei
   if (shot.layout === 'split' && shot.cx2 !== undefined) {
     const half = H / 2
     for (const [cx, y] of [[shot.cx, 0], [shot.cx2, half]] as const) {
-      const c = cropBox(src, cx, W / half, zoom)
+      const c = cropBox(src, cx, W / half, zoom * (shot.zoom ?? 1))
       ctx.drawImage(video, c.x, c.y, c.w, c.h, 0, y, W, half)
     }
     return
   }
-  const c = cropBox(src, shot.cx, W / H, zoom)
+  const c = cropBox(src, shot.cx, W / H, zoom * (shot.zoom ?? 1))
   ctx.drawImage(video, c.x, c.y, c.w, c.h, 0, 0, W, H)
 }
 
 /** Rechteck des aktuellen Ausschnitts in der Quelle (0..1), für die Markierung im Quellmonitor. */
-export function sourceRects(src: { width: number; height: number }, shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2'>, zoom: number): Array<{ x: number; w: number }> {
+export function sourceRects(src: { width: number; height: number }, shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2'> & { zoom?: number }, zoom: number): Array<{ x: number; w: number }> {
   if (shot.layout === 'fit') return [{ x: 0, w: 1 }]
   const aspect = shot.layout === 'split' ? 1080 / 960 : 1080 / 1920
   return [shot.cx, ...(shot.layout === 'split' && shot.cx2 !== undefined ? [shot.cx2] : [])].map((cx) => {
-    const c = cropBox(src, cx, aspect, zoom)
+    const c = cropBox(src, cx, aspect, zoom * (shot.zoom ?? 1))
     return { x: c.x / src.width, w: c.w / src.width }
   })
 }

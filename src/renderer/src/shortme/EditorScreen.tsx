@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, Wand2, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { baseState, canRedo, canUndo, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
 import type { PreviewPlan, ShortmeShot } from '@shared/shortme'
-import { PRESETS, captionCss, scopeCss } from '@shared/captions'
+import { PRESETS, captionCss, groupWords, scopeCss } from '@shared/captions'
 import { useStore } from './store'
 import { IMG, TRANSCRIPT } from './data'
 import { useClipList } from './clipData'
@@ -38,7 +38,7 @@ export function EditorScreen(): React.JSX.Element {
   // ---------- Nicht-destruktive Bearbeitung: Operationslog, Autosave ----------
   const origStart = real?.start ?? 0
   const D = real ? real.end - real.start : clip.duration
-  const baseSt = useMemo(() => baseState({ start: origStart, end: real?.end ?? clip.duration, hookText: clip.hook }, useStore.getState().presetId), [origStart, real?.end, clip.duration, clip.hook])
+  const baseSt = useMemo(() => baseState({ start: origStart, end: real?.end ?? clip.duration, hookText: clip.hook, corrections: real?.corrections }, useStore.getState().presetId), [origStart, real?.end, clip.duration, clip.hook, real?.corrections])
   const [log, setLog] = useState<EditLog>(emptyLog(clipId))
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(true)
@@ -239,7 +239,8 @@ export function EditorScreen(): React.JSX.Element {
   }
   const caption = (patch: CaptionPatch): void => commit({ t: 'caption', patch })
   const curIdx = Math.max(0, words.findLastIndex((w) => w.t <= t))
-  const cap = words.slice(Math.floor(curIdx / preset.wordsPerLine) * preset.wordsPerLine, Math.floor(curIdx / preset.wordsPerLine) * preset.wordsPerLine + preset.wordsPerLine)
+  const groups = useMemo(() => groupWords(words.filter((w) => !cut.includes(w.g)).map((w) => ({ w: w.w, start: w.t, end: w.e, g: w.g, hi: w.hi })), preset, size / 60), [words, cut, preset, size])
+  const cap = groups.find((gr) => gr.some((w) => w.g === words[curIdx]?.g)) ?? groups.find((gr) => gr[0].start >= t) ?? groups[groups.length - 1] ?? []
   const zn = ZONES[zone]
   const absT = origStart + t
   const wordRef = useRef<HTMLSpanElement>(null)
@@ -264,7 +265,7 @@ export function EditorScreen(): React.JSX.Element {
         <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportNow()}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 310px', gap: 14, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'clamp(260px, 17vw, 380px) minmax(0, 1fr) clamp(280px, 17vw, 360px)', gap: 14, minHeight: 0 }}>
         {/* Transkript */}
         <div className="sm-glass" style={{ padding: 16, overflowY: 'auto' }}>
           <h3 style={{ marginBottom: 10 }}>Transkript</h3>
@@ -287,8 +288,8 @@ export function EditorScreen(): React.JSX.Element {
         </div>
 
         {/* Bühne: Quellmonitor + vertikale Vorschau */}
-        <div style={{ display: 'flex', gap: 16, justifyContent: 'center', alignItems: 'center', minHeight: 0, minWidth: 0 }}>
-          <div style={{ display: showSource ? 'grid' : 'none', gap: 8, width: '40%', maxWidth: 420, alignSelf: 'center' }}>
+        <div style={{ display: 'flex', gap: 20, justifyContent: 'center', alignItems: 'center', minHeight: 0, minWidth: 0 }}>
+          <div style={{ display: showSource ? 'grid' : 'none', gap: 8, flex: '1 1 0', minWidth: 0, maxWidth: 'min(820px, calc((100vh - 360px) * 16 / 9))', alignSelf: 'center' }}>
             <div title="Klick auf eine Person: Kamera folgt ihr ab hier" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); commit({ t: 'follow', at: absT, cx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) }) }}
               style={{ position: 'relative', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--edge)', background: '#000', cursor: 'crosshair' }}>
               {srcUrl
@@ -299,7 +300,7 @@ export function EditorScreen(): React.JSX.Element {
             </div>
             <small>Heller Rahmen = aktueller Ausschnitt im Export</small>
           </div>
-          <div style={{ position: 'relative', height: '100%', maxHeight: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--edge-highlight)', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', containerType: 'size' }}>
+          <div style={{ position: 'relative', flex: 'none', height: '100%', maxHeight: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--edge-highlight)', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', containerType: 'size' }}>
             {srcUrl
               ? <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
               : <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover' }} />}
@@ -307,7 +308,7 @@ export function EditorScreen(): React.JSX.Element {
             <style>{scopeCss(captionCss(preset, { scale: size / 60, highlight: st.caption.highlight }), '.sm-cap')}</style>
             <div className="sm-cap" style={{ position: 'absolute', left: 0, right: 0, top: `${pos}%`, transform: 'translateY(-50%)', padding: '0 4%' }}>
               <div className="segment"><div className="line">
-                {cap.filter((w) => !cut.includes(w.g)).map((w) => <span key={w.g} className={`word${w.g === words[curIdx]?.g ? ' word-being-narrated' : ''}${w.hi ? ' emphasis' : ''}`}>{w.w}</span>)}
+                {cap.map((x) => <span key={x.g} className={`word${x.g === words[curIdx]?.g ? ' word-being-narrated' : ''}${x.hi ? ' emphasis' : ''}`}>{x.w}</span>)}
               </div></div>
             </div>
             {zn && <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${zn.top * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${zn.bottom * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', right: 0, top: `${zn.top * 100}%`, bottom: `${zn.bottom * 100}%`, width: `${zn.right * 100}%`, background: 'rgba(255,255,255,0.16)' }} /></div>}

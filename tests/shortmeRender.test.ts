@@ -104,13 +104,13 @@ describe('ASS-Untertitel', () => {
   })
   it('ein Dialogue je Wortzustand, Zeiten aus der gekürzten Zeitleiste, Hook oben', () => {
     const words = [{ w: 'Hallo', start: 0.5, end: 0.9 }, { w: 'du', start: 1, end: 1.2 }, { w: 'da', start: 1.3, end: 1.6, tag: 'emphasis' as const }, { w: 'Welt', start: 2.0, end: 2.4 }]
-    const ass = buildAss(words, { width: 1080, height: 1920, preset: { ...PRESETS[0], wordsPerLine: 3 }, hook: { text: 'Mein Hook', seconds: 3 } })
+    const ass = buildAss(words, { width: 1080, height: 1920, preset: PRESETS[0], hook: { text: 'Mein Hook', seconds: 3 } })
     const ev = ass.split('\n').filter((l) => l.startsWith('Dialogue'))
     expect(ev).toHaveLength(1 + 4)
     expect(ev[0]).toContain('Hook')
     expect(ev[1]).toContain('0:00:00.50,0:00:01.00')
     expect(ev[1]).toContain('HALLO')
-    expect(ev[3]).toContain('0:00:01.30,0:00:01.85')
+    expect(ev[3]).toContain('0:00:01.30,0:00:02.00')
     expect(ev[4]).toContain('WELT')
     expect(ass).toContain('PlayResX: 1080')
   })

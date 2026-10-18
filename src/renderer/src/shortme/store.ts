@@ -17,7 +17,7 @@ interface State {
   progress: number // 0..1 simulierte Verarbeitung
   paused: boolean
   /* Erstellen-Optionen (letzte Auswahl wird gemerkt) */
-  opts: { format: string; frame: string; length: string; captions: string; removePauses: boolean; workflow: string; query: string }
+  opts: { format: string; frame: string; length: string; captions: string; removePauses: boolean; workflow: string; query: string; count: string }
   /* Editor: nicht-destruktive Operationen */
   trim: [number, number]
   hookText: string
@@ -51,7 +51,7 @@ export const useStore = create<State>((set, get) => ({
   presetId: load('sm.preset', 'impact'),
   progress: 0,
   paused: false,
-  opts: load('sm.opts', { format: '9:16', frame: 'Smart', length: 'Automatisch', captions: 'preset', removePauses: true, workflow: 'Prüfen & Bearbeiten', query: '' }),
+  opts: load('sm.opts', { format: '9:16', frame: 'Smart', length: 'Automatisch', captions: 'preset', removePauses: true, workflow: 'Prüfen & Bearbeiten', query: '', count: 'Auto' }),
   trim: [0, 47],
   hookText: CLIPS[0].hook,
   undoStack: [],

@@ -88,3 +88,10 @@
 - [ ] Untertitel-Text im Editor ändern: Vorschau und Export zeigen den neuen Text
 - [ ] Clip-Auswahl: sind die neuen Clips besser (Anfang verständlich, Hook, Pointe)? Welche Videos laufen noch schlecht?
 - [ ] UI: keine Farbtupfer mehr außer Untertitel-Presets
+
+## M10
+- [ ] Kein doppeltes Bild mehr bei Einzelsprecher; Split nur bei zwei Personen nötig
+- [ ] Mehr Clips pro Video; „Anzahl Clips“ wirkt
+- [ ] Sprecher nie halb im Bild
+- [ ] Untertitel einzeilig; Korrekturen sinnvoll (keine falschen Namen)
+- [ ] Editor füllt Fullscreen sinnvoll

@@ -43,8 +43,8 @@ export interface EditState {
 
 export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops: [], cursor: 0 })
 
-export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'>, presetId = 'impact'): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: false }, wordEdits: {}, caption: { presetId, scale: 1, y: 0.68, highlight: true, zone: 'Aus' }, layoutOps: [] }
+export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string> }, presetId = 'impact'): EditState {
+  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: false }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId, scale: 1, y: 0.68, highlight: true, zone: 'Aus' }, layoutOps: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */

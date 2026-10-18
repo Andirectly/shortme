@@ -1,4 +1,4 @@
-import { PRESETS, type CaptionPreset } from '@shared/captions'
+import { PRESETS, groupWords, type CaptionPreset } from '@shared/captions'
 import type { ClipTagKind } from '@shared/shortme'
 
 export { PRESETS, type CaptionPreset }
@@ -57,9 +57,9 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 `
   const lines: string[] = []
   if (o.hook?.text) lines.push(`Dialogue: 1,${assTime(0)},${assTime(o.hook.seconds)},Hook,,0,0,0,,{\\fad(150,200)}${esc(o.hook.text)}`)
-  const n = Math.max(1, p.wordsPerLine)
-  for (let g = 0; g < words.length; g += n) {
-    const grp = words.slice(g, g + n)
+  const groups = groupWords(words, p, 1)
+  for (let gi = 0; gi < groups.length; gi++) {
+    const grp = groups[gi]
     const text = (i: number | null): string => grp.map((w, k) => {
       const t = esc(p.upper ? w.w.toUpperCase() : w.w)
       const active = i === k
@@ -70,7 +70,7 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
       const next = grp[k + 1]
       const start = w.start
       // Ende: bis zum nächsten Wort der Gruppe, beim letzten Wort bis zu 0,25 s nach Wortende (kein Flackern in kurzen Lücken)
-      const end = next ? next.start : Math.min(w.end + 0.25, words[g + n]?.start ?? Infinity)
+      const end = next ? next.start : Math.min(w.end + 0.25, groups[gi + 1]?.[0].start ?? Infinity)
       if (end - start < 0.02) return
       lines.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Cap,,0,0,0,,{\\an5\\pos(${Math.round(o.width / 2)},${y})}${text(k)}`)
     })
