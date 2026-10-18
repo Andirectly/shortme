@@ -117,3 +117,9 @@ export interface PreviewPlan {
   shots: ShortmeShot[]
   pieces: Array<{ src0: number; src1: number; out0: number; zoom: number; shot: ShortmeShot }>
 }
+
+/** „Wer ist wer?“ – erkannte Personen des Videos (Vorschaubild als Data-URL). */
+export type PersonRole = 'normal' | 'main' | 'ignore'
+export interface ShortmePerson { id: string; label: string; role: PersonRole; seconds: number; thumb: string | null }
+export interface ShortmePersons { confirmed: boolean; confidence: number; needsReview: boolean; persons: ShortmePerson[] }
+export interface PersonsPatch { labels?: Record<string, string>; roles?: Record<string, PersonRole> }

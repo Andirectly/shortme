@@ -10,6 +10,8 @@ export interface PlanTrack {
   centres: number[] // 0..1 horizontale Gesichtsmitte
   areas: number[] // normalisierte Boxfläche
   scores: number[] // ASD-Logit je Tick
+  /** Person des ganzen Videos (Wiedererkennung über Schnitte), falls bekannt. */
+  person?: string
 }
 
 export interface PlanInput {
@@ -23,6 +25,8 @@ export interface PlanInput {
   targetAspect?: number
   /** Sprache je Tick (VAD). Ohne Angabe gilt jeder Tick als Sprache. Gewechselt wird nur während Sprache. */
   speech?: boolean[]
+  /** Rollen aus dem „Wer ist wer?“-Dialog: `ignore` wird nie zum Ziel, `main` gewinnt bei unklarem ASD. */
+  personRoles?: Record<string, 'main' | 'ignore'>
 }
 
 export interface PlanOptions {
@@ -60,6 +64,8 @@ const clampCx = (cx: number, w: number): number => Math.min(1 - w / 2, Math.max(
 
 interface Seg { start: number; end: number; track: number | null }
 
+const t_ignored = (inp: PlanInput, t: PlanTrack): boolean => !!t.person && inp.personRoles?.[t.person] === 'ignore'
+const isMain = (inp: PlanInput, id: number): boolean => { const t = inp.tracks.find((x) => x.id === id); return !!t?.person && inp.personRoles?.[t.person] === 'main' }
 const speechAt = (inp: PlanInput, i: number): boolean => inp.speech ? !!inp.speech[i] : true
 
 /** Aktiver Sprecher je Tick mit Hysterese: Wechsel nur bei ≥ 1,25× Score und ≥ 1 s Führung; Hintergrundgesichter (< 10 % der größten Fläche) zählen nicht. */
@@ -70,7 +76,7 @@ export function activeSpeakers(inp: PlanInput, opt: PlanOptions = PLAN_DEFAULTS)
   let active: number | null = null
   let lead: { id: number; since: number } | null = null
   for (let i = 0; i < inp.ticks; i++) {
-    const present = inp.tracks.map((t) => ({ t, v: at(t, i) })).filter((x) => x.v)
+    const present = inp.tracks.map((t) => ({ t, v: at(t, i) })).filter((x) => x.v && !(t_ignored(inp, x.t)))
     const maxA = Math.max(0, ...present.map((x) => x.v!.a))
     const cands = present.filter((x) => x.v!.a >= maxA * opt.ignoreAreaRatio).map((x) => ({ id: x.t.id, s: smooth(x.t, i, half) ?? -9 }))
     if (cands.length === 0) { out.push(null); active = null; lead = null; continue }
@@ -80,7 +86,8 @@ export function activeSpeakers(inp: PlanInput, opt: PlanOptions = PLAN_DEFAULTS)
       // Neustart nach Kamerawechsel/Verlust: den Sprechenden, sonst das größte Gesicht
       const second = cands.filter((c) => c.id !== best.id).reduce((m, c) => Math.max(m, c.s), -Infinity)
       const clear = cands.length === 1 ? best.s > -0.5 : best.s - second > ASD_LEAD
-      const speaking = best.s > 0 || (clear && speechAt(inp, i)) ? best : cands.reduce((a, b) => { const A = at(inp.tracks.find((t) => t.id === a.id)!, i)!.a; const B = at(inp.tracks.find((t) => t.id === b.id)!, i)!.a; return B > A ? b : a })
+      const main = cands.find((c) => isMain(inp, c.id))
+      const speaking = best.s > 0 || (clear && speechAt(inp, i)) ? best : main ?? cands.reduce((a, b) => { const A = at(inp.tracks.find((t) => t.id === a.id)!, i)!.a; const B = at(inp.tracks.find((t) => t.id === b.id)!, i)!.a; return B > A ? b : a })
       active = speaking.id
       lead = null
     } else if (best.id !== cur.id && speechAt(inp, i) && (best.s > 0 ? (cur.s <= 0 || best.s >= cur.s * opt.switchRatio) : false) && best.s - cur.s > ASD_LEAD) {

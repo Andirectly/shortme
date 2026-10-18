@@ -126,6 +126,8 @@ export function ClipsScreen(): React.JSX.Element {
   const list = useClipList()
   const exportClips = useProject((s) => s.exportClips)
   const exportJob = useProject((s) => s.exportJob)
+  const persons = useProject((s) => s.persons)
+  const openPersons = useProject((s) => s.openPersons)
   const presetId = useStore((s) => s.presetId)
   const title = useProject((s) => s.currentTitle ?? s.imported?.meta.title ?? s.job?.title)
   const sorted = [...list].sort((a, b) => b.score - a.score)
@@ -134,6 +136,7 @@ export function ClipsScreen(): React.JSX.Element {
       <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}>
         <div><h1>{title ?? PROJECTS[0].name}</h1><small>{list.length} Clips · nach Score sortiert</small></div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {persons && persons.persons.length > 0 && <Pill onClick={openPersons}>Wer ist wer?{persons.needsReview ? ' ·  prüfen' : ''}</Pill>}
           <Pill pressed={view === 'grid'} onClick={() => setView('grid')}><LayoutGrid size={14} /> Raster</Pill>
           <Pill pressed={view === 'list'} onClick={() => setView('list')}><List size={14} /> Liste</Pill>
         </div>

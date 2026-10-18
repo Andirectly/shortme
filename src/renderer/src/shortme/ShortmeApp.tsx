@@ -8,6 +8,7 @@ import { ProcessingScreen, ClipsScreen, ProjectsScreen } from './ClipScreens'
 import { EditorScreen } from './EditorScreen'
 import { StudioScreen, SettingsScreen } from './OtherScreens'
 import { ModelsScreen, SetupWizard } from './ModelsScreen'
+import { PersonsDialog } from './PersonsDialog'
 import './tokens.css'
 
 export default function ShortmeApp(): React.JSX.Element {
@@ -25,6 +26,7 @@ export default function ShortmeApp(): React.JSX.Element {
       {screen === 'models' && <ModelsScreen />}
       {screen === 'settings' && <SettingsScreen />}
       <SetupWizard />
+      <PersonsDialog />
     </Shell>
   )
 }

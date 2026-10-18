@@ -8,10 +8,11 @@ import { encodeFaceTrack, type FaceCrops } from './asdFrontend'
 import { FaceCropStore } from './faceCropStore'
 import { runFfmpeg, streamRawFrames, probeVideo } from './ffmpeg'
 import { computeMfcc, MFCC_COEFFS } from './mfcc'
+import { cropFaceForEmbed, embedAvailable, embedFace, normalize } from './faceEmbed'
 import { detectPose, mergeFacesAndHeads, poseAvailable } from './pose'
 import { buildFaceTracks, type FaceTrack } from './facetracks'
 import { detectFaces, frameDifference, modelsDir, MODEL_W, MODEL_H } from './detect'
-import type { FaceBox } from './speaker'
+import { iou, type FaceBox } from './speaker'
 import { detectFacesYuNet, faceDetectionSize, yunetAvailable } from './yunet'
 import { timed } from './timing'
 
@@ -107,6 +108,10 @@ export interface ScoredFaceTrack {
   scores: number[]
   /** Smoothed face box per frame from `start`, for layouts that need more than x. */
   boxes?: FaceBox[]
+  /** Gesichts-Embedding (normiert, Mittel über Stichproben) für die Wiedererkennung über Schnitte; fehlt bei Tracks ohne echtes Gesicht. */
+  emb?: Float32Array
+  /** Bestes Gesicht (112×112 RGB) als Vorschaubild der Person. */
+  crop?: Buffer
 }
 
 export interface AsdAnalysis {
@@ -122,7 +127,10 @@ export interface AsdAnalysis {
   detector?: 'yunet' | 'ultraface'
 }
 
+interface FaceSample { f: number; box: FaceBox; emb: Float32Array; crop: Buffer }
+
 interface DetectionPass {
+  embeds: FaceSample[]
   facesPerFrame: Array<FaceBox[] | null>
   sceneCuts: number[]
   sceneTransitions: Array<{ start: number; end: number }>
@@ -204,6 +212,8 @@ export async function runDetectionPass(
     return faces
   }
   const usePose = poseAvailable()
+  const useEmbed = embedAvailable() && !!highResolution
+  const embeds: FaceSample[] = []
   const rawCuts: number[] = []
   const differences: number[] = []
   let prev: Buffer | null = null
@@ -232,6 +242,14 @@ export async function runDetectionPass(
       if (cut) rawCuts.push(f)
       if (shouldDetectFaces(f, lastFaceFrame, cut, stride)) {
         let faces = highResolution ? await detectHigh(frame, f, cut) : await detectFaces(frame, undefined, signal)
+        // Wiedererkennung: ~1 Gesichts-Embedding je Sekunde (nur echte Gesichter, keine Pose-Köpfe)
+        if (useEmbed && f % ASD_FPS === 0) {
+          for (const box of faces.filter((b) => b.score >= 0.75 && b.x2 - b.x1 > 0.02)) {
+            const c = cropFaceForEmbed(frame, width, height, box)
+            const emb = await embedFace(c.tensor, signal).catch(() => null)
+            if (emb) embeds.push({ f, box, emb, crop: c.raw })
+          }
+        }
         // Pose-Köpfe ergänzen Personen ohne erkanntes Gesicht (Profil, abgewandt)
         if (usePose && highResolution) faces = mergeFacesAndHeads(faces, await detectPose(frame, width, height, signal).catch(() => []))
         facesPerFrame.push(faces)
@@ -255,7 +273,7 @@ export async function runDetectionPass(
   // of each cluster (when the new shot has settled).
   const mergeWindow = Math.max(1, Math.round(CUT_MERGE_SEC * ASD_FPS))
   const sceneCuts = rawCuts.filter((cut, i) => i === rawCuts.length - 1 || rawCuts[i + 1] - cut > mergeWindow)
-  return { facesPerFrame, sceneCuts, sceneTransitions: sceneTransitionRanges(differences), frameCount, faceFrameRatio }
+  return { embeds, facesPerFrame, sceneCuts, sceneTransitions: sceneTransitionRanges(differences), frameCount, faceFrameRatio }
 }
 
 /** 2x2 box downscale of packed RGB (odd trailing row/column dropped). */
@@ -533,7 +551,17 @@ export async function analyzeClipASD(
         const scores = await crops.read(t, frames => frames.length < 2 ? Promise.resolve([]) : scoreTrack(frames, mfcc, track.start, signal))
         const frames = scores.length
         if (frames < 2) continue
+        const mine = detection.embeds.filter((e) => { const k = e.f - track.start; return k >= 0 && k < frames && iou(track.boxes[k], e.box) > 0.4 })
+        let emb: Float32Array | undefined
+        let crop: Buffer | undefined
+        if (mine.length) {
+          const sum = new Float32Array(mine[0].emb.length)
+          for (const m of mine) for (let q = 0; q < sum.length; q++) sum[q] += m.emb[q]
+          emb = normalize(sum)
+          crop = mine.reduce((a, b) => ((b.box.x2 - b.box.x1) > (a.box.x2 - a.box.x1) ? b : a)).crop
+        }
         scored.push({
+          emb, crop,
           start: track.start,
           centres: track.boxes.slice(0, frames).map((b) => (b.x1 + b.x2) / 2),
           areas: track.boxes.slice(0, frames).map((b) => (b.x2 - b.x1) * (b.y2 - b.y1)),

@@ -82,6 +82,15 @@ export const CATALOG: AssetSpec[] = [
     recommendedFromVramMb: 0
   },
   {
+    id: 'face-embed',
+    name: 'Gesichts-Wiedererkennung (MobileFaceNet)',
+    kind: 'vision',
+    note: 'Erkennt dieselbe Person über Schnitte hinweg (14 MB)',
+    files: [{ url: `${HF}/immich-app/buffalo_s/resolve/main/recognition/model.onnx`, name: 'w600k_mbf.onnx', size: 13616099, sha256: '9cc6e4a75f0e2bf0b1aed94578f144d15175f357bdc05e815e5c4a02b319eb4f' }],
+    expect: ['w600k_mbf.onnx'],
+    recommendedFromVramMb: 0
+  },
+  {
     id: 'speaker-segmentation',
     name: 'pyannote Segmentierung 3.0',
     kind: 'vad',

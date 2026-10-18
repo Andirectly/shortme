@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ShortmeClips, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
+import type { PersonsPatch, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
 const api = (): Window['cutawan']['shortme'] | null => (typeof window !== 'undefined' && window.cutawan?.shortme ? window.cutawan.shortme : null)
 
@@ -26,6 +26,13 @@ interface ProjectState {
   startTranscribe: (diarize: boolean, query?: string, wanted?: number) => Promise<boolean>
   exportClips: (clipIds: string[], presetId: string, srt: boolean) => Promise<boolean>
   exportJob: ShortmeJob | null
+  /** „Wer ist wer?“ */
+  persons: ShortmePersons | null
+  personsOpen: boolean
+  pendingExport: { clipIds: string[]; presetId: string; srt: boolean } | null
+  openPersons: () => void
+  closePersons: () => void
+  savePersons: (patch: PersonsPatch) => Promise<void>
   pause: () => Promise<void>
   resume: () => Promise<void>
   stop: () => Promise<void>
@@ -45,6 +52,21 @@ export const useProject = create<ProjectState>((set, get) => ({
   clipsFile: null,
   transcript: null,
   exportJob: null,
+  persons: null,
+  personsOpen: false,
+  pendingExport: null,
+  openPersons: () => set({ personsOpen: true }),
+  closePersons: () => set({ personsOpen: false, pendingExport: null }),
+  savePersons: async (patch) => {
+    const a = api()
+    const hash = get().clipsFile?.hash
+    if (!a || !hash) return
+    const persons = await a.personsSave(hash, patch)
+    const pending = get().pendingExport
+    set({ persons, personsOpen: false, pendingExport: null })
+    await get().loadResults(hash)
+    if (pending) await get().exportClips(pending.clipIds, pending.presetId, pending.srt)
+  },
   hasApi: false,
   projects: [],
   currentTitle: null,
@@ -60,8 +82,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   loadResults: async (hash) => {
     const a = api()
     if (!a) return
-    const [clipsFile, transcript] = await Promise.all([a.clips(hash), a.transcript(hash)])
-    set({ clipsFile, transcript })
+    const [clipsFile, transcript, persons] = await Promise.all([a.clips(hash), a.transcript(hash), a.persons(hash)])
+    set({ clipsFile, transcript, persons })
   },
   init: () => {
     const a = api()
@@ -117,6 +139,8 @@ export const useProject = create<ProjectState>((set, get) => ({
     const a = api()
     const hash = get().clipsFile?.hash
     if (!a || !hash || clipIds.length === 0) return false
+    // Unsichere Personenerkennung: erst „Wer ist wer?“ klären, dann exportieren
+    if (get().persons?.needsReview) { set({ personsOpen: true, pendingExport: { clipIds, presetId, srt } }); return false }
     set({ exportJob: await a.exportClips(hash, clipIds, { presetId, srt }) })
     return true
   },

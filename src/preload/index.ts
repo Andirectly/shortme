@@ -22,7 +22,7 @@ import type {
 import type { OpenRouterCatalog } from '@shared/openrouter'
 import type { AssetSpec, AssetStatus, CheckItem, HardwareInfo } from '@shared/engines'
 import type { CaptionPatch, EditLog } from '@shared/edits'
-import type { PreviewPlan, ShortmeClips, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
+import type { PersonsPatch, PreviewPlan, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
 const api = {
   checkSubscriptionSetup: (): Promise<{ message: string; requestsToday: number }> => ipcRenderer.invoke('settings:checkSubscription'),
@@ -180,6 +180,8 @@ const api = {
     projects: (): Promise<Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null }>> => ipcRenderer.invoke('shortme:projects'),
     editorAssets: (hash: string, clipId: string): Promise<{ peaks: number[]; step: number; strip: string[] }> => ipcRenderer.invoke('shortme:editorAssets', hash, clipId),
     previewPlan: (hash: string, clipId: string, log: EditLog, presetId?: string): Promise<PreviewPlan> => ipcRenderer.invoke('shortme:previewPlan', hash, clipId, log, presetId),
+    persons: (hash: string): Promise<ShortmePersons | null> => ipcRenderer.invoke('shortme:persons', hash),
+    personsSave: (hash: string, patch: PersonsPatch): Promise<ShortmePersons | null> => ipcRenderer.invoke('shortme:personsSave', hash, patch),
     clips: (hash: string): Promise<ShortmeClips | null> => ipcRenderer.invoke('shortme:clips', hash),
     transcript: (hash: string): Promise<ShortmeTranscript | null> => ipcRenderer.invoke('shortme:transcript', hash),
     onJob: (cb: (j: ShortmeJob) => void): (() => void) => {

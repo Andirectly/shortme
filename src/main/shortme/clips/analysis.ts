@@ -11,6 +11,7 @@ import { detectShots } from './scenes'
 import { selectClips } from './select'
 import { makeThumbs } from './thumbs'
 import { layoutForClip } from '../layout/run'
+import { applyPersons, buildPersons } from './persons'
 import type { PlanInput } from '../../../shared/layoutPlan'
 
 export interface AnalysisOptions {
@@ -102,11 +103,18 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     }
   }
   // Tracking & Layouts (M5): Gesichtsquote fließt ins Ranking ein
+  const layouts: Awaited<ReturnType<typeof layoutForClip>>[] = []
   for (let i = 0; i < clips.length; i++) {
     report('layout', i / clips.length, `Bildausschnitt planen (${i + 1}/${clips.length}) …`)
     const l = await layoutForClip(meta, clips[i], cuts, opts.signal)
+    layouts.push(l)
     await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(l.input))
     clips[i] = { ...clips[i], shots: l.shots, faceRatio: l.faceRatio, score: Math.max(0, clips[i].score - l.penalty) }
+  }
+  // Personen über das ganze Video (Wiedererkennung) → persons.json; Plan-Eingaben tragen die Personen
+  if (layouts.some((l) => l.identities.length)) {
+    const pf = await buildPersons(meta, clips, layouts).catch((e) => { console.error('Personen-Zuordnung fehlgeschlagen:', e); return null })
+    if (pf) for (let i = 0; i < clips.length; i++) await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(applyPersons(layouts[i].input, clips[i].id, pf)))
   }
   clips.sort((x, y) => y.score - x.score)
   report('thumbs', 0, 'Vorschaubilder …')

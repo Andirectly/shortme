@@ -6,7 +6,9 @@ import { facePenalty, faceRatio, planShots, type PlanInput, type PlanTrack } fro
 
 const STRIDE = ASD_FPS / 5 // Planungsraster 5 Ticks/s
 
-export interface ClipLayout { shots: ShortmeShot[]; faceRatio: number; penalty: number; /** Tracks/Schnitte für manuelle Korrekturen im Editor (szenenweise konsistent). */ input: PlanInput }
+export interface ClipLayout { shots: ShortmeShot[]; faceRatio: number; penalty: number; /** Tracks/Schnitte für manuelle Korrekturen im Editor (szenenweise konsistent). */ input: PlanInput
+  /** Gesichts-Embeddings je Track (für die Personen-Zuordnung über das ganze Video). */
+  identities: Array<{ track: number; emb: Float32Array; crop?: Buffer; sec: number }> }
 
 /** LR-ASD-Analyse (Gesichter, Tracks, Sprecher-Werte) → Plan-Eingabe auf 5-Hz-Raster, relativ zum Clipbeginn. */
 export async function layoutForClip(meta: ProjectMeta, clip: Pick<ShortmeClip, 'start' | 'end'>, shotCuts: number[], signal?: AbortSignal, pre?: AsdAnalysis | null): Promise<ClipLayout> {
@@ -33,5 +35,6 @@ export async function layoutForClip(meta: ProjectMeta, clip: Pick<ShortmeClip, '
   const input: PlanInput = { tracks, ticks, dt, cuts: [...cuts].filter((c) => c > 0 && c < ticks).sort((a, b) => a - b), sourceAspect: meta.width / meta.height, speech }
   const shots = planShots(input)
   const ratio = faceRatio(shots, input)
-  return { shots, faceRatio: ratio, penalty: facePenalty(ratio), input }
+  const identities = (analysis?.tracks ?? []).flatMap((t, track) => (t.emb ? [{ track, emb: t.emb, crop: t.crop, sec: t.centres.length / ASD_FPS }] : []))
+  return { shots, faceRatio: ratio, penalty: facePenalty(ratio), input, identities }
 }

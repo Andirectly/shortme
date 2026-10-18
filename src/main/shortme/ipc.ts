@@ -9,7 +9,10 @@ import { editorAssets } from './editorAssets'
 import { planExport } from './render/exporter'
 import { sanitizeLog } from '../../shared/edits'
 import { loadTranscript, runTranscription } from './transcription'
-import { loadClips, runAnalysis } from './clips/analysis'
+import { loadClips, runAnalysis, layoutFile } from './clips/analysis'
+import { loadPersons, personsFile, replanWithPersons } from './clips/persons'
+import { writeFileAtomic } from './atomic'
+import type { PersonsPatch, ShortmePersons } from '@shared/shortme'
 import { makeThumbs, thumbPath } from './clips/thumbs'
 import { existsSync } from 'node:fs'
 import { ensureLayoutInput, ensureSignals, loadLayoutInput } from './clips/analysis'
@@ -45,6 +48,25 @@ export function registerShortmeIpc(): void {
       await runTranscription(meta, { diarize: !!opts?.diarize, signal, onProgress: (p) => report(p.stage, p.fraction, p.message) })
       await runAnalysis(meta, { query: opts?.query, wanted: opts?.wanted, signal, onProgress: report })
     }, () => discardProject(hash))
+  })
+  const personsView = async (hash: string): Promise<ShortmePersons | null> => {
+    const pf = await loadPersons(hash)
+    if (!pf) return null
+    const persons = await Promise.all(pf.persons.map(async (p) => ({ id: p.id, label: p.label, role: p.role, seconds: p.seconds, thumb: p.thumb ? await dataUrl(projectFile(hash, p.thumb)) : null })))
+    return { confirmed: pf.confirmed, confidence: pf.confidence, needsReview: pf.needsReview && !pf.confirmed, persons }
+  }
+  ipcMain.handle('shortme:persons', (_e, hash: string) => personsView(hash))
+  /** Zuordnung speichern (gilt für das ganze Video) und alle Clips neu planen – ohne neue Analyse. */
+  ipcMain.handle('shortme:personsSave', async (_e, hash: string, patch: PersonsPatch) => {
+    const pf = await loadPersons(hash)
+    const file = await loadClips(hash)
+    if (!pf || !file) return null
+    for (const p of pf.persons) { if (patch.labels?.[p.id]) p.label = String(patch.labels[p.id]).slice(0, 40); if (patch.roles?.[p.id]) p.role = patch.roles[p.id] }
+    pf.confirmed = true
+    await writeFileAtomic(personsFile(hash), JSON.stringify(pf, null, 1))
+    const clips = await replanWithPersons(hash, file.clips, (id) => loadLayoutInput(hash, id), (id, input) => writeFileAtomic(layoutFile(hash, id), JSON.stringify(input)))
+    await writeFileAtomic(projectFile(hash, 'clips.json'), JSON.stringify({ ...file, clips }, null, 1))
+    return personsView(hash)
   })
   ipcMain.handle('shortme:clips', async (_e, hash: string) => {
     const file = await loadClips(hash)
