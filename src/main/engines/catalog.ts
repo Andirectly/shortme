@@ -73,6 +73,15 @@ export const CATALOG: AssetSpec[] = [
     recommendedFromVramMb: 0
   },
   {
+    id: 'yolov8n-pose',
+    name: 'YOLOv8n-Pose',
+    kind: 'vision',
+    note: 'Personen- und Kopferkennung, auch im Profil (13 MB)',
+    files: [{ url: `${HF}/Xenova/yolov8n-pose/resolve/main/onnx/model.onnx`, name: 'yolov8n-pose.onnx', size: 13484153, sha256: '04f6d2416266f2aba6c5ba8b26de33ed9eba3279f972ac02e33f9f1366547586' }],
+    expect: ['yolov8n-pose.onnx'],
+    recommendedFromVramMb: 0
+  },
+  {
     id: 'speaker-segmentation',
     name: 'pyannote Segmentierung 3.0',
     kind: 'vad',

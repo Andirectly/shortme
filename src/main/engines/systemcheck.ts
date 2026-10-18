@@ -48,7 +48,7 @@ export async function runSystemCheck(mgr: AssetManager, hw: HardwareInfo): Promi
   const vision = ['lr-asd-frontend.onnx', 'lr-asd-backend.onnx', 'face-detection-yunet.onnx', 'ultraface-rfb-320.onnx', 'silero-vad.onnx'].filter((f) => !existsSync(join(modelsDir(), f)))
   items.push({ id: 'bundled-models', name: 'Mitgelieferte Modelle', ok: vision.length === 0, detail: vision.length ? `fehlen: ${vision.join(', ')}` : 'Gesichter, LR-ASD, VAD vorhanden' })
 
-  const required = ['parakeet-v3', 'silero-vad', 'transnetv2', 'node-runtime', 'speaker-segmentation', 'speaker-embedding', hw.recommendedLlm]
+  const required = ['parakeet-v3', 'silero-vad', 'transnetv2', 'yolov8n-pose', 'node-runtime', 'speaker-segmentation', 'speaker-embedding', hw.recommendedLlm]
   const missing: string[] = []
   for (const id of required) if (!(await mgr.isInstalled(id))) missing.push(id)
   items.push({ id: 'models', name: 'Modelle (Assistent)', ok: missing.length === 0, detail: missing.length ? `fehlen: ${missing.join(', ')}` : `Parakeet, ${hw.recommendedLlm}, TransNetV2` })

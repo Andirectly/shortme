@@ -8,6 +8,7 @@ import { encodeFaceTrack, type FaceCrops } from './asdFrontend'
 import { FaceCropStore } from './faceCropStore'
 import { runFfmpeg, streamRawFrames, probeVideo } from './ffmpeg'
 import { computeMfcc, MFCC_COEFFS } from './mfcc'
+import { detectPose, mergeFacesAndHeads, poseAvailable } from './pose'
 import { buildFaceTracks, type FaceTrack } from './facetracks'
 import { detectFaces, frameDifference, modelsDir, MODEL_W, MODEL_H } from './detect'
 import type { FaceBox } from './speaker'
@@ -202,6 +203,7 @@ export async function runDetectionPass(
     allLarge = faces.length > 0 && faces.every(face => face.y2 - face.y1 >= LARGE_FACE_HEIGHT)
     return faces
   }
+  const usePose = poseAvailable()
   const rawCuts: number[] = []
   const differences: number[] = []
   let prev: Buffer | null = null
@@ -229,7 +231,9 @@ export async function runDetectionPass(
       const cut = difference > ASD_SCENE_CUT_THRESHOLD
       if (cut) rawCuts.push(f)
       if (shouldDetectFaces(f, lastFaceFrame, cut, stride)) {
-        const faces = highResolution ? await detectHigh(frame, f, cut) : await detectFaces(frame, undefined, signal)
+        let faces = highResolution ? await detectHigh(frame, f, cut) : await detectFaces(frame, undefined, signal)
+        // Pose-Köpfe ergänzen Personen ohne erkanntes Gesicht (Profil, abgewandt)
+        if (usePose && highResolution) faces = mergeFacesAndHeads(faces, await detectPose(frame, width, height, signal).catch(() => []))
         facesPerFrame.push(faces)
         facePresent = faces.length > 0
         if (facePresent) {
