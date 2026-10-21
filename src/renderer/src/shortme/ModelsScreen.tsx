@@ -52,8 +52,10 @@ export function ModelsScreen(): React.JSX.Element {
   const [more, setMore] = useState(false)
   const ids = requiredIds(hw)
   const rec = new Set(ids)
-  const main = catalog.filter((c) => rec.has(c.id))
-  const other = catalog.filter((c) => !rec.has(c.id))
+  // Modelle mit Mindest-VRAM (großes LLM) erscheinen nur auf Rechnern, deren Grafikkarte genug hat
+  const fits = (c: { minVramMb?: number }): boolean => !c.minVramMb || (hw?.vramTotalMb ?? 0) >= c.minVramMb
+  const main = catalog.filter((c) => rec.has(c.id) && fits(c))
+  const other = catalog.filter((c) => !rec.has(c.id) && fits(c))
   const missing = main.filter((c) => status[c.id]?.state !== 'installed')
   const doImport = async (): Promise<void> => {
     const r = await importFolder()

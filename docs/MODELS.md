@@ -53,6 +53,7 @@ Wird vom Testlab bzw. `scripts/sync-models-docs.ts` erzeugt – nicht von Hand �
 | Qwen3-14B Q4_K_M | Aktuelles Modell für die Clip-Auswahl. | aktiv |
 | Gemma 4 12B QAT Q4_0 | Neueres Modell, versteht Text, Bild und Audio. | Kandidat (nicht integriert) |
 | Qwen3.8 27B (3-Bit) | Größeres Modell, stark komprimiert. | Kandidat (nicht integriert) |
+| Qwen3.8 27B (Q4_K_M) – Großes Modell | Dichtes 27B-Modell für den Hauptrechner (ab ca. 22 GB VRAM), 16k Kontext mit KV-Cache q8. | Kandidat (nicht integriert) |
 
 ## Untertitel-Renderer (`renderer`)
 
@@ -60,6 +61,14 @@ Wird vom Testlab bzw. `scripts/sync-models-docs.ts` erzeugt – nicht von Hand �
 |---|---|---|
 | tscaps (@tscaps/engine) | Aktueller Renderer: CSS-Vorlagen, Bilder per SVG im versteckten Fenster, Export direkt als Video. | aktiv |
 | Remotion | React-Komposition, Bilder per Headless-Chrome, Overlay wird mit FFmpeg über das Video gelegt. | Test |
+
+## Clip-Transkription (zweiter Durchgang) (`clip_asr`)
+
+| Modell | Zweck | Status |
+|---|---|---|
+| Parakeet v3 (Standard) | Das Transkript der ganzen Folge bleibt für die Untertitel; kein zweiter Durchgang. | aktiv |
+| Parakeet, zweiter Durchgang | Nur die ausgewählten Clips noch einmal, zusammenhängend und ohne VAD-Vorfilter; übernimmt nur andere Schreibweisen. | Test |
+| Qwen3-ASR 1.7B (+ ForcedAligner 0.6B) | Genauere Texterkennung (30 Sprachen, Deutsch dabei); Wortzeiten über einen getrennten Aligner. | Kandidat (nicht integriert) |
 
 ## Werkzeuge (Twitch)
 

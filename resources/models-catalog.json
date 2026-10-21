@@ -32,6 +32,10 @@
     {
       "id": "renderer",
       "name": "Untertitel-Renderer"
+    },
+    {
+      "id": "clip_asr",
+      "name": "Clip-Transkription (zweiter Durchgang)"
     }
   ],
   "models": [
@@ -417,6 +421,97 @@
       "size": "ca. 370 MB zusätzlich",
       "license": "Remotion License (privat frei)",
       "bestFor": "Wenn komplexere Animationen/Vorlagen gewünscht sind"
+    },
+    {
+      "id": "parakeet_v3_clip",
+      "slot": "clip_asr",
+      "status": "aktiv",
+      "integrated": true,
+      "assets": [
+        "parakeet-v3"
+      ],
+      "name": "Parakeet v3 (Standard)",
+      "short": "Das Transkript der ganzen Folge bleibt für die Untertitel; kein zweiter Durchgang.",
+      "pros": [
+        "Schnell (ca. 0,04× Echtzeit)",
+        "Wortzeiten kommen direkt aus dem Modell",
+        "Schon im Einsatz"
+      ],
+      "cons": [
+        "Verliert gelegentlich Wortanfänge an Segmentgrenzen",
+        "Schreibweise bei Namen und Fachwörtern nur mittel"
+      ],
+      "size": "ca. 0,7 GB",
+      "license": "CC-BY-4.0",
+      "bestFor": "Standard"
+    },
+    {
+      "id": "parakeet_pass2",
+      "slot": "clip_asr",
+      "status": "test",
+      "integrated": true,
+      "assets": [
+        "parakeet-v3"
+      ],
+      "name": "Parakeet, zweiter Durchgang",
+      "short": "Nur die ausgewählten Clips noch einmal, zusammenhängend und ohne VAD-Vorfilter; übernimmt nur andere Schreibweisen.",
+      "pros": [
+        "Gleiches Modell, kein Zusatz-Download",
+        "Keine Segmentgrenzen mitten im Satz",
+        "Wortzahl und Zeiten bleiben unverändert (nur Schreibweisen werden übernommen)"
+      ],
+      "cons": [
+        "Gleiche Schwächen des Modells wie der Standard",
+        "Zusätzliche Rechenzeit je Clip (wenige Sekunden)"
+      ],
+      "size": "kein Zusatz",
+      "license": "CC-BY-4.0",
+      "bestFor": "Test, ob zusammenhängende Dekodierung weniger Fehler macht"
+    },
+    {
+      "id": "qwen3_asr_17b",
+      "slot": "clip_asr",
+      "status": "kandidat",
+      "integrated": false,
+      "name": "Qwen3-ASR 1.7B (+ ForcedAligner 0.6B)",
+      "short": "Genauere Texterkennung (30 Sprachen, Deutsch dabei); Wortzeiten über einen getrennten Aligner.",
+      "pros": [
+        "Apache-2.0",
+        "Laut Hersteller sehr gute Erkennung auch bei Musik/Gesang",
+        "Text läuft über llama.cpp (llama-server mit mmproj) – ohne Python möglich"
+      ],
+      "cons": [
+        "Der ForcedAligner (Wortzeiten) hat keinen Weg ohne Python (nur transformers/vLLM); es gibt keinen ONNX-/llama.cpp-Port",
+        "Ohne Aligner nur Text: Wortzeiten müssten aus dem Parakeet-Transkript abgeleitet werden",
+        "Langes Audio macht in llama.cpp noch Probleme (Fehlerberichte)"
+      ],
+      "size": "ca. 2,5 GB (Q8_0) + mmproj",
+      "license": "Apache-2.0",
+      "bestFor": "Bessere Schreibweise ausgewählter Clips (Text), Zeiten aus Parakeet"
+    },
+    {
+      "id": "qwen3_8_27b_q4",
+      "slot": "llm",
+      "status": "kandidat",
+      "integrated": false,
+      "assets": [
+        "qwen3-8-27b"
+      ],
+      "name": "Qwen3.8 27B (Q4_K_M) – Großes Modell",
+      "short": "Dichtes 27B-Modell für den Hauptrechner (ab ca. 22 GB VRAM), 16k Kontext mit KV-Cache q8.",
+      "pros": [
+        "Deutlich größer als Qwen3-14B (mehr Verständnis für Pointen und Kontext)",
+        "Q4_K_M ist deutlich besser als die 3-Bit-Variante aus dem Spike",
+        "Apache-2.0, läuft mit der mitgelieferten llama.cpp-Version"
+      ],
+      "cons": [
+        "17,4 GB Datei, ca. 21 GB VRAM bei 16k Kontext – nur auf der großen Grafikkarte",
+        "Langsamer (im Spike +50 % schon bei 3-Bit)",
+        "Im Spike (3-Bit) kein klarer Qualitätsvorteil – Q4_K_M ist noch ungemessen"
+      ],
+      "size": "ca. 17,4 GB Datei",
+      "license": "Apache-2.0",
+      "bestFor": "Hauptrechner: prüfen, ob mehr Modellgröße die Auswahl verbessert"
     }
   ]
 }

@@ -85,6 +85,10 @@ export interface LabResult {
   video?: string
   per60Sec?: number
   extraMb?: number
+  /** Platz „Clip-Transkription“: Wörter (Zeiten relativ zum Abschnitt). */
+  text?: { words: Array<{ w: string; start: number; end: number }> }
+  /** Platz „Clip-Auswahl (LLM)“: gewählte Clips mit Score und Begründung. */
+  clips?: Array<{ title: string; score: number; reason: string; start: number; end: number }>
 }
 
 export interface LabRunRequest { slot: string; modelA: string; modelB: string; source: string; start: number; dur: number; /** nur Platz „Untertitel-Renderer“: gemeinsames Preset */ presetId?: string }

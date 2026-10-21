@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePresets } from './presets'
+import { ClipsCompare, TextCompare } from './LabCompare'
 import { ChevronDown, ChevronRight, FlaskConical, Pause, Play } from 'lucide-react'
 import type { LabResult, LabSource, ModelView, ModelsView } from '@shared/models'
 import { sourceRects } from '@shared/previewDraw'
@@ -153,7 +154,9 @@ export function TestlabScreen(): React.JSX.Element {
   }, [view, slot, models])
   const mA = models.find((m) => m.id === aId), mB = models.find((m) => m.id === bId)
   const src = sources.find((s) => s.id === srcId)
-  const comparable = slot === 'face' || slot === 'tracking' || slot === 'renderer'
+  const comparable = slot === 'face' || slot === 'tracking' || slot === 'renderer' || slot === 'clip_asr' || slot === 'llm'
+  const shownSources = slot === 'llm' ? sources.filter((x) => x.kind === 'project') : sources
+  useEffect(() => { if (slot === 'llm') { setDur((d) => (d < 300 ? 600 : d)); setSrc((cur) => (shownSources.some((x) => x.id === cur) ? cur : shownSources[0]?.id ?? cur)) } }, [slot, shownSources])
   const allPresets = usePresets((p) => p.all)
   const loadPresets = usePresets((p) => p.load)
   const [presetId, setPresetId] = useState('glow-karaoke')
@@ -201,17 +204,27 @@ export function TestlabScreen(): React.JSX.Element {
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) 120px 120px auto', gap: 12, alignItems: 'end' }}>
           <label style={{ display: 'grid', gap: 6 }}><small>Testclip</small>
-            <select aria-label="Testclip" value={srcId} onChange={(e) => setSrc(e.target.value)} style={sel}>{sources.map((s) => <option key={s.id} value={s.id}>{s.label}{s.durationSec ? ` (${fmt(s.durationSec)})` : ''}</option>)}</select>
+            <select aria-label="Testclip" value={srcId} onChange={(e) => setSrc(e.target.value)} style={sel}>{shownSources.map((s) => <option key={s.id} value={s.id}>{s.label}{s.durationSec ? ` (${fmt(s.durationSec)})` : ''}</option>)}</select>
           </label>
           <label style={{ display: 'grid', gap: 6 }}><small>Start (s)</small><input className="sm-input" type="number" min={0} value={start} onChange={(e) => setStart(Math.max(0, +e.target.value))} aria-label="Start in Sekunden" /></label>
-          <label style={{ display: 'grid', gap: 6 }}><small>Dauer (s)</small><input className="sm-input" type="number" min={5} max={120} value={dur} onChange={(e) => setDur(Math.min(120, Math.max(5, +e.target.value)))} aria-label="Dauer in Sekunden" /></label>
+          <label style={{ display: 'grid', gap: 6 }}><small>Dauer (s)</small><input className="sm-input" type="number" min={5} max={slot === 'llm' ? 1800 : 120} value={dur} onChange={(e) => setDur(Math.min(slot === 'llm' ? 1800 : 120, Math.max(5, +e.target.value)))} aria-label="Dauer in Sekunden" /></label>
           <Button variant="primary" disabled={running || !src || !aId || !bId || !comparable} onClick={() => void run()}>{running ? 'Läuft …' : 'Vergleich starten'}</Button>
         </div>
         {!comparable && <small>Für diesen Platz gibt es noch keinen Vergleich.</small>}
         {running && <small>A: {msgs.A} · B: {msgs.B}</small>}
         {err && <small style={{ color: 'var(--warn)' }}>{err}</small>}
       </div>
-      {results && (
+      {results && (results.a.text || results.a.clips) && (
+        <div className="sm-glass" style={{ padding: 16, display: 'grid', gap: 14 }}>
+          {results.a.text ? <TextCompare a={results.a} b={results.b} nameA={mA?.name ?? results.a.model} nameB={mB?.name ?? results.b.model} /> : <ClipsCompare a={results.a} b={results.b} nameA={mA?.name ?? results.a.model} nameB={mB?.name ?? results.b.model} />}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Button variant="secondary" onClick={() => void decide('A')}>Links behalten</Button>
+            <Button variant="secondary" onClick={() => void decide('B')}>Rechts behalten</Button>
+          </div>
+          {decided && <small role="status" style={{ textAlign: 'center' }}>{decided}</small>}
+        </div>
+      )}
+      {results && !results.a.text && !results.a.clips && (
         <div className="sm-glass" style={{ padding: 16, display: 'grid', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 16 }}>
             <Pane res={results.a} label={`A · ${mA?.name ?? results.a.model}`} path={results.a.video ?? results.path} t={t} playing={playing} master onTime={onTime} overlays={ov} />

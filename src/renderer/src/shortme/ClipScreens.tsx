@@ -188,7 +188,7 @@ export function ProjectsScreen(): React.JSX.Element {
 
 const STAGE_RANGE: Record<string, [number, number, number]> = {
   // [Zeile, von, bis] – Anteil an der Gesamtanzeige
-  audio: [0, 0, 0.03], asr: [0, 0.03, 0.45], speakers: [0, 0.45, 0.52], finalize: [0, 0.52, 0.55],
+  audio: [0, 0, 0.03], asr: [0, 0.03, 0.45], gaps: [0, 0.45, 0.49], speakers: [0, 0.49, 0.52], finalize: [0, 0.52, 0.55],
   signals: [1, 0.55, 0.6], shots: [1, 0.6, 0.8], layout: [2, 0.95, 0.97], llm: [2, 0.8, 0.8], texttiling: [2, 0.8, 0.95], candidates: [2, 0.8, 0.85], rate: [2, 0.85, 0.93], compare: [2, 0.93, 0.95], snap: [2, 0.95, 0.97], thumbs: [2, 0.97, 1], done: [2, 1, 1]
 }
 const ROWS = ['Transkribieren', 'Analysieren', 'Clips finden']

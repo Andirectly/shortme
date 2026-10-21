@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { assetDir } from '../paths'
 import { track, killTree } from '../sidecars'
-import type { AsrMessage, AsrRequest, AsrSegment, SpeakerTurn } from './protocol'
+import type { AsrMessage, AsrRequest, AsrSegment, Range, SpeakerTurn, VadParams } from './protocol'
 
 export interface AsrResult { segments: AsrSegment[]; loadMs: number; decodeMs: number; audioSec: number }
 
@@ -50,7 +50,7 @@ function runWorker(req: AsrRequest, onMessage: (m: AsrMessage) => void, signal?:
     signal?.addEventListener('abort', abort, { once: true })
     child.on('message', (m: AsrMessage) => {
       onMessage(m)
-      if (m.type === 'result' || m.type === 'turns') finish(() => resolve(m))
+      if (m.type === 'result' || m.type === 'turns' || m.type === 'gaps') finish(() => resolve(m))
       else if (m.type === 'error') finish(() => reject(new Error(m.message)))
     })
     child.once('exit', (code) => finish(() => reject(new Error(`ASR-Prozess beendet (Code ${code}) ${err}`))))
@@ -60,6 +60,8 @@ function runWorker(req: AsrRequest, onMessage: (m: AsrMessage) => void, signal?:
 
 export interface TranscribeOpts {
   maxSeconds?: number
+  /** VAD-Parameter (Standard: VAD_DEFAULTS). */
+  vad?: VadParams
   /** Ab dieser Sekunde fortsetzen (Checkpoint). */
   resumeFrom?: number
   signal?: AbortSignal
@@ -72,7 +74,7 @@ export interface TranscribeOpts {
 export async function transcribeWav(wav: string, opts: TranscribeOpts = {}): Promise<AsrResult> {
   const segments: AsrSegment[] = []
   const end = await runWorker(
-    { mode: 'asr', modelDir: join(assetDir('parakeet-v3'), 'sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8'), vadModel: join(assetDir('silero-vad'), 'silero_vad.onnx'), wav, maxSeconds: opts.maxSeconds, resumeFrom: opts.resumeFrom },
+    { mode: 'asr', modelDir: join(assetDir('parakeet-v3'), 'sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8'), vadModel: join(assetDir('silero-vad'), 'silero_vad.onnx'), wav, maxSeconds: opts.maxSeconds, vad: opts.vad, resumeFrom: opts.resumeFrom },
     (m) => {
       if (m.type === 'progress') opts.onProgress?.(m.done, m.total)
       else if (m.type === 'segment') { segments.push(m.segment); opts.onSegment?.(m.segment) }
@@ -81,6 +83,26 @@ export async function transcribeWav(wav: string, opts: TranscribeOpts = {}): Pro
   )
   if (end.type !== 'result') throw new Error('Unerwartete Antwort des ASR-Prozesses')
   return { segments, loadMs: end.loadMs, decodeMs: end.decodeMs, audioSec: end.audioSec }
+}
+
+export interface GapResult { found: Range[]; segments: AsrSegment[]; scanMs: number; decodeMs: number }
+
+/** Lückensuche + Nachtranskription (siehe protocol.ts, mode 'gaps'); `wordSpans` = [Start, Ende] der vorhandenen Wörter. */
+export async function fillGaps(wav: string, wordSpans: Range[], opts: { signal?: AbortSignal; minGap?: number; margin?: number; ranges?: Range[] } = {}): Promise<GapResult> {
+  const segments: AsrSegment[] = []
+  const end = await runWorker(
+    { mode: 'gaps', modelDir: join(assetDir('parakeet-v3'), 'sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8'), vadModel: join(assetDir('silero-vad'), 'silero_vad.onnx'), wav, words: wordSpans, minGap: opts.minGap, margin: opts.margin, ranges: opts.ranges },
+    (m) => { if (m.type === 'segment') segments.push(m.segment) },
+    opts.signal
+  )
+  if (end.type !== 'gaps') throw new Error('Unerwartete Antwort des ASR-Prozesses')
+  return { found: end.found, segments, scanMs: end.scanMs, decodeMs: end.decodeMs }
+}
+
+/** Feste Bereiche ohne VAD-Vorfilter dekodieren (Testlab „zweiter Durchgang“). */
+export async function transcribeRanges(wav: string, ranges: Range[], opts: { signal?: AbortSignal } = {}): Promise<AsrSegment[]> {
+  const r = await fillGaps(wav, [], { signal: opts.signal, ranges })
+  return r.segments
 }
 
 /** Sprecher-Segmentierung (pyannote 3.0 + wespeaker); Ergebnis: Sprecher-Abschnitte. */

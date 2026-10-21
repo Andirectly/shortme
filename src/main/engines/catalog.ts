@@ -45,6 +45,16 @@ export const CATALOG: AssetSpec[] = [
     recommendedFromVramMb: 14000
   },
   {
+    id: 'qwen3-8-27b',
+    name: 'Qwen3.8 27B (Q4_K_M)',
+    kind: 'llm',
+    note: 'Großes Modell für den Hauptrechner · ca. 21 GB VRAM bei 16k Kontext (KV-Cache q8) · Testlab-Kandidat',
+    files: [{ url: `${HF}/bartowski/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-Q4_K_M.gguf`, name: 'Qwen3.8-27B-Q4_K_M.gguf', size: 17442399968, sha256: '880a52af8317974f7b4b064a6bc29ff49e188b91aa218e08eea3078b6b1cc673' }],
+    expect: ['Qwen3.8-27B-Q4_K_M.gguf'],
+    vramMb: 21000,
+    minVramMb: 22000
+  },
+  {
     id: 'qwen3-8b',
     name: 'Qwen3-8B (Q4_K_M)',
     kind: 'llm',

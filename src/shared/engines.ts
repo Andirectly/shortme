@@ -26,6 +26,8 @@ export interface AssetSpec {
   vramMb?: number
   /** Teil der Basis-Empfehlung? Mindest-VRAM in MB, ab dem das Profil empfohlen wird. */
   recommendedFromVramMb?: number
+  /** Nur anbieten, wenn die Grafikkarte mindestens so viel VRAM hat (MB); sonst im Modell-Manager unsichtbar. */
+  minVramMb?: number
   /** Windows-only (Engine-Binärdateien). */
   platform?: 'win32'
 }
