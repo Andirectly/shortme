@@ -471,23 +471,26 @@
     {
       "id": "qwen3_asr_17b",
       "slot": "clip_asr",
-      "status": "kandidat",
-      "integrated": false,
-      "name": "Qwen3-ASR 1.7B (+ ForcedAligner 0.6B)",
-      "short": "Genauere Texterkennung (30 Sprachen, Deutsch dabei); Wortzeiten über einen getrennten Aligner.",
+      "status": "test",
+      "integrated": true,
+      "name": "Qwen3-ASR 1.7B (nur Text, über llama.cpp)",
+      "short": "Genauere Texterkennung; läuft ohne Python über llama-server. Wortzeiten bleiben von Parakeet (der Aligner ist nur in Python verfügbar).",
       "pros": [
         "Apache-2.0",
         "Laut Hersteller sehr gute Erkennung auch bei Musik/Gesang",
         "Text läuft über llama.cpp (llama-server mit mmproj) – ohne Python möglich"
       ],
       "cons": [
-        "Der ForcedAligner (Wortzeiten) hat keinen Weg ohne Python (nur transformers/vLLM); es gibt keinen ONNX-/llama.cpp-Port",
-        "Ohne Aligner nur Text: Wortzeiten müssten aus dem Parakeet-Transkript abgeleitet werden",
-        "Langes Audio macht in llama.cpp noch Probleme (Fehlerberichte)"
+        "Der ForcedAligner (Wortzeiten) hat keinen Weg ohne Python: kein ONNX-/llama.cpp-Port",
+        "Nur Text: Wortzeiten und Wortindizes bleiben von Parakeet, Schreibweisen werden per Wortausrichtung übernommen",
+        "Lange Audios machen in llama.cpp noch Probleme – deshalb 25-Sekunden-Stücke"
       ],
-      "size": "ca. 2,5 GB (Q8_0) + mmproj",
+      "size": "ca. 2,5 GB (Q8_0 + Projektor)",
       "license": "Apache-2.0",
-      "bestFor": "Bessere Schreibweise ausgewählter Clips (Text), Zeiten aus Parakeet"
+      "bestFor": "Bessere Schreibweise ausgewählter Clips (Text), Zeiten aus Parakeet",
+      "assets": [
+        "qwen3-asr"
+      ]
     },
     {
       "id": "qwen3_8_27b_q4",

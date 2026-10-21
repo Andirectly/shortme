@@ -55,6 +55,18 @@ export const CATALOG: AssetSpec[] = [
     minVramMb: 22000
   },
   {
+    id: 'qwen3-asr',
+    name: 'Qwen3-ASR 1.7B (Q8_0, nur Text)',
+    kind: 'llm',
+    note: 'Testlab: zweiter Durchgang (Text) über llama-server mit Audio-Projektor · Wortzeiten kommen weiter aus Parakeet',
+    files: [
+      { url: `${HF}/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/Qwen3-ASR-1.7B-Q8_0.gguf`, name: 'Qwen3-ASR-1.7B-Q8_0.gguf', size: 2165034944, sha256: '58e22d0532d4eacaf034cfac17a6fed159f37c41390c710186783be439d1fc57' },
+      { url: `${HF}/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf`, name: 'mmproj-Qwen3-ASR-1.7B-Q8_0.gguf', size: 355709344, sha256: '46c1d533af3f354ceb37ce855dbceff7da7fa7cf1e6a523df3b13440bd164c0d' }
+    ],
+    expect: ['Qwen3-ASR-1.7B-Q8_0.gguf', 'mmproj-Qwen3-ASR-1.7B-Q8_0.gguf'],
+    vramMb: 3500
+  },
+  {
     id: 'qwen3-8b',
     name: 'Qwen3-8B (Q4_K_M)',
     kind: 'llm',

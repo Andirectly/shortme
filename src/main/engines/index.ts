@@ -30,7 +30,8 @@ vram.register({
     const id = llmOverride ?? hw.recommendedLlm
     const spec = CATALOG.find((c) => c.id === id)!
     // Das große Modell braucht den KV-Cache in q8 (16k Kontext in ca. 21 GB), kleine Karten sowieso
-    await llama.start({ model: join(assetDir(id), spec.expect[0]), kvQuant: hw.kvQuant || id === 'qwen3-8-27b' })
+    const mm = spec.expect.find((e) => e.startsWith('mmproj'))
+    await llama.start({ model: join(assetDir(id), spec.expect[0]), kvQuant: hw.kvQuant || id === 'qwen3-8-27b', ...(mm ? { mmproj: join(assetDir(id), mm), ctx: 8192 } : {}) })
   },
   unload: () => llama.stop()
 })

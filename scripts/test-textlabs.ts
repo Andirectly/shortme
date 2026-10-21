@@ -10,7 +10,7 @@ async function main(): Promise<void> {
   if (what === 'asr') {
     const path = join(process.cwd(), 'test-' + 'videos', 'podcast-2p.mp4')
     const a = await runClipAsrSide('parakeet_v3_clip', path, 120, 90, console.log)
-    const b = await runClipAsrSide('parakeet_pass2', path, 120, 90, console.log)
+    const b = await runClipAsrSide(hash || 'parakeet_pass2', path, 120, 90, console.log)
     const wa = a.text!.words.map((w) => w.w), wb = b.text!.words.map((w) => w.w)
     const ops = alignWords(wa, wb)
     const subs = substitutions(wa, wb)

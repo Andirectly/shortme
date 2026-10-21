@@ -7,6 +7,7 @@ import { basename, join } from 'node:path'
 import { dataRoot } from '../engines/paths'
 import { withAsr, withLlmModel } from '../engines'
 import { transcribeRanges, transcribeWav } from '../engines/asr/client'
+import { qwenMerged } from './qwenAsr'
 import { runFfmpeg } from '../pipeline/ffmpeg'
 import { writeFileAtomic } from '../shortme/atomic'
 import { loadMeta } from '../shortme/project'
@@ -26,7 +27,7 @@ const empty = (model: string, slot: string, source: string, start: number, dur: 
 })
 
 /** Modell-ID (Testlab) → Verfahren. */
-export const CLIP_ASR_MODELS: Record<string, 'standard' | 'pass2'> = { parakeet_v3_clip: 'standard', parakeet_pass2: 'pass2' }
+export const CLIP_ASR_MODELS: Record<string, 'standard' | 'pass2' | 'qwen'> = { parakeet_v3_clip: 'standard', parakeet_pass2: 'pass2', qwen3_asr_17b: 'qwen' }
 /** Modell-ID (Testlab) → Asset des Modell-Managers. */
 export const LLM_ASSETS: Record<string, string> = { qwen3_14b: 'qwen3-14b', qwen3_8_27b_q4: 'qwen3-8-27b' }
 
@@ -46,10 +47,11 @@ export async function runClipAsrSide(model: string, path: string, start: number,
   onProgress('Ton ausschneiden …')
   const wav = join(dataRoot(), 'testlab', `clipasr-${key(path, start, dur)}.wav`)
   if (!existsSync(wav)) await runFfmpeg(['-y', '-ss', String(start), '-t', String(dur), '-i', path, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', wav])
-  onProgress(mode === 'standard' ? 'Parakeet (VAD-Segmente) …' : 'Parakeet, zweiter Durchgang (zusammenhängend) …')
+  onProgress(mode === 'standard' ? 'Parakeet (VAD-Segmente) …' : mode === 'pass2' ? 'Parakeet, zweiter Durchgang (zusammenhängend) …' : 'Qwen3-ASR wird geladen und hört zu …')
   const base = vramMb()
   const t0 = Date.now()
-  const segments = await withAsr(() => (mode === 'standard' ? transcribeWav(wav).then((r) => r.segments) : transcribeRanges(wav, [[0, dur]])))
+  // Qwen3-ASR liefert nur Text (kein Python-Aligner): Wortzeiten kommen von Parakeet, Einfügungen bekommen geschätzte Zeiten
+  const segments = mode === 'qwen' ? await qwenMerged(wav, dur) : await withAsr(() => (mode === 'standard' ? transcribeWav(wav).then((r) => r.segments) : transcribeRanges(wav, [[0, dur]])))
   const runtimeSec = (Date.now() - t0) / 1000
   const words = segments.flatMap((s) => s.words).sort((a, b) => a.start - b.start).map((w) => ({ w: w.w, start: +w.start.toFixed(2), end: +w.end.toFixed(2) }))
   const res: LabResult = { ...empty(model, 'clip_asr', basename(path), start, dur), runtimeSec: +runtimeSec.toFixed(1), vramPeakMb: base >= 0 ? Math.max(0, vramMb() - base) : -1, text: { words }, context: `${words.length} Wörter` }

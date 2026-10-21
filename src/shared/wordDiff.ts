@@ -63,3 +63,62 @@ export function substitutions(standard: string[], second: string[]): Record<numb
   }
   return out
 }
+
+// ── Text-Quelle (Qwen3-ASR) + Wortzeiten von Parakeet ───────────────────────────────────────────────
+export interface TWord { w: string; start: number; end: number }
+export interface Insert { /** alter Index, VOR dem eingefügt wird (orig.length = ans Ende) */ before: number; words: TWord[] }
+
+/**
+ * Qwen3-ASR liefert nur Text. Abgleich mit den Parakeet-Wörtern (Zeiten bleiben von Parakeet):
+ * – gleiche Wörter: Parakeet bleibt, – ersetzte Wörter (andere Schreibweise): Text von Qwen, Zeit von Parakeet,
+ * – nur Parakeet hat das Wort: bleibt (Qwen hat dort nichts erkannt), – nur Qwen: Einfügung mit geschätzten Zeiten, gleichmäßig verteilt
+ *   zwischen den Nachbarwörtern (am Rand: bis zum Rand des Sprachbereichs laut VAD, sonst 0,3 s je Wort).
+ */
+export function mergeQwenText(orig: TWord[], second: string[], speech: Array<[number, number]> = []): { subs: Record<number, string>; inserts: Insert[] } {
+  const ops = alignWords(orig.map((w) => w.w), second)
+  const subs: Record<number, string> = {}
+  const inserts: Insert[] = []
+  let run: { before: number; toks: string[] } | null = null
+  const flush = (): void => {
+    if (!run) return
+    const prev = orig[run.before - 1], next = orig[run.before]
+    const speechAt = (t: number): [number, number] | undefined => speech.find(([a, b]) => t >= a - 0.05 && t <= b + 0.05)
+    const n = run.toks.length
+    let a = prev ? prev.end : next ? (speechAt(next.start)?.[0] ?? next.start - 0.3 * n) : 0
+    let b = next ? next.start : prev ? (speechAt(prev.end)?.[1] ?? prev.end + 0.3 * n) : a + 0.3 * n
+    if (b < a) b = a
+    // zu enges Fenster: jedes Wort bekommt mindestens 60 ms (leichte Überlappung mit dem Nachbarn ist hier besser als Null-Länge)
+    const slice = Math.max((b - a) / n, 0.06)
+    const words = run.toks.map((w, i) => ({ w, start: +(a + i * slice).toFixed(3), end: +(a + (i + 1) * slice).toFixed(3) }))
+    inserts.push({ before: run.before, words })
+    run = null
+    void a; void b
+  }
+  let lastA = -1 // zuletzt verarbeiteter Index in orig
+  for (const op of ops) {
+    if (op.kind === 'ins') {
+      if (!run) run = { before: lastA + 1, toks: [] }
+      run.toks.push(second[op.b!])
+      continue
+    }
+    flush()
+    if (op.a !== undefined) lastA = op.a
+    if (op.kind === 'sub' && op.a !== undefined && op.b !== undefined && norm(orig[op.a].w) !== norm(second[op.b])) subs[op.a] = second[op.b]
+  }
+  flush()
+  return { subs, inserts }
+}
+
+/** Einfügungen in eine Wortliste einsetzen. map[alt] = neuer Index; starts[i] = neuer Startindex der Einfügung i. */
+export function applyInserts<T extends TWord>(words: T[], inserts: Array<{ before: number; words: T[] }>): { words: T[]; map: number[]; starts: number[] } {
+  const sorted = [...inserts].sort((a, b) => a.before - b.before)
+  const out: T[] = []
+  const map: number[] = []
+  const starts: number[] = []
+  let k = 0
+  for (let i = 0; i <= words.length; i++) {
+    while (k < sorted.length && sorted[k].before === i) { starts.push(out.length); out.push(...sorted[k].words); k++ }
+    if (i < words.length) { map.push(out.length); out.push(words[i]) }
+  }
+  return { words: out, map, starts }
+}

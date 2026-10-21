@@ -15,7 +15,7 @@ import { applyPersons, buildPersons } from './persons'
 import { loadHeat } from './heat'
 import { loadChatSignal } from '../../twitch/chat'
 import { loadProfile, channelLayout } from '../profiles'
-import { secondPassCorrections, secondPassEnabled } from './secondPass'
+import { applySecondPass, secondPassKind } from './secondPass'
 import { findFacecam, camHasFace } from '../layout/facecam'
 import { mergeStreamScenes, scenesOf } from '../layout/streamShots'
 import { defaultStream, type StreamLayout } from '../../../shared/streamLayout'
@@ -147,9 +147,14 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     }
   }
   // Testlab „Clip-Transkription“: nur wenn dort der zweite Durchgang aktiv gewählt wurde (Standard: Parakeet-Transkript bleibt)
-  if (clips.length && (await secondPassEnabled())) {
+  const spKind = clips.length ? await secondPassKind() : null
+  if (spKind) {
     report('layout', 0, 'Clips noch einmal transkribieren …')
-    clips = await secondPassCorrections(meta.hash, t, clips, opts.signal).catch((e) => { if (opts.signal?.aborted) throw e; console.error('Zweiter Durchgang fehlgeschlagen:', e); return clips })
+    try {
+      const r = await applySecondPass(spKind, meta.hash, t, clips, opts.signal)
+      clips = r.clips
+      report('layout', 0, `Zweiter Durchgang: ${r.substituted} Wörter anders geschrieben, ${r.inserted} ergänzt`)
+    } catch (e) { if (opts.signal?.aborted) throw e; console.error('Zweiter Durchgang fehlgeschlagen (Transkript bleibt):', e) }
   }
   // Twitch: von Twitch stumm geschaltete Abschnitte (geschützte Musik) nie als Clip vorschlagen
   const silent = meta.twitch?.silent ?? []

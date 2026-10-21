@@ -17,7 +17,7 @@ describe('Modell-Plätze', () => {
   })
   it('neben den aktiven Modellen sind nur SCRFD-10G, BoT-SORT-ReID und Remotion integriert', () => {
     const extra = cat.models.filter((m) => m.integrated && m.status !== 'aktiv').map((m) => m.id)
-    expect(extra.sort()).toEqual(['botsort_reid', 'parakeet_pass2', 'qwen3_8_27b_q4', 'remotion_renderer', 'scrfd_10g'])
+    expect(extra.sort()).toEqual(['botsort_reid', 'parakeet_pass2', 'qwen3_8_27b_q4', 'qwen3_asr_17b', 'remotion_renderer', 'scrfd_10g'])
   })
   it('wirksamer Status: Entscheidung > Zum Entfernen > Test > Kandidat', () => {
     const yunet = cat.models.find((m) => m.id === 'yunet')!, scrfd = cat.models.find((m) => m.id === 'scrfd_10g')!, k = cat.models.find((m) => m.id === 'scrfd_2_5g')!

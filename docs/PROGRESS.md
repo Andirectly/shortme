@@ -180,3 +180,50 @@ Korrekturen: Auswahllisten dunkel (`color-scheme: dark` + Option-Farben, vorher 
 **A3 Großes Modell (Qwen3.8 27B, Q4_K_M).** Vorschlag (Modell wird NICHT geladen, Eintrag `integrated: false`): `bartowski/Qwen3.8-27B-GGUF`, Datei `Qwen3.8-27B-Q4_K_M.gguf` = 17.442.399.968 Byte (SHA-256 geprüft über die HF-API), Apache-2.0, nicht gesperrt; alternativ Q5_K_M 20,9 GB (zu knapp bei 16k Kontext in 24 GB). Qwen3.8 ist laut Quellen (Aug. 2026) das neueste dichte Qwen im 27B-Bereich; im Spike (3-Bit) kein klarer Vorteil – Q4_K_M ist ungemessen. VRAM-Schätzung ≈ 21 GB bei 16k mit KV-Cache q8 (`--cache-type-k/v q8_0` wird für dieses Modell erzwungen). Modell-Manager: neues Feld `minVramMb` (22000) → nur auf Karten mit genug VRAM sichtbar. Testlab-Platz `llm`: Vergleich auf demselben Projekt-Abschnitt (Text), links/rechts Clips mit Score, Begründung, Laufzeit, VRAM; „gemeinsam“-Markierung bei überlappenden Clips. Getestet mit Qwen3-14B (2 Clips aus 3 min in 51 s, 11,4 GB). LLM-Wechsel: `withLlmModel` (ASR und LLM nie gleichzeitig; danach wird das empfohlene Modell wieder geladen). Standard bleibt Qwen3-14B.
 **Tests:** tests/transcriptGaps.test.ts, wordDiff.test.ts, testlabRegistry (angepasst); gesamt 920 grün. **Nicht geprüft:** Qwen3.8 27B (nicht geladen), zweiter Durchgang im vollen Pipeline-Lauf (nur Bausteine), Testlab-Oberfläche im Fenster, Qwen3-ASR (nicht heruntergeladen).
 **A3 Ergebnis (Qwen3.8 27B Q4_K_M geladen, auf Zuruf):** Datei geladen und per SHA-256 geprüft (17,4 GB), im Testlab-Platz „Clip-Auswahl (LLM)“ als integrierte Alternative wählbar (`qwen3_8_27b_q4`, Status Test). Qwen3-14B bleibt Standard/aktiv. Erster Vergleich (Projekt „Ich teste die BESTEN NEUERÖFFNUNGEN“, erste 600 s Text): **Qwen3-14B** 4 Clips, 94 s, VRAM-Spitze +11,4 GB, Scores 58–66; **Qwen3.8 27B Q4_K_M** 4 Clips, 209,5 s (≈ 2,2×), +17,7 GB (16k Kontext, KV q8 – passt komfortabel in 24 GB), Scores 61–70; 2 von 4 Clips überlappen (New-York-Pizza, Zimtschnecke), das große Modell wählt zusätzlich die Döner-Passagen. Qualität ist damit nicht entschieden (4 Clips, kein Referenzwert) – Entscheidung im Testlab. Gefundene Fehler beim Test: (1) `withLlmModel` entlud das LLM nicht über den VRAM-Sequencer (nach dem ersten Lauf kam ein leerer Server → stille Heuristik); jetzt `vram.releaseAll()`; (2) Heuristik-Ergebnisse werden im Testlab nicht mehr zwischengespeichert, sondern als Fehler gemeldet.
+
+## M22 – Qwen3-ASR als Text-Quelle, Ursachen fehlender Wörter, objektiver LLM-Vergleich
+**Qwen3-ASR (Testlab-Modell `qwen3_asr_17b`, Platz „Clip-Transkription“).** `ggml-org/Qwen3-ASR-1.7B-GGUF` (Q8_0 2,17 GB + mmproj 0,36 GB, SHA-256 geprüft, Apache-2.0) läuft über den mitgelieferten `llama-server` (Audio als `input_audio`, Stücke ≤ 25 s, Ausgabe „language X<asr_text>“ wird bereinigt) – ohne Python. Zusammenführung (`shared/wordDiff.ts` `mergeQwenText`): gleiche Wörter bleiben von Parakeet, andere Schreibweisen übernehmen den Qwen-Text (Zeit von Parakeet), Wörter nur bei Parakeet bleiben, Wörter nur bei Qwen werden mit **geschätzten Zeiten** eingefügt (gleichmäßig zwischen den Nachbarwörtern, am Rand bis zum VAD-Bereich, mindestens 60 ms je Wort). Produktiv nur, wenn im Testlab aktiv gewählt (`clips/secondPass.ts`): ein Server-Lauf für alle Clips, danach Transkript mit eingefügten Wörtern gespeichert und Clips/Tags/Korrekturen/Segmente auf neue Wortindizes umgerechnet (`clips/remap.ts`, getestet). Standard bleibt Parakeet.
+
+### Objektiver LLM-Vergleich mit „Most replayed“-Heatmap
+Aufbau (`scripts/eval-models.ts heat`): 5 YouTube-Videos mit Heatmap (11–13 min, zusammen 60 min; 2 Easy-German/Coaching deutsch, 3× Joe Rogan englisch), gleiche Einstellungen (6 Clips gewünscht, Themenkarte/Bewertung/Paarvergleich/Einrasten/Untertitel-Prüfung wie in der App, ohne Audio-Ereignisse, **Heatmap nicht in der Auswahl**), nur das Modell wechselt. Metrik: Anteil der gewählten Clips, die ein Segment aus dem **obersten Viertel** der Heatmap überlappen; Zufallsbasis = gleich lange Clips an zufälligen Stellen (400 Ziehungen). Modell-Scores werden nicht verglichen.
+
+| Video | Länge | Wörter | Modell | Clips | Spitzen-Anteil | Zufall | Ø Heat-Wert | Auswahlphase |
+|---|---|---|---|---|---|---|---|---|
+| Do Germans Plan for the Future? | 13 min | 1777 | Qwen3-14B | 6 | 33 % | 47 % | 0,35 | 127 s |
+| | | | Qwen3.8 27B | 6 | 33 % | 44 % | 0,45 | 206 s |
+| Joe Rogan SILENT After Katt Williams | 13 min | 2067 | Qwen3-14B | 5 | 20 % | 36 % | 0,04 | 82 s |
+| | | | Qwen3.8 27B | 6 | 50 % | 37 % | 0,08 | 178 s |
+| Joe Rogan: Lion-Killing Chimps | 12 min | 2281 | Qwen3-14B | 6 | 50 % | 43 % | 0,19 | 109 s |
+| | | | Qwen3.8 27B | 6 | 67 % | 43 % | 0,31 | 234 s |
+| MrBallen tells Joe Rogan … | 11 min | 1998 | Qwen3-14B | 6 | 33 % | 46 % | 0,22 | 100 s |
+| | | | Qwen3.8 27B | 6 | 50 % | 45 % | 0,16 | 223 s |
+| So krempelst du dein Leben um! | 11 min | 1613 | Qwen3-14B | 6 | 67 % | 59 % | 0,29 | 120 s |
+| | | | Qwen3.8 27B | 6 | 50 % | 60 % | 0,26 | 272 s |
+| **Gesamt** | **60 min** | 9736 | **Qwen3-14B** | 29 | **41 %** | 47 % | 0,22 | **537 s** |
+| | | | **Qwen3.8 27B** | 30 | **50 %** | 46 % | 0,25 | **1113 s** |
+
+**Einordnung (ehrlich):** 27B liegt bei 50 % vs. 41 % (14B), die Zufallsbasis bei 46–47 %. Bei 29/30 Clips ist der Unterschied von 9 Punkten (≈ 3 Clips) **nicht belastbar** (Standardfehler ≈ 9 Punkte); keines der Modelle schlägt den Zufall klar, 27B liegt nur leicht darüber, 14B leicht darunter. Pro Video schwankt es stark (14B besser bei „So krempelst du …“). Die Heatmap misst Wiedergabe-Verhalten (Rückspulen, Einstiege), nicht „guter Clip“; zudem liefen englische Videos durch deutsche Prompts. **Laufzeit:** 27B braucht im Mittel das 2,07-Fache (223 s vs. 107 s je 12-min-Video). Ein Vorteil des großen Modells ist damit nicht belegt; Qwen3-14B bleibt Standard.
+
+### Auswahlphase für ein 60-Minuten-Video (gemessen, nicht hochgerechnet)
+`test-videos/long-60.mp4` (60 min, 10.998 Wörter), Standardeinstellungen (24 Clips gewünscht = Dauer/150 s), nur die Auswahlphase (`selectClips`: Themenkarte, Kandidaten, Bewertung, Paarvergleich, Einrasten, Untertitel-Prüfung; ohne Transkription, Kamerawechsel, Layout), Modell-Ladezeit nicht eingerechnet, RTX 5090.
+
+| Modell | Clips | Auswahlphase | Faktor |
+|---|---|---|---|
+| Qwen3-14B Q4_K_M | 24 | **369,5 s (6,2 min)** | 1,0 |
+| Qwen3.8 27B Q4_K_M | 24 | **824,2 s (13,7 min)** | 2,23 |
+
+Gegenprobe: die 5 kurzen Videos zusammen (60 min Material, 6 Clips je Video) brauchten 537 s bzw. 1113 s – mehr als ein einzelnes 60-min-Video, weil jede Auswahl feste Kosten hat (Themenkarte, Prüfdurchläufe). Für eine Hochrechnung auf 60 min ist daher die echte Messung (369 s / 824 s) maßgeblich; grob gilt: Auswahlphase ≈ 0,10 × Videolänge (14B) bzw. 0,23 × Videolänge (27B). Gesamtdauer eines 60-min-Videos kommt oben drauf (Transkription ≈ 3 min, Kamerawechsel, Layout je Clip).
+
+### Ursache fehlender Wörter (podcast-2p, erste 600 s; Referenz Qwen3-ASR)
+Parakeet 1908 Wörter in 43 VAD-Stücken (+15 durch Lückenfüllung); Qwen3-ASR 2045 Wörter; **259 Wörter nur bei Qwen** (155 Gruppen: 102 × 1 Wort, 42 × 2–3, 11 × ≥ 4), 96 andere Schreibweisen. Qwen ist nur Vergleichsreferenz (kein Beweis): ca. 20 % der Stichproben-Funde sind Artefakte (Zahl als Ziffer und Wort „siebzehn 17“, Wortwiederholungen „Köln Köln-Nippis“).
+
+| Ursache der Qwen-only-Wörter | Wörter | Anteil |
+|---|---|---|
+| gleichzeitiges Sprechen (LR-ASD 46 Stellen/39 s, Diarisierung 25 Stellen/21 s) | 36 | 14 % |
+| außerhalb der VAD-Stücke (Sprache nicht erkannt) | 16 | 6 % |
+| am Rand eines ASR-Stücks (≤ 0,6 s) | 23 | 9 % |
+| mitten im Stück (Modell lässt aus) | 184 | 71 % |
+| davon von der Lückenfüllung zurückgeholt | 10 | 4 % |
+
+Häufigste fehlende Wörter: ja ×16, also ×15, ist ×12, jetzt ×8, es ×8, auch ×7, okay ×6 – **kurze Funktions-/Füllwörter im schnellen Gespräch**, selten ganze Sätze. **Untertitel-Darstellung:** Transkript 1923 Wörter = Gruppen 1923 = VTT 1923, ASS 1921 (2 Wörter weniger, Ursache nicht untersucht); die Darstellung verliert praktisch nichts. **Fazit:** Fehlende Wörter entstehen fast nur im Erkenner (Auslassungen mitten im Stück, vor allem kurze Wörter); Grenzen und Überlappung zusammen ≈ 29 %.
+**Qwen3-ASR im Testlab** (podcast-2p, 90 s): Parakeet 321 Wörter / 6,5 s, Qwen-Text + Parakeet-Zeiten 384 Wörter / 11,9 s, 88 Unterschiede. Fehler gefunden und behoben: Regex `/s+/` statt `/\s+/` (Backslash-Verlust beim Schreiben) hatte die ersten Auswertungen verfälscht.
