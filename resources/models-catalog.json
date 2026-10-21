@@ -492,8 +492,8 @@
     {
       "id": "qwen3_8_27b_q4",
       "slot": "llm",
-      "status": "kandidat",
-      "integrated": false,
+      "status": "test",
+      "integrated": true,
       "assets": [
         "qwen3-8-27b"
       ],

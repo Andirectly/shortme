@@ -53,7 +53,7 @@ Wird vom Testlab bzw. `scripts/sync-models-docs.ts` erzeugt – nicht von Hand �
 | Qwen3-14B Q4_K_M | Aktuelles Modell für die Clip-Auswahl. | aktiv |
 | Gemma 4 12B QAT Q4_0 | Neueres Modell, versteht Text, Bild und Audio. | Kandidat (nicht integriert) |
 | Qwen3.8 27B (3-Bit) | Größeres Modell, stark komprimiert. | Kandidat (nicht integriert) |
-| Qwen3.8 27B (Q4_K_M) – Großes Modell | Dichtes 27B-Modell für den Hauptrechner (ab ca. 22 GB VRAM), 16k Kontext mit KV-Cache q8. | Kandidat (nicht integriert) |
+| Qwen3.8 27B (Q4_K_M) – Großes Modell | Dichtes 27B-Modell für den Hauptrechner (ab ca. 22 GB VRAM), 16k Kontext mit KV-Cache q8. | Test |
 
 ## Untertitel-Renderer (`renderer`)
 

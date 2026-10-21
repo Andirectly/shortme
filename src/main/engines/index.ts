@@ -23,7 +23,6 @@ export async function hardware(refresh = false): Promise<HardwareInfo> {
 // ASR läuft pro Auftrag in eigenem Prozess (asr/client.ts); als Resident sorgt er nur dafür, dass das LLM entladen ist.
 /** Zeitweise anderes LLM (Testlab-Vergleich) – null = das empfohlene/aktive Modell. */
 let llmOverride: string | null = null
-let llmRunning: string | null = null
 vram.register({
   name: 'llm',
   load: async () => {
@@ -32,7 +31,6 @@ vram.register({
     const spec = CATALOG.find((c) => c.id === id)!
     // Das große Modell braucht den KV-Cache in q8 (16k Kontext in ca. 21 GB), kleine Karten sowieso
     await llama.start({ model: join(assetDir(id), spec.expect[0]), kvQuant: hw.kvQuant || id === 'qwen3-8-27b' })
-    llmRunning = id
   },
   unload: () => llama.stop()
 })
@@ -44,8 +42,9 @@ export const withLlm = <T>(fn: (baseUrl: string) => Promise<T>): Promise<T> => v
 /** Wie withLlm, aber mit einem bestimmten LLM-Asset (Testlab); danach wird wieder das empfohlene Modell geladen. */
 export async function withLlmModel<T>(assetId: string, fn: (baseUrl: string) => Promise<T>): Promise<T> {
   llmOverride = assetId
-  if (llmRunning && llmRunning !== assetId) { await llama.stop(); llmRunning = null }
-  try { return await withLlm(fn) } finally { llmOverride = null; await llama.stop(); llmRunning = null }
+  // Der Sequencer merkt sich das geladene LLM: erst entladen, sonst bliebe ein zuvor gestartetes anderes Modell oder ein beendeter Server im Spiel
+  await vram.releaseAll()
+  try { return await withLlm(fn) } finally { llmOverride = null; await vram.releaseAll() }
 }
 /** Exklusiv: ASR-Stufe (llama-server wird vorher entladen). */
 export const withAsr = <T>(fn: () => Promise<T>): Promise<T> => vram.use('asr', fn)

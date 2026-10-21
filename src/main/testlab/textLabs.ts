@@ -91,6 +91,7 @@ export async function runLlmSide(model: string, sourceId: string, start: number,
   try {
     clips = await withLlmModel(asset, (url) => selectClips(input, { baseUrl: url, wanted, query: profile.prompt || undefined, report: (_s, f, m) => onProgress(`${m} ${Math.round(f * 100)} %`), topicsCache: { load: async () => null, save: async () => undefined } }))
   } finally { clearInterval(poll) }
+  if (clips.length && clips.every((c) => /^Heuristik/.test(c.reason))) throw new Error('Das Modell hat nicht geantwortet (Auswahl fiel auf die Heuristik zurück) – nichts gespeichert.')
   const runtimeSec = (Date.now() - t0) / 1000
   const res: LabResult = {
     ...empty(model, 'llm', basename(meta.sourcePath), start, end - start), runtimeSec: +runtimeSec.toFixed(1), vramPeakMb: base >= 0 ? Math.max(0, peak - base) : -1,
