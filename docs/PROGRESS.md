@@ -227,3 +227,6 @@ Parakeet 1908 Wörter in 43 VAD-Stücken (+15 durch Lückenfüllung); Qwen3-ASR 
 
 Häufigste fehlende Wörter: ja ×16, also ×15, ist ×12, jetzt ×8, es ×8, auch ×7, okay ×6 – **kurze Funktions-/Füllwörter im schnellen Gespräch**, selten ganze Sätze. **Untertitel-Darstellung:** Transkript 1923 Wörter = Gruppen 1923 = VTT 1923, ASS 1921 (2 Wörter weniger, Ursache nicht untersucht); die Darstellung verliert praktisch nichts. **Fazit:** Fehlende Wörter entstehen fast nur im Erkenner (Auslassungen mitten im Stück, vor allem kurze Wörter); Grenzen und Überlappung zusammen ≈ 29 %.
 **Qwen3-ASR im Testlab** (podcast-2p, 90 s): Parakeet 321 Wörter / 6,5 s, Qwen-Text + Parakeet-Zeiten 384 Wörter / 11,9 s, 88 Unterschiede. Fehler gefunden und behoben: Regex `/s+/` statt `/\s+/` (Backslash-Verlust beim Schreiben) hatte die ersten Auswertungen verfälscht.
+
+## M23 – LEER-Diagnose und Sicherheitsnetz
+Fehlerfall YouTube 1zmTYbX3aeo (Ausschnitt ins Leere): Ursache = Rückfall `fixed cx=0,5` im Ping-Pong-Fenster, wenn nach einem Kamerawechsel nur eine Spur im Segment liegt (zwei Personen links/rechts → Mitte leer). Bericht und Beweisbilder: docs/LEER-DIAGNOSE.md. Umgesetzt: `guardEmptyShots` (> 0,5 s keine Person im Ausschnitt → „Ganzes Bild“, `auto: 'empty'`, im Editor markiert); 31,4 s in 8 von 10 Clips des Fehlervideos. Korrektur der Planung selbst nur vorgeschlagen.

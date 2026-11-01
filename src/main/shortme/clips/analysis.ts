@@ -20,7 +20,7 @@ import { findFacecam, camHasFace } from '../layout/facecam'
 import { mergeStreamScenes, scenesOf } from '../layout/streamShots'
 import { defaultStream, type StreamLayout } from '../../../shared/streamLayout'
 import type { ContentType, FrameChoice } from '../../../shared/videoKind'
-import type { PlanOptions } from '../../../shared/layoutPlan'
+import { guardEmptyShots, type PlanOptions } from '../../../shared/layoutPlan'
 import { overlapsSilence } from '../../twitch/silence'
 import { detectAudioEvents, loadEvents, saveEvents, yamnetAvailable, type AudioEvent } from './audioEvents'
 import { loadTopics, saveTopics, type TopicMap } from './topics'
@@ -181,7 +181,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
       const l = await layoutForClip(meta, clips[i], cuts, opts.signal, undefined, plan)
       layouts[i] = l
       await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(l.input))
-      let shots = l.shots
+      let shots = guardEmptyShots(l.shots, l.input) // Sicherheitsnetz: keine Person im Ausschnitt → Ganzes Bild
       let penalty = l.penalty
       let stream: StreamLayout | undefined
       if (frame === 'fit') shots = [{ start: 0, end: clips[i].end - clips[i].start, layout: 'fit', cx: 0.5, zoom: 1 }]
@@ -190,7 +190,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
         if (streamBase) {
           const base = streamBase
           const scenes = await Promise.all(scenesOf(clips[i].start, clips[i].end, cuts).map(async (sc) => ({ ...sc, cam: await camHasFace(meta.sourcePath, (sc.start + sc.end) / 2, base.cam, opts.signal).catch(() => false) })))
-          shots = mergeStreamScenes(clips[i].start, clips[i].end, l.shots, scenes, base)
+          shots = mergeStreamScenes(clips[i].start, clips[i].end, shots, scenes, base)
           stream = base
         } else shots = [{ start: 0, end: clips[i].end - clips[i].start, layout: 'fixed', cx: 0.5, zoom: 1 }]
       }

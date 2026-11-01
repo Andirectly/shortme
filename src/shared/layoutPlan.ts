@@ -320,3 +320,45 @@ export function faceRatio(shots: ShortmeShot[], inp: PlanInput): number {
 export function facePenalty(ratio: number): number {
   return ratio >= 0.6 ? 0 : Math.round(Math.min(20, (0.6 - ratio) * 40))
 }
+
+/**
+ * Sicherheitsnetz vor dem Rendern: liegt im geplanten Ausschnitt (smart/fest) über mehr als `minSec` Sekunden keine erkannte Person
+ * (Gesicht oder Kopf/Pose – beides steckt in den Spuren), wird dieser Abschnitt auf „Ganzes Bild“ (unscharfer Hintergrund) gestellt und
+ * mit `auto: 'empty'` markiert. Split, Ganzes Bild und Facecam-Layouts bleiben unberührt. Reine Funktion – Analyse, Vorschau und Export
+ * nutzen dieselben Shots.
+ */
+export function guardEmptyShots(shots: ShortmeShot[], inp: PlanInput, minSec = 0.5): ShortmeShot[] {
+  const w = cropWidth(inp.sourceAspect, inp.targetAspect)
+  const out: ShortmeShot[] = []
+  for (const sh of shots) {
+    if (sh.layout !== 'smart' && sh.layout !== 'fixed') { out.push(sh); continue }
+    const half = w / sh.zoom / 2
+    const empty = (i: number): boolean => !inp.tracks.some((tr) => { const v = at(tr, i); return !!v && Math.abs(v.c - sh.cx) <= half })
+    const i0 = Math.max(0, Math.floor(sh.start / inp.dt)), i1 = Math.min(inp.ticks, Math.ceil(sh.end / inp.dt))
+    // zusammenhängende leere Tick-Läufe ≥ minSec
+    const runs: Array<[number, number]> = []
+    for (let i = i0; i < i1;) {
+      if (!empty(i)) { i++; continue }
+      let j = i
+      while (j < i1 && empty(j)) j++
+      if ((j - i) * inp.dt > minSec + 1e-9) runs.push([Math.max(sh.start, i * inp.dt), Math.min(sh.end, j * inp.dt)])
+      i = j
+    }
+    if (!runs.length) { out.push(sh); continue }
+    let cur = sh.start
+    for (const [a, b] of runs) {
+      if (a > cur + 1e-6) out.push({ ...sh, start: cur, end: a })
+      out.push({ start: a, end: b, layout: 'fit', cx: 0.5, zoom: 1, auto: 'empty' })
+      cur = b
+    }
+    if (sh.end > cur + 1e-6) out.push({ ...sh, start: cur, end: sh.end })
+  }
+  // Rest-Splitter < 0,3 s an den Nachbarn hängen (kein Flackern), gleiche Nachbarn verschmelzen
+  const merged: ShortmeShot[] = []
+  for (const s of out) {
+    const p = merged[merged.length - 1]
+    if (p && p.layout === s.layout && p.auto === s.auto && Math.abs(p.cx - s.cx) < 0.01) p.end = s.end
+    else merged.push({ ...s })
+  }
+  return merged
+}

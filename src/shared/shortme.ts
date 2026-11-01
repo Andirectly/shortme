@@ -108,6 +108,8 @@ export interface ShortmeShot {
   cx2?: number
   zoom: number
   track?: number
+  /** Sicherheitsnetz: automatisch auf „Ganzes Bild“ gestellt, weil im geplanten Ausschnitt keine Person war. */
+  auto?: 'empty'
 }
 
 export interface ShortmeClips {

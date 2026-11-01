@@ -501,7 +501,7 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         </div>
         {/* Shots */}
         <div style={{ position: 'relative', borderRadius: 6, background: 'rgba(255,255,255,0.04)' }}>
-          {shots.map((s, i) => <div key={i} title={`${LAYOUT_LABEL[s.layout]} · ${fmt(s.start)}–${fmt(s.end)}`} style={{ position: 'absolute', top: 2, bottom: 2, left: pct(s.start), width: `calc(${pct(s.end)} - ${pct(s.start)})`, background: LAYOUT_COLOR[s.layout], borderRadius: 4, fontSize: 10, lineHeight: '20px', paddingLeft: 4, overflow: 'hidden', whiteSpace: 'nowrap', color: '#fff' }}>{LAYOUT_LABEL[s.layout]}</div>)}
+          {shots.map((s, i) => <div key={i} title={`${LAYOUT_LABEL[s.layout]}${s.auto ? " (automatisch: keine Person im Ausschnitt)" : ""} · ${fmt(s.start)}–${fmt(s.end)}`} style={{ position: 'absolute', top: 2, bottom: 2, left: pct(s.start), width: `calc(${pct(s.end)} - ${pct(s.start)})`, background: LAYOUT_COLOR[s.layout], borderRadius: 4, fontSize: 10, lineHeight: '20px', paddingLeft: 4, overflow: 'hidden', whiteSpace: 'nowrap', color: '#fff', ...(s.auto ? { outline: '1px dashed var(--warn)' } : {}) }}>{LAYOUT_LABEL[s.layout]}{s.auto ? ' · auto' : ''}</div>)}
         </div>
         {/* außerhalb des Beschnitts abdunkeln */}
         <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: pct(trim[0]), background: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }} />
