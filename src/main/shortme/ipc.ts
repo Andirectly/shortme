@@ -20,7 +20,8 @@ import { prepareRemotionBrowser } from '../remotion/render'
 import type { LabRunRequest } from '../../shared/models'
 import { loadStyle, saveStyle } from './styleDefaults'
 import type { StyleDefaults } from '../../shared/edits'
-import { loadFeedback, saveFeedback } from './clips/feedback'
+import { loadRatings, saveRating } from './clips/feedback'
+import type { Level } from '../../shared/learn'
 import type { PersonsPatch, ShortmePersons } from '@shared/shortme'
 import { makeThumbs, thumbPath } from './clips/thumbs'
 import { existsSync } from 'node:fs'
@@ -107,8 +108,8 @@ export function registerShortmeIpc(): void {
     const otf = f.fileName.toLowerCase().endsWith('.otf')
     return `@font-face { font-family: '${family}'; font-weight: 400 900; src: url(data:font/${otf ? 'otf' : 'ttf'};base64,${(await readFile(f.path)).toString('base64')}) format('${otf ? 'opentype' : 'truetype'}'); }`
   })
-  ipcMain.handle('shortme:feedback', (_e, hash: string) => loadFeedback(hash))
-  ipcMain.handle('shortme:feedbackSet', (_e, hash: string, clipId: string, vote: number) => saveFeedback(hash, clipId, vote === 1 ? 1 : vote === -1 ? -1 : 0))
+  ipcMain.handle('shortme:feedback', (_e, hash: string) => loadRatings(hash))
+  ipcMain.handle('shortme:feedbackSet', (_e, hash: string, clipId: string, rating: { level: Level; reasons: string[] } | null) => saveRating(hash, clipId, rating))
   // Testlab: Modell-Plätze, Quellen, Vergleich, Entscheidung
   ipcMain.handle('testlab:models', () => modelsView())
   ipcMain.handle('testlab:enabled', () => testlabFlag())

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { Level, Ratings } from '@shared/learn'
 import { useStore } from './store'
 import { FRAME_LABELS, frameFromLabel, type ContentType } from '@shared/videoKind'
 import type { StyleDefaults } from '@shared/edits'
@@ -48,12 +49,12 @@ interface ProjectState {
   exportJob: ShortmeJob | null
   /** „Wer ist wer?“ */
   persons: ShortmePersons | null
-  feedback: Record<string, -1 | 0 | 1>
+  feedback: Ratings
   /** Globaler Standardstil der Untertitel (Stil-Studio). */
   style: StyleDefaults
   loadStyle: () => Promise<void>
   saveStyle: (s: StyleDefaults) => Promise<void>
-  setFeedback: (clipId: string, vote: -1 | 0 | 1) => Promise<void>
+  setFeedback: (clipId: string, rating: { level: Level; reasons: string[] } | null) => Promise<void>
   personsOpen: boolean
   pendingExport: { clipIds: string[]; presetId: string; srt: boolean } | null
   openPersons: () => void
@@ -85,7 +86,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   style: {},
   loadStyle: async () => { const a = api(); if (a) set({ style: await a.styleGet() }) },
   saveStyle: async (st) => { const a = api(); if (a) set({ style: await a.styleSet(st) }) },
-  setFeedback: async (clipId, vote) => { const a = api(); const hash = get().clipsFile?.hash; if (!a || !hash) return; set({ feedback: await a.feedbackSet(hash, clipId, vote) }) },
+  setFeedback: async (clipId, rating) => { const a = api(); const hash = get().clipsFile?.hash; if (!a || !hash) return; set({ feedback: await a.feedbackSet(hash, clipId, rating) }) },
   personsOpen: false,
   pendingExport: null,
   openPersons: () => set({ personsOpen: true }),

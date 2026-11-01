@@ -20,6 +20,7 @@ import { drawLayout, sourceRects } from '@shared/previewDraw'
 import { STREAM_PRESETS, streamSeamY, type StreamLayout } from '@shared/streamLayout'
 import { CONTENT_TYPES, contentLabel, type ContentType } from '@shared/videoKind'
 import { StreamFrames } from './StreamFrames'
+import { RatingBar, useRatingKeys } from './RatingBar'
 
 const ZONES: Record<string, { top: number; bottom: number; right: number }> = { TikTok: { top: 0.12, bottom: 0.2, right: 0.14 }, Reels: { top: 0.1, bottom: 0.18, right: 0.1 }, Shorts: { top: 0.1, bottom: 0.22, right: 0.12 } }
 const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', Fest: 'fixed', Vollbild: 'fit', Split: 'split', 'Facecam + Gameplay': 'stream' }
@@ -44,6 +45,7 @@ export function EditorScreen(): React.JSX.Element {
   const exportClips = useProject((s) => s.exportClips)
   const exportJob = useProject((s) => s.exportJob)
   const go = useStore((s) => s.go)
+  useRatingKeys(() => clipId)
   const { base } = useSprings()
 
   // ---------- Nicht-destruktive Bearbeitung: Operationslog, Autosave ----------
@@ -313,6 +315,7 @@ export function EditorScreen(): React.JSX.Element {
         <h2 style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{clip.title}</h2>
         {/* Schnellwahl: Ausschnitt der aktuellen Einstellung (Szene) sofort ändern – derselbe Operationsweg wie im Reiter „Bildausschnitt“ */}
         <Segmented options={Object.keys(LAYOUTS).filter((k) => k !== 'Facecam + Gameplay' || canStream)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} />
+        <RatingBar clipId={clipId} chips="dropdown" />
         <small style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{saved ? <><Check size={13} /> Gespeichert</> : 'Speichert …'}</small>
         <Button variant="ghost" aria-label="Rückgängig (Strg+Z)" disabled={!canUndo(log)} onClick={undo}><Undo2 size={16} /></Button>
         <Button variant="ghost" aria-label="Wiederholen (Strg+Y)" disabled={!canRedo(log)} onClick={redo}><Redo2 size={16} /></Button>

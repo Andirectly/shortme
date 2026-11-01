@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { Pause, Play, Square, Trash2, Check, Loader2, AlertTriangle, LayoutGrid, List, Download, Wand2, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { RatingBar, setHoveredClip, useListRatingKeys } from './RatingBar'
+import { Pause, Play, Square, Trash2, Check, Loader2, AlertTriangle, LayoutGrid, List, Download, Wand2 } from 'lucide-react'
 import { useStore } from './store'
 import { useProject } from './projectStore'
 import { CLIPS, PROJECTS, type Clip } from './data'
@@ -87,10 +88,8 @@ function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: b
   const { base, reduced } = useSprings()
   const [hover, setHover] = useState(false)
   const [pop, setPop] = useState(false)
-  const vote = useProject((s) => s.feedback[c.id] ?? 0)
-  const setFeedback = useProject((s) => s.setFeedback)
   return (
-    <motion.div className="sm-card" style={{ position: 'relative', overflow: 'visible', contentVisibility: 'auto', containIntrinsicSize: '260px 520px', outline: selected ? '2px solid var(--accent)' : 'none', ...(c.pending ? { opacity: 0.45, pointerEvents: 'none', filter: 'grayscale(0.8)' } : {}) }} whileTap={reduced ? undefined : { scale: 0.97 }} transition={base} onHoverStart={() => setHover(true)} onHoverEnd={() => { setHover(false); setPop(false) }}>
+    <motion.div className="sm-card" style={{ position: 'relative', overflow: 'visible', contentVisibility: 'auto', containIntrinsicSize: '260px 520px', outline: selected ? '2px solid var(--accent)' : 'none', ...(c.pending ? { opacity: 0.45, pointerEvents: 'none', filter: 'grayscale(0.8)' } : {}) }} whileTap={reduced ? undefined : { scale: 0.97 }} transition={base} onHoverStart={() => { setHover(true); setHoveredClip(c.id) }} onHoverEnd={() => { setHover(false); setPop(false); setHoveredClip(null) }}>
       <div onClick={onOpen} style={{ aspectRatio: '9/16', borderRadius: 'var(--r-card) var(--r-card) 0 0', overflow: 'hidden', position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover', transform: hover && !reduced ? 'scale(1.08)' : 'scale(1)', transition: 'transform 2.4s linear' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.3), transparent 30%, transparent 60%, rgba(0,0,0,0.7))' }} />
@@ -100,10 +99,7 @@ function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: b
       <button aria-label="Auswählen" aria-pressed={selected} onClick={onSelect} style={{ position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: '50%', border: '1.5px solid #fff', background: selected ? 'var(--accent)' : 'rgba(0,0,0,0.35)', display: 'grid', placeItems: 'center' }}>{selected && <Check size={14} />}</button>
       <div style={{ padding: '10px 12px 12px', display: 'grid', gap: 4 }}>
         <h3 style={{ fontSize: 14, lineHeight: 1.25 }}>{c.title}</h3>
-        <div style={{ display: 'flex', gap: 4, position: 'absolute', right: 10, bottom: 10 }}>
-          <button aria-label="Guter Clip" aria-pressed={vote === 1} title="Guter Clip (fließt in spätere Feinabstimmung ein)" onClick={() => void setFeedback(c.id, vote === 1 ? 0 : 1)} style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--edge)', background: vote === 1 ? '#fff' : 'rgba(0,0,0,0.35)', color: vote === 1 ? '#000' : '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><ThumbsUp size={14} /></button>
-          <button aria-label="Schlechter Clip" aria-pressed={vote === -1} title="Schlechter Clip" onClick={() => void setFeedback(c.id, vote === -1 ? 0 : -1)} style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--edge)', background: vote === -1 ? '#fff' : 'rgba(0,0,0,0.35)', color: vote === -1 ? '#000' : '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><ThumbsDown size={14} /></button>
-        </div>
+        <div style={{ position: 'absolute', right: 10, bottom: 10 }}><RatingBar clipId={c.id} chips="popover" /></div>
         <small>{c.duration} s {c.faceRatio < 0.6 && <span title={`Gesichtsquote ${Math.round(c.faceRatio * 100)} %`} style={{ color: 'var(--warn)', marginLeft: 6 }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> wenig Gesicht</span>}</small>
       </div>
       <AnimatePresence>
@@ -124,6 +120,7 @@ function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: b
 }
 
 export function ClipsScreen(): React.JSX.Element {
+  useListRatingKeys()
   const view = useStore((s) => s.view)
   const setView = useStore((s) => s.setView)
   const selected = useStore((s) => s.selected)

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import type { Level, Ratings } from '../shared/learn'
 import type {
   AnalyzeOptions,
   CaptionVideoOptions,
@@ -192,8 +193,8 @@ const api = {
     previewPlan: (hash: string, clipId: string, log: EditLog, presetId?: string): Promise<PreviewPlan> => ipcRenderer.invoke('shortme:previewPlan', hash, clipId, log, presetId),
     styleGet: (): Promise<StyleDefaults> => ipcRenderer.invoke('shortme:styleGet'),
     styleSet: (style: StyleDefaults): Promise<StyleDefaults> => ipcRenderer.invoke('shortme:styleSet', style),
-    feedback: (hash: string): Promise<Record<string, -1 | 0 | 1>> => ipcRenderer.invoke('shortme:feedback', hash),
-    feedbackSet: (hash: string, clipId: string, vote: -1 | 0 | 1): Promise<Record<string, -1 | 0 | 1>> => ipcRenderer.invoke('shortme:feedbackSet', hash, clipId, vote),
+    feedback: (hash: string): Promise<Ratings> => ipcRenderer.invoke('shortme:feedback', hash),
+    feedbackSet: (hash: string, clipId: string, rating: { level: Level; reasons: string[] } | null): Promise<Ratings> => ipcRenderer.invoke('shortme:feedbackSet', hash, clipId, rating),
     testlab: {
       models: (): Promise<ModelsView> => ipcRenderer.invoke('testlab:models'),
       enabled: (): Promise<boolean | null> => ipcRenderer.invoke('testlab:enabled'),
