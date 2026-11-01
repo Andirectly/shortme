@@ -244,3 +244,10 @@ export async function storageBytes(): Promise<number> {
 export function resumeWorkbench(): void { setTimeout(kick, 90_000).unref() }
 export { STATUS_LABEL }
 export type { WorkStatus }
+
+export async function resetWorkbench(): Promise<void> {
+  if (current) throw new Error('Die Werkbank arbeitet gerade – erst pausieren und warten.')
+  items = []
+  await writeFileAtomic(itemsFile(), '[]')
+  broadcast()
+}

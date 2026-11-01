@@ -35,9 +35,9 @@ const textIn = (words: Array<{ w: string; start: number; end: number }>, a: numb
 export async function projectRecords(hash: string, split: 'train' | 'test'): Promise<{ video: Record<string, unknown>; cands: CandRecord[] } | null> {
   const [meta, clipsFile, tr] = await Promise.all([loadMeta(hash), loadClips(hash), loadTranscript(hash)])
   if (!meta || !tr) return null
-  const [heat, events, ratings, corr, trace, creator] = await Promise.all([
+  const [heat, events, ratings, corr, trace, creator, trend] = await Promise.all([
     loadHeat(hash), loadEvents(hash), loadRatings(hash), loadCorrections(hash),
-    readJson<CandTrace[]>(projectFile(hash, 'candidates.json'), []), readJson<CreatorFile | null>(projectFile(hash, 'creator.json'), null)
+    readJson<CandTrace[]>(projectFile(hash, 'candidates.json'), []), readJson<CreatorFile | null>(projectFile(hash, 'creator.json'), null), readJson<unknown>(projectFile(hash, 'trend.json'), null)
   ])
   const words = tr.words
   const marks = (a: number, b: number): string[] => {
@@ -81,7 +81,7 @@ export async function projectRecords(hash: string, split: 'train' | 'test'): Pro
   }))
   // Rhapsody-Zeile: `vid`, `gt` (100 Bins 0..1 der Wiedergabe-Kurve), `title`, `metadata`, `transcript` (Segmente)
   const gt = heat ? Array.from({ length: 100 }, (_, i) => +heatStats(heat, (i * meta.durationSec) / 100, ((i + 1) * meta.durationSec) / 100).mean.toFixed(3)) : null
-  const video = { vid: hash, title: meta.title, gt, metadata: { durationSec: meta.durationSec, contentType: meta.contentType ?? null, url: meta.sourceUrl ?? null, channel: creator?.channel ?? meta.twitch?.channel ?? null, split }, transcript: tr.segments.map((s) => ({ start: s.start, end: s.end, text: s.text })) }
+  const video = { vid: hash, title: meta.title, gt, metadata: { durationSec: meta.durationSec, contentType: meta.contentType ?? null, url: meta.sourceUrl ?? null, channel: creator?.channel ?? meta.twitch?.channel ?? null, split, ...(trend ? { trend } : {}) }, transcript: tr.segments.map((s) => ({ start: s.start, end: s.end, text: s.text })) }
   return { video, cands }
 }
 

@@ -1,18 +1,25 @@
-import { readFile } from 'node:fs/promises'
-import { ipcMain } from 'electron'
+import { cp, readdir, readFile, rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { jobs } from '../shortme/ipc'
-import { loadMeta, projectFile } from '../shortme/project'
+import { loadMeta, projectFile, projectsRoot } from '../shortme/project'
 import { loadClips } from '../shortme/clips/analysis'
 import { thumbPath } from '../shortme/clips/thumbs'
 import { loadTranscript } from '../shortme/transcription'
 import { overview, type EvalFile, type WorkItem } from '../../shared/workbench'
-import type { CreatorFile } from '../../shared/learnData'
+import type { CandRecord, CreatorFile, Pair } from '../../shared/learnData'
+import { calibration, counts, MIN_PATTERNS, patterns, stages, suggestRules, type Rule } from '../../shared/learnStats'
+import { decideRule, loadRules, removeRule } from './rules'
 import { rebuildDataset, scheduleRebuild, setBusyProbe } from './dataset'
-import { collecting, loadLearnSettings, onLearnChange, readJson, saveLearnSettings, type LearnSettings } from './store'
-import { addLinks, addReference, currentId, evaluateProject, isPaused, kick, loadEvals, removeItem, resumeWorkbench, retry, setPaused, storageBytes, workbenchItems } from './workbench'
+import { collecting, datasetDir, learnFile, loadLearnSettings, onLearnChange, readJson, saveLearnSettings, type LearnSettings } from './store'
+import { addLinks, addReference, currentId, evaluateProject, isPaused, kick, loadEvals, removeItem, resetWorkbench, resumeWorkbench, retry, setPaused, storageBytes, workbenchItems } from './workbench'
 import { blindAnswer, blindPrepare, blindStats, type MomentRef } from './blind'
 
 const dataUrl = async (p: string): Promise<string | null> => { try { return `data:image/jpeg;base64,${(await readFile(p)).toString('base64')}` } catch { return null } }
+
+async function jsonl<T>(name: string): Promise<T[]> {
+  try { return (await readFile(join(datasetDir(), name), 'utf8')).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l) as T) } catch { return [] }
+}
 
 export function registerLearnIpc(): void {
   onLearnChange(() => scheduleRebuild())
@@ -43,6 +50,38 @@ export function registerLearnIpc(): void {
       shorts: (creator?.shorts ?? []).map((s) => ({ ...s, moments: s.moments.map((m) => ({ ...m, text: text(m.start, m.end) })) })),
       eval: ev as EvalFile | null
     }
+  })
+  ipcMain.handle('learn:stats', async () => {
+    const [cands, pairs, evals, rules, cfg] = await Promise.all([jsonl<CandRecord>('candidates.jsonl'), jsonl<Pair>('pairs.jsonl'), loadEvals(), loadRules(), loadLearnSettings()])
+    const ms = evals.flatMap((e) => e.moments)
+    const c = counts(cands, pairs)
+    // Muster und Vorschläge erst ab 50 Korrekturen („Muster zeigen“)
+    const unlocked = c.corrections >= MIN_PATTERNS
+    const open = unlocked ? suggestRules(cands, ms).filter((r) => !rules.accepted.some((a) => a.id === r.id) && !rules.rejected.includes(r.id)) : []
+    return { settings: cfg, counts: c, patterns: unlocked ? patterns(cands, ms) : [], calibration: calibration(cands, pairs, ms), open, accepted: rules.accepted, stages: stages(c, cfg.collect, open.length, rules.accepted.length) }
+  })
+  ipcMain.handle('learn:rule', (_e, rule: Rule, decision: 'accept' | 'reject') => decideRule(rule, decision))
+  ipcMain.handle('learn:ruleRemove', (_e, id: string) => removeRule(id))
+  ipcMain.handle('learn:export', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    const r = await (win ? dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] }) : dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] }))
+    if (r.canceled || !r.filePaths[0]) return null
+    const dest = join(r.filePaths[0], `shortme-lerndaten-${new Date().toISOString().slice(0, 10)}`)
+    await cp(datasetDir(), join(dest, 'dataset'), { recursive: true }).catch(() => undefined)
+    for (const f of ['blind.json', 'rules.json']) await cp(learnFile(f), join(dest, f)).catch(() => undefined)
+    return dest
+  })
+  /** Alles Gelernte entfernen (mit Rückfrage): Datensatz, Werkbank-Liste, Bewertungen, Korrekturen, Spuren. Projekte, Clips und Einstellungen bleiben. */
+  ipcMain.handle('learn:clear', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    const box = { type: 'warning' as const, buttons: ['Alles löschen', 'Abbrechen'], defaultId: 1, cancelId: 1, title: 'Lerndaten löschen', message: 'Alle Lerndaten löschen?', detail: 'Bewertungen, Korrekturen, Datensatz, Werkbank-Liste und Blindtests werden entfernt. Projekte und Clips bleiben.' }
+    if ((win ? await dialog.showMessageBox(win, box) : await dialog.showMessageBox(box)).response !== 0) return false
+    await resetWorkbench()
+    await rm(datasetDir(), { recursive: true, force: true })
+    for (const f of ['blind.json', 'rules.json', 'workbench.json']) await rm(learnFile(f), { force: true })
+    for (const d of ['sf', 'lf', 'tmp']) await rm(learnFile(d), { recursive: true, force: true })
+    for (const h of await readdir(projectsRoot()).catch(() => [] as string[])) for (const f of ['ratings.json', 'feedback.json', 'corrections.jsonl', 'candidates.json', 'creator.json', 'eval.json', 'trend.json', 'features8k.f32']) await rm(projectFile(h, f), { force: true })
+    return true
   })
   ipcMain.handle('learn:blind:prepare', (_e, hash: string, a: MomentRef, b: MomentRef) => blindPrepare(hash, a, b))
   ipcMain.handle('learn:blind:answer', (_e, id: string, choice: 'left' | 'right' | 'tie') => blindAnswer(id, choice))

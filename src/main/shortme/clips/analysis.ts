@@ -9,6 +9,8 @@ import { loadTranscript } from '../transcription'
 import { signalsFromWav, type Signals } from './signals'
 import { detectShots } from './scenes'
 import { collecting, notifyLearnChange } from '../../learn/store'
+import { applyAcceptedRules } from '../../learn/rules'
+import { fetchTrend } from '../../learn/trend'
 import { selectClips, type CandTrace } from './select'
 import { makeThumbs } from './thumbs'
 import { layoutForClip } from '../layout/run'
@@ -148,6 +150,8 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
       clips = await selectClips(input, { ...sel, baseUrl: null })
     }
   }
+  // Bestätigte Lern-Regeln (Lernen → Regeln) auf die neuen Grenzen anwenden; ohne bestätigte Regel bleibt alles unverändert
+  clips = await applyAcceptedRules(clips, t.words, meta.durationSec)
   // Testlab „Clip-Transkription“: nur wenn dort der zweite Durchgang aktiv gewählt wurde (Standard: Parakeet-Transkript bleibt)
   const spKind = clips.length ? await secondPassKind() : null
   if (spKind) {
@@ -226,6 +230,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   await writeFileAtomic(projectFile(meta.hash, 'clips.json'), JSON.stringify(file, null, 1))
   if (trace.length && (await collecting())) await writeFileAtomic(projectFile(meta.hash, 'candidates.json'), JSON.stringify(trace))
   notifyLearnChange()
+  void fetchTrend(meta.hash).catch(() => undefined)
   await markStage(meta.hash, 'clips', true)
   stageSec[curStage] = (stageSec[curStage] ?? 0) + (Date.now() - curAt) / 1000
   console.info(`[perf] Analyse ${Math.round(meta.durationSec / 60)} min Video: ${Object.entries(stageSec).map(([k, v]) => `${k} ${v.toFixed(0)} s`).join(' · ')}`)

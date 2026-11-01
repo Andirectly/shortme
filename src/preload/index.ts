@@ -31,6 +31,8 @@ import type { LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twi
 import type { PlatformId, UploadOverview } from '@shared/upload'
 import type { WbOverview, WbProject, WbStatus, WorkItem } from '@shared/workbench'
 import type { LearnSettings } from '@shared/learn'
+import type { LearnStats } from '@shared/learnStats'
+import type { Rule } from '@shared/learnStats'
 import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
 import type { PersonsPatch, PreviewPlan, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
@@ -223,6 +225,12 @@ const api = {
     learn: {
       settings: (): Promise<LearnSettings> => ipcRenderer.invoke('learn:settings'),
       setSettings: (p: Partial<LearnSettings>): Promise<LearnSettings> => ipcRenderer.invoke('learn:setSettings', p),
+      stats: (): Promise<LearnStats> => ipcRenderer.invoke('learn:stats'),
+      rebuild: (): Promise<void> => ipcRenderer.invoke('learn:rebuild'),
+      rule: (rule: Rule, decision: 'accept' | 'reject'): Promise<void> => ipcRenderer.invoke('learn:rule', rule, decision),
+      ruleRemove: (id: string): Promise<void> => ipcRenderer.invoke('learn:ruleRemove', id),
+      exportData: (): Promise<string | null> => ipcRenderer.invoke('learn:export'),
+      clearData: (): Promise<boolean> => ipcRenderer.invoke('learn:clear'),
       wbList: (): Promise<WorkItem[]> => ipcRenderer.invoke('learn:wb:list'),
       wbAdd: (urls: string[]): Promise<{ added: number; skipped: number }> => ipcRenderer.invoke('learn:wb:add', urls),
       wbRetry: (id: string): Promise<void> => ipcRenderer.invoke('learn:wb:retry', id),
