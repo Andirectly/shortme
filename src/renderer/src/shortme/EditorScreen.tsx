@@ -22,8 +22,8 @@ import { CONTENT_TYPES, contentLabel, type ContentType } from '@shared/videoKind
 import { StreamFrames } from './StreamFrames'
 
 const ZONES: Record<string, { top: number; bottom: number; right: number }> = { TikTok: { top: 0.12, bottom: 0.2, right: 0.14 }, Reels: { top: 0.1, bottom: 0.18, right: 0.1 }, Shorts: { top: 0.1, bottom: 0.22, right: 0.12 } }
-const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', Vollbild: 'fixed', 'Ganzes Bild': 'fit', Split: 'split', 'Facecam + Gameplay': 'stream' }
-const LAYOUT_LABEL: Record<ShortmeShot['layout'], string> = { smart: 'Smart', fit: 'Ganzes Bild', split: 'Split', fixed: 'Vollbild', stream: 'Facecam + Gameplay' }
+const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', Fest: 'fixed', Vollbild: 'fit', Split: 'split', 'Facecam + Gameplay': 'stream' }
+const LAYOUT_LABEL: Record<ShortmeShot['layout'], string> = { smart: 'Smart', fit: 'Vollbild', split: 'Split', fixed: 'Fest', stream: 'Facecam + Gameplay' }
 const LAYOUT_COLOR: Record<ShortmeShot['layout'], string> = { smart: 'rgba(255,255,255,0.55)', fit: 'rgba(255,255,255,0.32)', split: 'rgba(255,255,255,0.62)', fixed: 'rgba(255,255,255,0.18)', stream: 'rgba(255,214,10,0.55)' }
 const CANVAS_W = 540
 const CANVAS_H = 960
@@ -89,6 +89,8 @@ export function EditorScreen(): React.JSX.Element {
   const [t, setT] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
+  /** Lautstärke nur für die Wiedergabe im Editor – wirkt nicht auf den Export. */
+  const [volume, setVolume] = useState(1)
   const [tab, setTab] = useState('Untertitel')
   const [showSource, setShowSource] = useState(true)
   const [zone, setZone] = useState('Aus')
@@ -223,6 +225,7 @@ export function EditorScreen(): React.JSX.Element {
     return () => { v.removeEventListener('loadedmetadata', onLoaded) }
   }, [srcUrl, origStart, clipId])
   useEffect(() => { if (videoRef.current) videoRef.current.muted = muted }, [muted])
+  useEffect(() => { if (videoRef.current) videoRef.current.volume = volume }, [volume, srcUrl])
 
   const selRef = useRef<number | null>(null)
   selRef.current = sel
@@ -394,7 +397,7 @@ export function EditorScreen(): React.JSX.Element {
                 <Segmented options={CONTENT_TYPES.map((c) => c.label)} value={contentLabel(kindNext ?? contentKind)} onChange={(n) => setKindNext(CONTENT_TYPES.find((c) => c.label === n)!.id)} />
                 {kindNext && kindNext !== contentKind && <small>Ausschnitt und Ranking werden neu berechnet (Transkript bleibt).</small>}
               </Row>
-              <Row label="Ganzer Clip"><Segmented options={['Smart', 'Vollbild', 'Ganzes Bild', ...(canStream ? ['Facecam + Gameplay'] : [])]} value={clipLayout} onChange={(n) => commit({ t: 'layoutClip', layout: LAYOUTS[n] })} /></Row>
+              <Row label="Ganzer Clip"><Segmented options={['Smart', 'Fest', 'Vollbild', ...(canStream ? ['Facecam + Gameplay'] : [])]} value={clipLayout} onChange={(n) => commit({ t: 'layoutClip', layout: LAYOUTS[n] })} /></Row>
               <Row label="Diese Einstellung"><Segmented options={Object.keys(LAYOUTS)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} /></Row>
               {streamShot && (
                 <>
@@ -414,7 +417,7 @@ export function EditorScreen(): React.JSX.Element {
         </div>
       </div>
 
-      <Timeline duration={D} trim={trim} t={t} onSeek={seek} words={words} playing={playing} onToggle={togglePlay} muted={muted} onMute={() => setMuted(!muted)}
+      <Timeline duration={D} trim={trim} t={t} onSeek={seek} words={words} playing={playing} onToggle={togglePlay} muted={muted} onMute={() => setMuted(!muted)} volume={volume} onVolume={setVolume}
         peaks={assets?.peaks} strip={assets?.strip}
         cuts={(plan?.cuts ?? []).map((c) => [c[0] - origStart, c[1] - origStart] as [number, number])}
         shots={(plan?.shots ?? []).map((s) => ({ ...s, start: s.start + (plan ? plan.start - origStart : 0), end: s.end + (plan ? plan.start - origStart : 0) }))}
@@ -426,12 +429,12 @@ export function EditorScreen(): React.JSX.Element {
 }
 
 interface TimelineProps {
-  duration: number; trim: [number, number]; t: number; onSeek: (n: number) => void; words: { t: number; e: number }[]; playing: boolean; onToggle: () => void; muted: boolean; onMute: () => void
+  duration: number; trim: [number, number]; t: number; onSeek: (n: number) => void; words: { t: number; e: number }[]; playing: boolean; onToggle: () => void; muted: boolean; onMute: () => void; volume: number; onVolume: (v: number) => void
   peaks?: number[]; strip?: string[]; cuts: Array<[number, number]>; shots: ShortmeShot[]; outDuration: number
   onTrim: (t: [number, number]) => void; onPreview: (t: [number, number]) => void; onCheckEnd: () => void; base: object
 }
 
-function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, onMute, peaks, strip, cuts, shots, outDuration, onTrim, onPreview, onCheckEnd, base }: TimelineProps): React.JSX.Element {
+function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, onMute, volume, onVolume, peaks, strip, cuts, shots, outDuration, onTrim, onPreview, onCheckEnd, base }: TimelineProps): React.JSX.Element {
   const track = useRef<HTMLDivElement>(null)
   const [grab, setGrab] = useState<'in' | 'out' | 'head' | null>(null)
   const live = useRef<[number, number]>(trim)
@@ -478,6 +481,7 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         <Button variant="primary" aria-label={playing ? 'Pause' : 'Abspielen'} onClick={onToggle} style={{ width: 44, padding: 0 }}>{playing ? <Pause size={16} /> : <Play size={16} />}</Button>
         <Button variant="ghost" aria-label="5 Sekunden vor" onClick={() => onSeek(t + 5)}><SkipForward size={15} /></Button>
         <Button variant="ghost" aria-label={muted ? 'Ton an' : 'Ton aus'} onClick={onMute}>{muted ? <VolumeX size={15} /> : <Volume2 size={15} />}</Button>
+        <input className="sm-range" type="range" aria-label="Lautstärke (nur Vorschau)" title="Lautstärke nur im Editor, nicht im Export" min={0} max={100} value={Math.round(volume * 100)} onChange={(e) => onVolume(Number(e.target.value) / 100)} style={{ width: 80 }} />
         <small style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-1)', minWidth: 130 }}>{fmt(t)} / {fmt(trim[1] - trim[0])}</small>
         <small>Export nach Kürzen: <b style={{ color: 'var(--text-1)' }}>{outDuration.toFixed(1)} s</b></small>
         <div style={{ flex: 1 }} />
@@ -501,7 +505,7 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         </div>
         {/* Shots */}
         <div style={{ position: 'relative', borderRadius: 6, background: 'rgba(255,255,255,0.04)' }}>
-          {shots.map((s, i) => <div key={i} title={`${LAYOUT_LABEL[s.layout]}${s.auto ? " (automatisch: keine Person im Ausschnitt)" : ""} · ${fmt(s.start)}–${fmt(s.end)}`} style={{ position: 'absolute', top: 2, bottom: 2, left: pct(s.start), width: `calc(${pct(s.end)} - ${pct(s.start)})`, background: LAYOUT_COLOR[s.layout], borderRadius: 4, fontSize: 10, lineHeight: '20px', paddingLeft: 4, overflow: 'hidden', whiteSpace: 'nowrap', color: '#fff', ...(s.auto ? { outline: '1px dashed var(--warn)' } : {}) }}>{LAYOUT_LABEL[s.layout]}{s.auto ? ' · auto' : ''}</div>)}
+          {shots.map((s, i) => <div key={i} title={`${LAYOUT_LABEL[s.layout]}${s.auto ? " (automatisch: keine Person im Ausschnitt → Vollbild)" : ""} · ${fmt(s.start)}–${fmt(s.end)}`} style={{ position: 'absolute', top: 2, bottom: 2, left: pct(s.start), width: `calc(${pct(s.end)} - ${pct(s.start)})`, background: LAYOUT_COLOR[s.layout], borderRadius: 4, fontSize: 10, lineHeight: '20px', paddingLeft: 4, overflow: 'hidden', whiteSpace: 'nowrap', color: '#fff', ...(s.auto ? { outline: '1px dashed var(--warn)' } : {}) }}>{LAYOUT_LABEL[s.layout]}{s.auto ? ' · auto' : ''}</div>)}
         </div>
         {/* außerhalb des Beschnitts abdunkeln */}
         <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: pct(trim[0]), background: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }} />

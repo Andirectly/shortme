@@ -16,7 +16,7 @@ export const contentLabel = (t: ContentType): string => CONTENT_TYPES.find((c) =
 /** Bildausschnitt-Wahl im Erstellen-Dialog. */
 export type FrameChoice = 'smart' | 'fit' | 'split' | 'fixed' | 'stream'
 
-export const FRAME_LABELS: Record<FrameChoice, string> = { smart: 'Smart', fit: 'Ganzes Bild', split: 'Split', fixed: 'Fest', stream: 'Facecam + Gameplay' }
+export const FRAME_LABELS: Record<FrameChoice, string> = { smart: 'Smart', fit: 'Vollbild', split: 'Split', fixed: 'Fest', stream: 'Facecam + Gameplay' }
 export const frameFromLabel = (l: string): FrameChoice => (Object.entries(FRAME_LABELS).find(([, v]) => v === l)?.[0] as FrameChoice | undefined) ?? 'smart'
 
 export interface KindProfile {
