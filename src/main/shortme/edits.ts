@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { emptyLog, push, sanitizeLog, type CaptionPatch, type EditLog } from '../../shared/edits'
 import { writeFileAtomic } from './atomic'
 import { projectFile } from './project'
+import { logEditDiff } from './corrections'
 
 const file = (hash: string, clipId: string): string => projectFile(hash, `edits/${clipId.replace(/[^\w.-]/g, '_')}.json`)
 
@@ -11,7 +12,9 @@ export async function loadEdits(hash: string, clipId: string): Promise<EditLog> 
 
 /** Autosave: jede Änderung des Logs landet atomar auf der Platte (Neustart stellt den Stand wieder her). */
 export async function saveEdits(hash: string, log: EditLog): Promise<void> {
+  const before = await loadEdits(hash, log.clipId)
   await writeFileAtomic(file(hash, log.clipId), JSON.stringify(log))
+  await logEditDiff(hash, before, log)
 }
 
 /** „Auf alle anwenden“: Untertitel-Stil als Operation an alle genannten Clips hängen (je Clip einzeln rückgängig machbar). */

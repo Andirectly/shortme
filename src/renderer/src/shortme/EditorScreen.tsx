@@ -90,6 +90,10 @@ export function EditorScreen(): React.JSX.Element {
   const words = useMemo(() => rawWords.map((w) => ({ ...w, w: st.wordEdits[w.g] ?? w.w, edited: st.wordEdits[w.g] !== undefined })), [rawWords, st.wordEdits])
   const [t, setT] = useState(0)
   const [playing, setPlaying] = useState(false)
+  // Wiedergabedauer für das Korrektur-Protokoll (Lernen): beim Verlassen des Clips melden
+  const playedRef = useRef(0)
+  useEffect(() => { if (!playing) return; const t0 = performance.now(); return () => { playedRef.current += (performance.now() - t0) / 1000 } }, [playing])
+  useEffect(() => () => { const sec = playedRef.current; playedRef.current = 0; if (hash && sec >= 1) void window.cutawan?.shortme?.played(hash, clipId, sec) }, [hash, clipId])
   const [muted, setMuted] = useState(false)
   /** Lautstärke nur für die Wiedergabe im Editor – wirkt nicht auf den Export. */
   const [volume, setVolume] = useState(1)
