@@ -26,6 +26,7 @@ import { makeThumbs, thumbPath } from './clips/thumbs'
 import { existsSync } from 'node:fs'
 import { ensureLayoutInput, ensureSignals, loadLayoutInput } from './clips/analysis'
 import { exportClip } from './render/exporter'
+import { addExport } from '../upload/store'
 import { logDir } from '../log'
 import { applyCaptionToAll, loadEdits, saveEdits } from './edits'
 import { baseState, effectiveClip, stateOf, type CaptionPatch, type EditLog } from '../../shared/edits'
@@ -159,7 +160,8 @@ export function registerShortmeIpc(): void {
         // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
         const st = stateOf(baseState(clips[i], undefined, await loadStyle()), await loadEdits(hash, clips[i].id))
         const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
-        await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, renderer: (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' : 'tscaps', seamCaption: st.caption.style.caption?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+        const exp = await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, renderer: (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' : 'tscaps', seamCaption: st.caption.style.caption?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+        await addExport({ hash, clipId: clips[i].id, title: eff.title, hookText: st.hook.text || eff.hookText, path: exp.path, durationSec: exp.durationSec })
       }
       void shell.openPath(outDir)
     })

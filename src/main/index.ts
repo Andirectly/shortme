@@ -3,6 +3,7 @@ import { release } from 'node:os'
 import { registerEngineIpc, installEngineLifecycle, runSelfTestIfRequested } from './engines'
 import { registerShortmeIpc, runExportSelfTestIfRequested } from './shortme/ipc'
 import { registerTwitchIpc, shutdownTwitch } from './twitch/ipc'
+import { registerUploadIpc } from './upload/ipc'
 import { initLog } from './log'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -327,6 +328,7 @@ app.whenReady().then(() => {
   registerEngineIpc()
   registerShortmeIpc()
   registerTwitchIpc()
+  registerUploadIpc()
   installEngineLifecycle()
   runSelfTestIfRequested()
   void runExportSelfTestIfRequested()

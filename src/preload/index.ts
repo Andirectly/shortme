@@ -27,6 +27,7 @@ import type { StyleDefaults } from '@shared/edits'
 import type { ContentType, FrameChoice, KindProfile } from '@shared/videoKind'
 import type { StreamLayout } from '@shared/streamLayout'
 import type { LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twitch'
+import type { PlatformId, UploadOverview } from '@shared/upload'
 import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
 import type { PersonsPatch, PreviewPlan, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
@@ -215,6 +216,15 @@ const api = {
     channelLayoutDelete: (channel: string): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutDelete', channel),
     channelLayoutSave: (channel: string, layout: StreamLayout): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutSave', channel, layout),
     findStream: (hash: string): Promise<StreamLayout | null> => ipcRenderer.invoke('shortme:findStream', hash),
+    upload: {
+      overview: (): Promise<UploadOverview> => ipcRenderer.invoke('upload:overview'),
+      saveCreds: (platform: PlatformId, key: string, secret: string): Promise<boolean> => ipcRenderer.invoke('upload:saveCreds', platform, key, secret),
+      connect: (platform: PlatformId): Promise<string | null> => ipcRenderer.invoke('upload:connect', platform),
+      disconnect: (platform: PlatformId): Promise<boolean> => ipcRenderer.invoke('upload:disconnect', platform),
+      suggest: (exportId: string): Promise<{ caption: string; hashtags: string[] }> => ipcRenderer.invoke('upload:suggest', exportId),
+      send: (exportId: string, platform: PlatformId, caption: string, resumeJobId?: string): Promise<string | null> => ipcRenderer.invoke('upload:send', exportId, platform, caption, resumeJobId),
+      onChanged: (cb: () => void): (() => void) => { const h = (): void => cb(); ipcRenderer.on('upload:changed', h); return () => ipcRenderer.removeListener('upload:changed', h) }
+    },
     twitch: {
       status: (): Promise<TwitchStatus> => ipcRenderer.invoke('twitch:status'),
       settings: (): Promise<{ chatSignal: boolean; bufferMinutes: number }> => ipcRenderer.invoke('twitch:settings'),

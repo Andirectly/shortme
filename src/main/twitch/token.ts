@@ -53,11 +53,11 @@ async function script(): Promise<string> {
   return scriptPath
 }
 
-async function run(mode: 'set' | 'get' | 'has' | 'del', stdin?: string): Promise<string> {
+async function run(mode: 'set' | 'get' | 'has' | 'del', stdin?: string, target = TARGET): Promise<string> {
   if (process.platform !== 'win32') throw new Error('Token-Speicher nur unter Windows')
   const file = await script()
   return new Promise((resolve, reject) => {
-    const p = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', file, mode, TARGET], { windowsHide: true })
+    const p = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', file, mode, target], { windowsHide: true })
     let out = ''
     let err = ''
     p.stdout.on('data', (d: Buffer) => (out += d))
@@ -72,3 +72,8 @@ export const saveTwitchToken = async (token: string): Promise<void> => { await r
 export const clearTwitchToken = async (): Promise<void> => { await run('del') }
 export const hasTwitchToken = async (): Promise<boolean> => { try { return (await run('has')) === '1' } catch { return false } }
 export const readTwitchToken = async (): Promise<string | null> => { try { return (await run('get')).trim() || null } catch { return null } }
+
+/** Beliebige Geheimnisse (Upload-Plattformen) im selben Speicher unter eigenem Ziel, z. B. „Shortme/TikTok/token“. */
+export const secretSet = (target: string, value: string): Promise<string> => run('set', value, target)
+export const secretDel = (target: string): Promise<string> => run('del', undefined, target)
+export const secretGet = async (target: string): Promise<string | null> => { try { return (await run('get', undefined, target)).trim() || null } catch { return null } }
