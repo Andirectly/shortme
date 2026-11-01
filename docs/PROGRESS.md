@@ -230,3 +230,6 @@ Häufigste fehlende Wörter: ja ×16, also ×15, ist ×12, jetzt ×8, es ×8, au
 
 ## M23 – LEER-Diagnose und Sicherheitsnetz
 Fehlerfall YouTube 1zmTYbX3aeo (Ausschnitt ins Leere): Ursache = Rückfall `fixed cx=0,5` im Ping-Pong-Fenster, wenn nach einem Kamerawechsel nur eine Spur im Segment liegt (zwei Personen links/rechts → Mitte leer). Bericht und Beweisbilder: docs/LEER-DIAGNOSE.md. Umgesetzt: `guardEmptyShots` (> 0,5 s keine Person im Ausschnitt → „Ganzes Bild“, `auto: 'empty'`, im Editor markiert); 31,4 s in 8 von 10 Clips des Fehlervideos. Korrektur der Planung selbst nur vorgeschlagen.
+
+## M24 – Upload (TikTok)
+- Teil 0 erledigt: Machbarkeit geprüft, Anleitung in docs/UPLOAD-SETUP.md (Entwurf-Modus, `video.upload`, Desktop-PKCE, Rückleitung http://localhost:8902/). Offen: PKCE-Hex vs. Base64url und `video.upload` in Sandbox erst beim ersten echten Versuch prüfbar.
