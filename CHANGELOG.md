@@ -6,6 +6,20 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.23.0] - 2026-11-01
+
+### Added
+
+- **Twitch**: VOD-, Clip- und Kanal-Import, "Letzte Minuten" eines laufenden Streams, Live-Puffer, Erkennung stummer Abschnitte, optionaler Token und Chat-Signal.
+- **Inhaltstyp** (Podcast, Vlog, Solo, Stream, Vortrag) mit Profilen und automatischem Vorschlag; Layout **Facecam + Gameplay** mit Erkennung, Rahmen im Editor und Kanal-Layouts.
+- **Transkript-Lücken** werden gesucht und gefüllt; Testlab-Plätze "Clip-Transkription" und "Clip-Auswahl (LLM)" (Qwen3.8 27B, Qwen3-ASR als Kandidaten).
+- **Sicherheitsnetz**: ohne Person im Ausschnitt wechselt der Abschnitt automatisch auf Vollbild (im Editor markiert).
+- Editor: Lautstärkeregler (nur Vorschau); Versionsanzeige unten links.
+
+### Changed
+
+- "Vollbild" heißt jetzt das ganze 16:9-Bild im Hochformat (vorher "Ganzes Bild"); der feste Mittelausschnitt heißt "Fest".
+
 ## [0.14.0] - 2026-10-13
 
 ### Added
