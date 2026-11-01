@@ -6,6 +6,19 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.24.0] - 2026-11-01
+
+### Added
+
+- **Clips erscheinen fortlaufend**: Die Übersicht öffnet sich beim ersten fertigen Clip, unfertige sind ausgegraut mit Prozentwert und noch nicht anklickbar.
+- Editor: Lautstärkeregler (nur Vorschau, nicht im Export).
+- **Testlab-Schalter** wirkt auf die Pipeline: aus = nur Standard-Modelle.
+
+### Changed
+
+- Ohne klaren Sprecher springt der Ausschnitt nie mehr in die Bildmitte: sichtbare Person verfolgen, bei zwei getrennten Personen Split, sonst Vollbild.
+- "Vollbild" = ganzes 16:9 im Hochformat; "Fest" = fester Mittelausschnitt.
+
 ## [0.23.0] - 2026-11-01
 
 ### Added

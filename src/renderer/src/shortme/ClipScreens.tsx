@@ -83,17 +83,18 @@ function DemoProcessing(): React.JSX.Element {
   )
 }
 
-function ClipCard({ c, selected, onSelect, onOpen }: { c: Clip; selected: boolean; onSelect: () => void; onOpen: () => void }): React.JSX.Element {
+function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: boolean; onSelect: () => void; onOpen: () => void; pct: number }): React.JSX.Element {
   const { base, reduced } = useSprings()
   const [hover, setHover] = useState(false)
   const [pop, setPop] = useState(false)
   const vote = useProject((s) => s.feedback[c.id] ?? 0)
   const setFeedback = useProject((s) => s.setFeedback)
   return (
-    <motion.div className="sm-card" style={{ position: 'relative', overflow: 'visible', contentVisibility: 'auto', containIntrinsicSize: '260px 520px', outline: selected ? '2px solid var(--accent)' : 'none' }} whileTap={reduced ? undefined : { scale: 0.97 }} transition={base} onHoverStart={() => setHover(true)} onHoverEnd={() => { setHover(false); setPop(false) }}>
+    <motion.div className="sm-card" style={{ position: 'relative', overflow: 'visible', contentVisibility: 'auto', containIntrinsicSize: '260px 520px', outline: selected ? '2px solid var(--accent)' : 'none', ...(c.pending ? { opacity: 0.45, pointerEvents: 'none', filter: 'grayscale(0.8)' } : {}) }} whileTap={reduced ? undefined : { scale: 0.97 }} transition={base} onHoverStart={() => setHover(true)} onHoverEnd={() => { setHover(false); setPop(false) }}>
       <div onClick={onOpen} style={{ aspectRatio: '9/16', borderRadius: 'var(--r-card) var(--r-card) 0 0', overflow: 'hidden', position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover', transform: hover && !reduced ? 'scale(1.08)' : 'scale(1)', transition: 'transform 2.4s linear' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.3), transparent 30%, transparent 60%, rgba(0,0,0,0.7))' }} />
+        {c.pending && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 15, background: 'rgba(0,0,0,0.35)' }}>{pct}&nbsp;%</div>}
       </div>
       <button className="sm-score" style={{ position: 'absolute', top: 10, left: 10, border: 0 }} aria-label={`Score ${c.score}, Details`} onClick={(e) => { e.stopPropagation(); setPop(!pop) }}>{c.score}</button>
       <button aria-label="Auswählen" aria-pressed={selected} onClick={onSelect} style={{ position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: '50%', border: '1.5px solid #fff', background: selected ? 'var(--accent)' : 'rgba(0,0,0,0.35)', display: 'grid', placeItems: 'center' }}>{selected && <Check size={14} />}</button>
@@ -136,11 +137,14 @@ export function ClipsScreen(): React.JSX.Element {
   const openPersons = useProject((s) => s.openPersons)
   const presetId = useStore((s) => s.presetId)
   const title = useProject((s) => s.currentTitle ?? s.imported?.meta.title ?? s.job?.title)
-  const sorted = [...list].sort((a, b) => b.score - a.score)
+  const sorted = [...list].sort((a, b) => Number(!!a.pending) - Number(!!b.pending) || b.score - a.score)
+  const job = useProject((s) => s.job)
+  const pending = list.filter((c) => c.pending).length
+  const pct = job && job.stage === 'layout' ? Math.round(job.progress * 100) : 0
   return (
     <div style={{ display: 'grid', gap: 18, paddingTop: 12, paddingBottom: 90 }}>
       <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}>
-        <div><h1>{title ?? PROJECTS[0].name}</h1><small>{list.length} Clips · nach Score sortiert</small></div>
+        <div><h1>{title ?? PROJECTS[0].name}</h1><small>{pending ? `${list.length - pending} von ${list.length} fertig · Analyse läuft` : `${list.length} Clips · nach Score sortiert`}</small></div>
         <div style={{ display: 'flex', gap: 8 }}>
           {persons && persons.persons.length > 0 && <Pill onClick={openPersons}>Wer ist wer?{persons.needsReview ? ' ·  prüfen' : ''}</Pill>}
           <Pill pressed={view === 'grid'} onClick={() => setView('grid')}><LayoutGrid size={14} /> Raster</Pill>
@@ -149,12 +153,12 @@ export function ClipsScreen(): React.JSX.Element {
       </div>
       {view === 'grid' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-          {sorted.map((c) => <ClipCard key={c.id} c={c} selected={selected.includes(c.id)} onSelect={() => toggle(c.id)} onOpen={() => openClip(c.id)} />)}
+          {sorted.map((c) => <ClipCard key={c.id} c={c} selected={selected.includes(c.id)} onSelect={() => toggle(c.id)} onOpen={() => !c.pending && openClip(c.id)} pct={pct} />)}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
           {sorted.map((c) => (
-            <motion.div key={c.id} className="sm-card" whileTap={{ scale: 0.99 }} transition={base} onClick={() => openClip(c.id)} style={{ display: 'grid', gridTemplateColumns: '24px 54px 1fr auto auto', alignItems: 'center', gap: 14, padding: 10 }}>
+            <motion.div key={c.id} className="sm-card" whileTap={{ scale: 0.99 }} transition={base} onClick={() => !c.pending && openClip(c.id)} style={{ ...(c.pending ? { opacity: 0.45, pointerEvents: 'none' as const } : {}), display: 'grid', gridTemplateColumns: '24px 54px 1fr auto auto', alignItems: 'center', gap: 14, padding: 10 }}>
               <input type="checkbox" checked={selected.includes(c.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(c.id)} aria-label="Auswählen" />
               <div style={{ width: 54, aspectRatio: '9/16', borderRadius: 8, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover' }} />
               <div><h3>{c.title}</h3><small>{c.reason}</small></div>

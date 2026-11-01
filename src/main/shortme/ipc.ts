@@ -138,7 +138,7 @@ export function registerShortmeIpc(): void {
     if (m) allowMediaPath(m.sourcePath)
     // Fehlende Vorschaubilder (ältere Projekte, früherer Fehler) beim Öffnen nachholen
     if (m) {
-      const missing = file.clips.filter((c) => !existsSync(thumbPath(hash, c.id)))
+      const missing = file.clips.filter((c) => !c.pending && !existsSync(thumbPath(hash, c.id)))
       if (missing.length) await makeThumbs(m, missing).catch((e) => console.error('Vorschaubilder:', e))
     }
     const thumbs: Record<string, string | null> = {}

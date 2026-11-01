@@ -120,14 +120,12 @@ describe('Layouts', () => {
     expect(drift.length).toBe(1)
   })
 
-  it('kein Sprecher > 3 s: mittiger fester Ausschnitt', () => {
+  it('kein Sprecher > 3 s: bei der Person bleiben, nie die Bildmitte', () => {
     const t = track(1, 0.3, 0, 20, (i) => (i < ticks(5) || i >= ticks(14) ? 3 : -3))
     const shots = planShots(base([t], 20))
     coverage(shots, 20)
-    const quiet = shots.find((s) => s.layout === 'fixed')!
-    expect(quiet.cx).toBe(0.5)
-    expect(quiet.start).toBeGreaterThanOrEqual(5)
-    expect(quiet.end).toBeLessThanOrEqual(14.01)
+    expect(shots.some((s) => s.layout === 'fixed')).toBe(false)
+    expect(shots.every((s) => s.layout === 'smart' && Math.abs(s.cx - 0.3) < 0.05)).toBe(true) // Stille Phase bleibt bei der Person (verschmilzt mit den Nachbarn)
   })
 })
 

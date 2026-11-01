@@ -18,6 +18,8 @@ interface ProjectState {
   transcript: ShortmeTranscript | null
   hasApi: boolean
   loadResults: (hash: string) => Promise<void>
+  /** Nur die Clipliste neu laden (während die Analyse noch läuft). */
+  refreshClips: (hash: string) => Promise<void>
   projects: ProjectCard[]
   loadProjects: () => Promise<void>
   deleteProject: (hash: string) => Promise<boolean>
@@ -66,6 +68,7 @@ interface ProjectState {
 export interface ProjectCard { hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null }
 
 let unsub: Array<() => void> = []
+let lastRefresh = 0
 
 export const useProject = create<ProjectState>((set, get) => ({
   imported: null,
@@ -110,6 +113,12 @@ export const useProject = create<ProjectState>((set, get) => ({
     set({ currentTitle: p?.title ?? null })
     return !!get().clipsFile
   },
+  refreshClips: async (hash) => {
+    const a = api()
+    if (!a) return
+    const clipsFile = await a.clips(hash)
+    if (clipsFile) set({ clipsFile })
+  },
   loadResults: async (hash) => {
     const a = api()
     if (!a) return
@@ -129,6 +138,18 @@ export const useProject = create<ProjectState>((set, get) => ({
         if (j.title.startsWith('Export')) { set({ exportJob: j }); return }
         set((s) => (s.job && s.job.id !== j.id && s.job.state === 'running' ? s : { job: j }))
         if (j.state === 'done') void get().loadResults(j.hash)
+        // Clips erscheinen, sobald sie fertig sind: Übersicht öffnet sich beim ersten fertigen Clip
+        else if (j.stage === 'layout' && j.state === 'running') {
+          const now = Date.now()
+          if (now - lastRefresh > 1200) {
+            lastRefresh = now
+            void get().refreshClips(j.hash).then(() => {
+              const f = get().clipsFile
+              const ui = useStore.getState()
+              if (f && f.hash === j.hash && ui.screen === 'processing' && f.clips.some((c) => !c.pending)) { set({ currentTitle: j.title }); ui.go('clips') }
+            })
+          }
+        }
       }),
       a.onImportProgress((p) => set({ importMessage: p.message, importProgress: p.progress }))
     ]

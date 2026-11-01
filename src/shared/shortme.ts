@@ -91,6 +91,8 @@ export interface ShortmeClip {
   shots?: ShortmeShot[]
   /** Facecam-Layout des Clips (erkannt oder vom Kanal übernommen); Grundlage für Szenen mit layout 'stream'. */
   stream?: StreamLayout
+  /** Layout-Analyse läuft noch: Clip ist in der Übersicht ausgegraut und noch nicht bearbeitbar. */
+  pending?: boolean
   /** Korrigierte Untertitel-Texte (globaler Wortindex → Text): Zeichensetzung, Groß-/Kleinschreibung, erkannte Fehler. */
   corrections?: Record<number, string>
 }

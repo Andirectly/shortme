@@ -227,9 +227,21 @@ export function planShots(inp: PlanInput, opt0: PlanOptions = PLAN_DEFAULTS): Sh
       }
     }
     if (s.track === null || s.track === -2) {
-      // keine Gesichter → ganzes Bild (unscharfer Hintergrund), nie ein leerer Ausschnitt
-      const anyFace = inp.tracks.some((t) => { for (let i = s.start; i <= s.end; i++) if (at(t, i)) return true; return false })
-      if (!anyFace || s.end - s.start + 1 >= 1) push(s.start, s.end, anyFace ? { layout: 'fixed', cx: 0.5, zoom: 1 } : { layout: 'fit', cx: 0.5, zoom: 1 })
+      // Kein klarer Sprecher: NIE die Bildmitte (zwischen zwei Personen ist sie leer). Reihenfolge: sichtbare Person(en) zeigen
+      // (eine → Ausschnitt auf sie, zwei getrennte → Split), sonst das ganze Bild (Vollbild mit unscharfem Hintergrund).
+      const vis = visible(s.start, s.end).sort((x, y) => y.area - x.area)
+      if (vis.length === 0) { push(s.start, s.end, { layout: 'fit', cx: 0.5, zoom: 1 }); continue }
+      if (vis.length >= 2 && opt.allowSplit !== false) {
+        const [l, r] = vis[0].c <= vis[1].c ? [vis[0].c, vis[1].c] : [vis[1].c, vis[0].c]
+        const sep = r - l
+        const z = Math.max(1, splitHalfFrac(inp.sourceAspect) / (0.95 * Math.max(sep, 1e-3)))
+        if (sep > w * 0.9 && z <= SPLIT_MAX_ZOOM) {
+          const hw = splitHalfFrac(inp.sourceAspect) / z
+          push(s.start, s.end, { layout: 'split', cx: clampCx(l, hw), cx2: clampCx(r, hw), zoom: z })
+        } else push(s.start, s.end, { layout: 'smart', cx: clampCx((l + r) / 2, w), zoom: 1 })
+        continue
+      }
+      push(s.start, s.end, { layout: 'smart', cx: clampCx(vis[0].c, w), zoom: 1 })
       continue
     }
     const track = inp.tracks.find((t) => t.id === s.track)!
@@ -255,7 +267,13 @@ export function planShots(inp: PlanInput, opt0: PlanOptions = PLAN_DEFAULTS): Sh
     if (lastR && lastR.quiet && lastR.b === -1) lastR.b = s.end
     else if (runStart <= s.end) ranges.push({ a: runStart, b: s.end, quiet: false })
     for (const r of ranges) {
-      if (r.quiet) { push(r.a, r.b, { layout: 'fixed', cx: 0.5, zoom: 1, track: track.id }); continue }
+      if (r.quiet) {
+        // Person spricht gerade nicht: trotzdem bei ihr bleiben (nicht in die Bildmitte springen)
+        const cs: number[] = []
+        for (let i = r.a; i <= r.b; i++) { const v = at(track, i); if (v) cs.push(v.c) }
+        push(r.a, r.b, { layout: 'smart', cx: clampCx(median(cs.length ? cs : [0.5]), w), zoom: 1, track: track.id })
+        continue
+      }
       // feste Ausschnitte: Subjekt wandert > 12 % → neuer fester Ausschnitt statt Verfolgen
       let from = r.a
       let anchor: number | null = null

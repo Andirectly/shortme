@@ -31,3 +31,20 @@ describe('Sicherheitsnetz: keine Person im Ausschnitt', () => {
     expect(guardEmptyShots(others, mk(Array(25).fill(0.9)))).toEqual(others)
   })
 })
+
+import { planShots } from '../src/shared/layoutPlan'
+describe('Rückfall ohne Sprecher: nie die Bildmitte', () => {
+  const mk2 = (n: number): PlanInput => ({
+    ticks: n, dt: 0.2, cuts: [], sourceAspect: 16 / 9,
+    tracks: [0.27, 0.7].map((c, id) => ({ id, start: 0, centres: Array(n).fill(c), areas: Array(n).fill(0.01), scores: Array(n).fill(-3) }))
+  })
+  it('zwei Personen links/rechts, keiner spricht → Split statt Mitte', () => {
+    const shots = planShots(mk2(60))
+    expect(shots.some((s) => s.layout === 'fixed')).toBe(false)
+    expect(shots.every((s) => s.layout === 'split' || s.layout === 'smart')).toBe(true)
+  })
+  it('keine Person sichtbar → Vollbild', () => {
+    const inp: PlanInput = { ticks: 30, dt: 0.2, cuts: [], sourceAspect: 16 / 9, tracks: [] }
+    expect(planShots(inp).every((s) => s.layout === 'fit')).toBe(true)
+  })
+})

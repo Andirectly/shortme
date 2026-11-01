@@ -171,6 +171,12 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     if (!streamBase) { const found = await findFacecam(meta.sourcePath, 0, meta.durationSec, 14, opts.signal).catch(() => null); if (found) streamBase = defaultStream(dims, found.cam) }
     report('layout', 0, streamBase ? 'Facecam gefunden' : 'Keine Facecam gefunden – Gameplay-Ausschnitt')
   }
+  // Fortschrittliche Übersicht: Clips sofort veröffentlichen (ausgegraut), jeder wird fertig, sobald sein Layout berechnet ist
+  const clipsPath = projectFile(meta.hash, 'clips.json')
+  let writing: Promise<unknown> = Promise.resolve()
+  const publish = (): Promise<unknown> => (writing = writing.then(() => writeFileAtomic(clipsPath, JSON.stringify({ version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, clips: [...clips].sort((x, y) => y.score - x.score) } satisfies ClipsFile, null, 1))))
+  clips = clips.map((c) => ({ ...c, pending: true }))
+  await publish()
   const layouts: Awaited<ReturnType<typeof layoutForClip>>[] = new Array(clips.length)
   let nextClip = 0
   let doneClips = 0
@@ -195,19 +201,25 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
         } else shots = [{ start: 0, end: clips[i].end - clips[i].start, layout: 'fixed', cx: 0.5, zoom: 1 }]
       }
       clips[i] = { ...clips[i], shots, faceRatio: l.faceRatio, score: Math.max(0, clips[i].score - penalty), ...(stream ? { stream } : {}) }
+      await makeThumbs(meta, [clips[i]], opts.signal)
+      clips[i] = { ...clips[i], pending: undefined }
+      await publish()
       report('layout', ++doneClips / clips.length, `Bildausschnitt planen (${doneClips}/${clips.length}) …`)
     }
   }
   report('layout', 0, `Bildausschnitt planen (0/${clips.length}) …`)
-  await Promise.all([layoutWorker(), layoutWorker()])
+  try { await Promise.all([layoutWorker(), layoutWorker()]) } catch (e) {
+    // Abbruch/Fehler: unfertige Clips verwerfen, fertige bleiben (Stoppen & behalten)
+    clips = clips.filter((c) => !c.pending)
+    await publish()
+    throw e
+  }
   // Personen über das ganze Video (Wiedererkennung) → persons.json; Plan-Eingaben tragen die Personen
   if (layouts.some((l) => l.identities.length)) {
     const pf = await buildPersons(meta, clips, layouts).catch((e) => { console.error('Personen-Zuordnung fehlgeschlagen:', e); return null })
     if (pf) for (let i = 0; i < clips.length; i++) await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(applyPersons(layouts[i].input, clips[i].id, pf)))
   }
   clips.sort((x, y) => y.score - x.score)
-  report('thumbs', 0, 'Vorschaubilder …')
-  await makeThumbs(meta, clips, opts.signal)
   const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, clips }
   await writeFileAtomic(projectFile(meta.hash, 'clips.json'), JSON.stringify(file, null, 1))
   await markStage(meta.hash, 'clips', true)

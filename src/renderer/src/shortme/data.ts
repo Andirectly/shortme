@@ -25,6 +25,8 @@ export interface Clip {
   tags: string[]
   reason: string
   criteria: { label: string; value: number }[]
+  /** Layout-Analyse läuft noch (ausgegraut, nicht anklickbar). */
+  pending?: boolean
 }
 
 const crit = (a: number, b: number, c: number, d: number, e: number): Clip['criteria'] => [
