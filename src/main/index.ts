@@ -2,6 +2,7 @@ import { app, BrowserWindow, nativeTheme, protocol, screen, shell } from 'electr
 import { release } from 'node:os'
 import { registerEngineIpc, installEngineLifecycle, runSelfTestIfRequested } from './engines'
 import { registerShortmeIpc, runExportSelfTestIfRequested } from './shortme/ipc'
+import { registerLearnIpc } from './learn/ipc'
 import { registerTwitchIpc, shutdownTwitch } from './twitch/ipc'
 import { registerUploadIpc } from './upload/ipc'
 import { initLog } from './log'
@@ -327,6 +328,7 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   registerEngineIpc()
   registerShortmeIpc()
+  registerLearnIpc()
   registerTwitchIpc()
   registerUploadIpc()
   installEngineLifecycle()

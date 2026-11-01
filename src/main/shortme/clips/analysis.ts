@@ -8,7 +8,8 @@ import { writeFileAtomic } from '../atomic'
 import { loadTranscript } from '../transcription'
 import { signalsFromWav, type Signals } from './signals'
 import { detectShots } from './scenes'
-import { selectClips } from './select'
+import { collecting, notifyLearnChange } from '../../learn/store'
+import { selectClips, type CandTrace } from './select'
 import { makeThumbs } from './thumbs'
 import { layoutForClip } from '../layout/run'
 import { applyPersons, buildPersons } from './persons'
@@ -132,7 +133,8 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   if (chat) report('signals', 1, `Chat-Signal gefunden (${chat.messages} Nachrichten) – fließt ins Ranking ein`)
   if (heat) report('signals', 1, 'Most-replayed-Kurve gefunden – fließt ins Ranking ein')
   const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat, events, chat: chat?.heat ?? null, weights: profile.ranking }
-  const sel = { query: [profile.prompt, opts.query].filter(Boolean).join(' ') || undefined, wanted: opts.wanted, signal: opts.signal, report, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
+  let trace: CandTrace[] = []
+  const sel = { query: [profile.prompt, opts.query].filter(Boolean).join(' ') || undefined, wanted: opts.wanted, signal: opts.signal, report, trace: (rows: CandTrace[]) => { trace = rows }, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
 
   let mode: ClipsFile['mode'] = 'llm'
   let clips: ShortmeClip[]
@@ -222,6 +224,8 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   clips.sort((x, y) => y.score - x.score)
   const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, clips }
   await writeFileAtomic(projectFile(meta.hash, 'clips.json'), JSON.stringify(file, null, 1))
+  if (trace.length && (await collecting())) await writeFileAtomic(projectFile(meta.hash, 'candidates.json'), JSON.stringify(trace))
+  notifyLearnChange()
   await markStage(meta.hash, 'clips', true)
   stageSec[curStage] = (stageSec[curStage] ?? 0) + (Date.now() - curAt) / 1000
   console.info(`[perf] Analyse ${Math.round(meta.durationSec / 60)} min Video: ${Object.entries(stageSec).map(([k, v]) => `${k} ${v.toFixed(0)} s`).join(' · ')}`)

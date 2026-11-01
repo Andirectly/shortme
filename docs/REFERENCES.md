@@ -26,3 +26,7 @@
 | Label | Von echten Nutzern gesetzte Clip-Grenzen (Themenabschnitte) | Implizit: Wiederholungs-Häufigkeit der Zuschauer (Podcast-Highlights) |
 
 **Eignung Vortraining:** Repurpose-10K passt inhaltlich (Langvideo → Clips, Nutzerlabels), aber Sprache vermutlich nicht Deutsch, Lizenz unklar, Videos müssen selbst geladen werden; nur als Experiment für private Nutzung, Ergebnis unsicher. Rhapsody passt zu Podcasts und liefert Verhaltenslabels (näher an Viralität), ist aber nur Englisch und NC/Forschung; für rein private Nutzung vertretbar, Transfer auf Deutsch nur über Text-/Audio-Merkmale ohne Sprachbindung (unbestätigt).
+
+## Unser Datensatz (`<Daten>/dataset/`, Rhapsody-kompatibel)
+- `videos.jsonl`: eine Zeile je Video wie Rhapsody (`vid`, `title`, `gt` = 100 Bins der Replay-Kurve 0..1 oder null, `metadata`, `transcript` = Segmente); `candidates.jsonl`: Kandidaten (Shortme, Creator, Referenz); `pairs.jsonl`: `{a, b, source, weight, vid, split}` (a besser als b); `split.json`: Video → train/test (80/20, einmal vergeben); `blind.jsonl`: Blindtest-Urteile.
+- Rhapsody-Highlights ableitbar: `gt[0] = gt[1]`, Bins mit `gt > 0,5`, absteigend, max. 20.

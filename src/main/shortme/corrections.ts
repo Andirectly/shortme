@@ -5,13 +5,15 @@ import { projectFile } from './project'
 import { loadClips } from './clips/analysis'
 import { loadTranscript } from './transcription'
 import { loadStyle } from './styleDefaults'
+import { collecting, notifyLearnChange } from '../learn/store'
 
 const file = (hash: string): string => projectFile(hash, 'corrections.jsonl')
 
 export async function logCorrection(hash: string, clipId: string, ev: CorrEvent[]): Promise<void> {
-  if (!ev.length) return
+  if (!ev.length || !(await collecting())) return
   const at = new Date().toISOString()
   await appendFile(file(hash), ev.map((e) => JSON.stringify({ at, clipId, ...e })).join('\n') + '\n', 'utf8')
+  notifyLearnChange()
 }
 
 export async function loadCorrections(hash: string): Promise<CorrRecord[]> {

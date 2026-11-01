@@ -24,6 +24,8 @@ export interface SelectInput {
   cuts: number[]
 }
 
+export interface CandTrace { start: number; end: number; criteria: ShortmeClip['criteria']; title: string; fate: 'rated' | 'finalist' | 'overlap' | 'selected' }
+
 export interface SelectOptions {
   /** URL des laufenden llama-server; null = Fallback (TextTiling). */
   baseUrl: string | null
@@ -33,6 +35,8 @@ export interface SelectOptions {
   wanted?: number
   minSec?: number
   maxSec?: number
+  /** Alle bewerteten Kandidaten (auch nicht gewählte) mit Schicksal – nur zum Sammeln von Lerndaten. */
+  trace?: (rows: CandTrace[]) => void
   signal?: AbortSignal
   report?: (stage: string, fraction: number, message: string) => void
 }
@@ -373,6 +377,8 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   report('snap', 0.9, 'Grenzen einrasten …')
   const taken: Range[] = []
   const out: ShortmeClip[] = []
+  const lost = new Set<Rated>()
+  const chosen = new Set<Rated>()
   const sctx = { words, sentences, silences: signals.silences, cuts, durationSec }
   // Themenvielfalt: jeder weitere Clip aus einem schon gewählten Thema kostet Punkte
   const topicOf = (f: Rated): number => topicOfRange(tmap, sentences[f.first].start, sentences[f.last].end)
@@ -382,8 +388,9 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
     scored.sort((a, b) => Number(solid(b.f)) - Number(solid(a.f)) || adj(b) - adj(a))
     const { f, score } = scored.shift()!
     const snapped = snapClip({ start: sentences[f.first].start, end: sentences[f.last].end }, { ...sctx, neighbors: taken, maxLen: MAX_CLIP_SEC })
-    if (snapped.end - snapped.start < minSec * 0.6 || taken.some((t) => snapped.start < t.end && snapped.end > t.start)) { console.info(`[select] verworfen (Überlappung/zu kurz): ${snapped.start.toFixed(1)}–${snapped.end.toFixed(1)}`); continue }
+    if (snapped.end - snapped.start < minSec * 0.6 || taken.some((t) => snapped.start < t.end && snapped.end > t.start)) { lost.add(f); console.info(`[select] verworfen (Überlappung/zu kurz): ${snapped.start.toFixed(1)}–${snapped.end.toFixed(1)}`); continue }
     taken.push({ start: snapped.start, end: snapped.end })
+    chosen.add(f)
     perTopic.set(topicOf(f), (perTopic.get(topicOf(f)) ?? 0) + 1)
     // Wortgrenzen aus dem EINGERASTETEN Bereich (Nachbarn/Länge können den Kandidaten kürzen)
     const fw = Math.max(0, words.findIndex((w) => w.start >= snapped.start - 0.06))
@@ -394,6 +401,8 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
       title: f.title, hookText: f.hookText, reason: f.reason, tags: resolveTags(f.tags, sentences, words, f.first, f.last), ...(input.heat ? { heat: Math.round(heatScore(input.heat, snapped.start, snapped.end) * 100) / 100 } : {}), ...(input.chat ? { chat: Math.round(heatScore(input.chat, snapped.start, snapped.end) * 100) / 100 } : {}), source: 'llm', snap: snapped.path, extended: f.extended
     })
   }
+  // Spur für das Lernen: alle bewerteten Kandidaten und wie weit sie kamen (Stufe, an der ein Moment verloren geht)
+  opts.trace?.(pool.map((f) => ({ start: sentences[f.first].start, end: sentences[f.last].end, criteria: f.criteria, title: f.title, fate: chosen.has(f) ? 'selected' : lost.has(f) ? 'overlap' : finalists.includes(f) ? 'finalist' : 'rated' })))
   // F: Untertitel-Korrektur je Clip (Zeichensetzung, Schreibweise, Erkennungsfehler) – als Vorbelegung, im Editor änderbar
   for (let i = 0; i < out.length; i++) {
     report('proofread', i / out.length, `Untertitel prüfen (${i + 1}/${out.length}) …`)

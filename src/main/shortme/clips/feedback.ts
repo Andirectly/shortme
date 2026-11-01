@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { writeFileAtomic } from '../atomic'
 import { projectFile } from '../project'
+import { notifyLearnChange } from '../../learn/store'
 import { fromThumbs, sanitizeRating, type Rating, type Ratings } from '../../../shared/learn'
 
 const file = (hash: string): string => projectFile(hash, 'ratings.json')
@@ -22,5 +23,6 @@ export async function saveRating(hash: string, clipId: string, rating: Pick<Rati
   const r = rating && sanitizeRating({ ...rating, at: new Date().toISOString() })
   if (r) all[clipId] = r; else delete all[clipId]
   await writeFileAtomic(file(hash), JSON.stringify(all, null, 1))
+  notifyLearnChange()
   return all
 }
