@@ -86,6 +86,7 @@ function DemoProcessing(): React.JSX.Element {
 
 function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: boolean; onSelect: () => void; onOpen: () => void; pct: number }): React.JSX.Element {
   const { base, reduced } = useSprings()
+  const deleteClip = useProject((s) => s.deleteClip)
   const [hover, setHover] = useState(false)
   const [pop, setPop] = useState(false)
   return (
@@ -99,7 +100,7 @@ function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: b
       <button aria-label="Auswählen" aria-pressed={selected} onClick={onSelect} style={{ position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: '50%', border: '1.5px solid #fff', background: selected ? 'var(--accent)' : 'rgba(0,0,0,0.35)', display: 'grid', placeItems: 'center' }}>{selected && <Check size={14} />}</button>
       <div style={{ padding: '10px 12px 12px', display: 'grid', gap: 4 }}>
         <h3 style={{ fontSize: 14, lineHeight: 1.25 }}>{c.title}</h3>
-        <div style={{ position: 'absolute', right: 10, bottom: 10 }}><RatingBar clipId={c.id} chips="popover" /></div>
+        <div style={{ position: 'absolute', right: 10, bottom: 10, display: 'flex', gap: 4, alignItems: 'flex-start' }}><RatingBar clipId={c.id} chips="popover" /><button aria-label="Clip löschen" title="Clip löschen" onClick={(e) => { e.stopPropagation(); void deleteClip(c.id) }} style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--edge)', background: 'rgba(0,0,0,0.35)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><Trash2 size={14} /></button></div>
         <small>{c.duration} s {c.faceRatio < 0.6 && <span title={`Gesichtsquote ${Math.round(c.faceRatio * 100)} %`} style={{ color: 'var(--warn)', marginLeft: 6 }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> wenig Gesicht</span>}</small>
       </div>
       <AnimatePresence>

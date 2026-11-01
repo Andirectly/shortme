@@ -89,7 +89,7 @@ function bestOffset(short: Float32Array, s: number, n: number, long: Float32Arra
  */
 export function locate(short: Float32Array, long: Float32Array, opts: { minScore?: number; chunkSec?: number } = {}): Moment[] {
   const n = Math.round((opts.chunkSec ?? 4) * FEAT_FPS)
-  const minScore = opts.minScore ?? 0.5
+  const minScore = opts.minScore ?? 0.75
   const sf = short.length / BANDS, lf = long.length / BANDS
   const longNorm = new Float64Array(lf + 1)
   for (let f = 0; f < lf; f++) { let e = 0; for (let b = 0; b < BANDS; b++) e += long[f * BANDS + b] ** 2; longNorm[f + 1] = longNorm[f] + e }
@@ -101,7 +101,7 @@ export function locate(short: Float32Array, long: Float32Array, opts: { minScore
     const last = g?.[g.length - 1]
     if (g && last && h.s - last.s === n && Math.abs(h.o - h.s - (last.o - last.s)) <= 3) g.push(h); else groups.push([h])
   }
-  return groups.map((g) => {
+  const moments = groups.map((g) => {
     let a = g[0].o, b = g[g.length - 1].o + n
     const d = g[0].o - g[0].s
     // Ränder um bis zu 3 s verlängern, solange die einzelnen Frames noch zusammenpassen
@@ -117,6 +117,13 @@ export function locate(short: Float32Array, long: Float32Array, opts: { minScore
     for (let i = 0; i < 3 * FEAT_FPS && frameSim(lastS + i) > 0.3; i++) b++
     return { start: Math.max(0, a) / FEAT_FPS, end: Math.min(lf, b) / FEAT_FPS, score: g.reduce((s, h) => s + h.score, 0) / g.length }
   })
+  // sortiert, Abschnitte ≤ 8 s Abstand verschmelzen (ein Short springt oft nur kurz vor/zurück); vereinzelte 4-s-Treffer < 0,9 sind meist Zufall
+  const out: Moment[] = []
+  for (const m of moments.sort((x, y) => x.start - y.start)) {
+    const last = out[out.length - 1]
+    if (last && m.start - last.end <= 8) { last.score = (last.score + m.score) / 2; last.end = Math.max(last.end, m.end) } else out.push({ ...m })
+  }
+  return out.filter((m) => m.end - m.start >= 5 || m.score >= 0.9)
 }
 
 const norm = (w: string): string => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')

@@ -9,6 +9,8 @@ export type CorrEvent =
   | { kind: 'export'; durationSec: number }
   /** Wiedergabedauer im Editor (Sekunden); zeigt auch bei verworfenen Clips, ob sie angesehen wurden. */
   | { kind: 'played'; sec: number }
+  /** Clip aus der Liste gelöscht; `playedSec` = so lange wurde er vorher im Editor abgespielt (0 = nie). */
+  | { kind: 'delete'; playedSec: number }
 
 export type CorrRecord = CorrEvent & { at: string; clipId: string }
 

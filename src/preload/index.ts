@@ -198,6 +198,7 @@ const api = {
     styleGet: (): Promise<StyleDefaults> => ipcRenderer.invoke('shortme:styleGet'),
     styleSet: (style: StyleDefaults): Promise<StyleDefaults> => ipcRenderer.invoke('shortme:styleSet', style),
     feedback: (hash: string): Promise<Ratings> => ipcRenderer.invoke('shortme:feedback', hash),
+    deleteClip: (hash: string, clipId: string): Promise<void> => ipcRenderer.invoke('shortme:deleteClip', hash, clipId),
     played: (hash: string, clipId: string, sec: number): Promise<void> => ipcRenderer.invoke('shortme:played', hash, clipId, sec),
     feedbackSet: (hash: string, clipId: string, rating: { level: Level; reasons: string[] } | null): Promise<Ratings> => ipcRenderer.invoke('shortme:feedbackSet', hash, clipId, rating),
     testlab: {

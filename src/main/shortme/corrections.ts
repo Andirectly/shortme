@@ -2,7 +2,10 @@ import { appendFile, readFile } from 'node:fs/promises'
 import { baseState, stateOf, type EditLog } from '../../shared/edits'
 import { diffStates, type CorrEvent, type CorrRecord } from '../../shared/corrections'
 import { projectFile } from './project'
+import { writeFileAtomic } from './atomic'
+import type { ShortmeClip } from '../../shared/shortme'
 import { loadClips } from './clips/analysis'
+import { readJson } from '../learn/store'
 import { loadTranscript } from './transcription'
 import { loadStyle } from './styleDefaults'
 import { collecting, notifyLearnChange } from '../learn/store'
@@ -29,4 +32,18 @@ export async function logEditDiff(hash: string, before: EditLog, after: EditLog)
     const base = baseState(clip, undefined, await loadStyle())
     await logCorrection(hash, after.clipId, diffStates(stateOf(base, before), stateOf(base, after), tr.words))
   } catch (e) { console.error('Korrektur-Protokoll:', e) }
+}
+
+export interface DeletedClip { clip: ShortmeClip; at: string; playedSec: number }
+export const loadDeleted = (hash: string): Promise<DeletedClip[]> => readJson<DeletedClip[]>(projectFile(hash, 'deleted.json'), [])
+
+/** Clip aus der Liste nehmen. Der Clip bleibt mit Wiedergabedauer in `deleted.json` (Lerndaten); Bewertung und Edits bleiben liegen. */
+export async function deleteClip(hash: string, clipId: string): Promise<void> {
+  const file = await loadClips(hash)
+  const clip = file?.clips.find((c) => c.id === clipId)
+  if (!file || !clip) return
+  const playedSec = (await loadCorrections(hash)).reduce((s, e) => s + (e.clipId === clipId && e.kind === 'played' ? e.sec : 0), 0)
+  await writeFileAtomic(projectFile(hash, 'deleted.json'), JSON.stringify([...(await loadDeleted(hash)), { clip, at: new Date().toISOString(), playedSec }]))
+  await writeFileAtomic(projectFile(hash, 'clips.json'), JSON.stringify({ ...file, clips: file.clips.filter((c) => c.id !== clipId) }, null, 1))
+  await logCorrection(hash, clipId, [{ kind: 'delete', playedSec }])
 }

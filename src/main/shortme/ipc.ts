@@ -28,6 +28,7 @@ import { existsSync } from 'node:fs'
 import { ensureLayoutInput, ensureSignals, loadLayoutInput } from './clips/analysis'
 import { exportClip } from './render/exporter'
 import { addExport } from '../upload/store'
+import { deleteClip } from './corrections'
 import { logCorrection } from './corrections'
 import { logDir } from '../log'
 import { applyCaptionToAll, loadEdits, saveEdits } from './edits'
@@ -192,6 +193,7 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('shortme:editsLoad', (_e, hash: string, clipId: string) => loadEdits(hash, clipId))
   ipcMain.handle('shortme:editsSave', (_e, hash: string, log: EditLog) => saveEdits(hash, log))
   ipcMain.handle('shortme:played', (_e, hash: string, clipId: string, sec: number) => (sec >= 1 ? logCorrection(hash, clipId, [{ kind: 'played', sec: Math.round(sec) }]) : undefined))
+  ipcMain.handle('shortme:deleteClip', (_e, hash: string, clipId: string) => deleteClip(hash, clipId))
   ipcMain.handle('shortme:applyAll', (_e, hash: string, clipIds: string[], patch: CaptionPatch) => applyCaptionToAll(hash, clipIds, patch))
   ipcMain.handle('shortme:openLogs', () => shell.openPath(logDir()))
   /** Projektliste: Titel, Dauer, Clip-Anzahl und 16:9-Vorschaubild (YouTube-Thumbnail bzw. Screenshot). */

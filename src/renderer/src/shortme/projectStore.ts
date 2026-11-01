@@ -54,6 +54,7 @@ interface ProjectState {
   style: StyleDefaults
   loadStyle: () => Promise<void>
   saveStyle: (s: StyleDefaults) => Promise<void>
+  deleteClip: (clipId: string) => Promise<void>
   setFeedback: (clipId: string, rating: { level: Level; reasons: string[] } | null) => Promise<void>
   personsOpen: boolean
   pendingExport: { clipIds: string[]; presetId: string; srt: boolean } | null
@@ -86,6 +87,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   style: {},
   loadStyle: async () => { const a = api(); if (a) set({ style: await a.styleGet() }) },
   saveStyle: async (st) => { const a = api(); if (a) set({ style: await a.styleSet(st) }) },
+  deleteClip: async (clipId) => { const a = api(); const hash = get().clipsFile?.hash; if (!a || !hash) return; await a.deleteClip(hash, clipId); await get().refreshClips(hash) },
   setFeedback: async (clipId, rating) => { const a = api(); const hash = get().clipsFile?.hash; if (!a || !hash) return; set({ feedback: await a.feedbackSet(hash, clipId, rating) }) },
   personsOpen: false,
   pendingExport: null,

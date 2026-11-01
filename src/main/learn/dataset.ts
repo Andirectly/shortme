@@ -11,7 +11,7 @@ import { loadHeat, heatStats } from '../shortme/clips/heat'
 import { loadRatings } from '../shortme/clips/feedback'
 import { loadTranscript } from '../shortme/transcription'
 import { loadEdits } from '../shortme/edits'
-import { loadCorrections } from '../shortme/corrections'
+import { loadCorrections, loadDeleted } from '../shortme/corrections'
 import type { CandTrace } from '../shortme/clips/select'
 import { collecting, datasetDir, readJson } from './store'
 
@@ -49,7 +49,8 @@ export async function projectRecords(hash: string, split: 'train' | 'test'): Pro
   const h = (a: number, b: number): CandRecord['heat'] => { if (!heat) return null; const s = heatStats(heat, a, b); return { mean: +s.mean.toFixed(3), max: +s.peak.toFixed(3) } }
   const cands: CandRecord[] = []
 
-  for (const c of clipsFile?.clips ?? []) {
+  const gone = await loadDeleted(hash)
+  for (const c of [...(clipsFile?.clips ?? []), ...gone.map((g) => g.clip)]) {
     const log = await loadEdits(hash, c.id)
     const st = stateOf(baseState(c), log)
     const cut = new Set(st.cutWords)
@@ -61,7 +62,7 @@ export async function projectRecords(hash: string, split: 'train' | 'test'): Pro
       ...base, id: `${hash}:${c.id}`, source: 'shortme', start: c.start, end: c.end, transcript: textIn(words, c.start, c.end), marks: marks(c.start, c.end),
       rubric: c.criteria, heat: h(c.start, c.end), rating: ratings[c.id] ? { level: ratings[c.id].level, reasons: ratings[c.id].reasons } : null,
       corrections: changed ? { startShift: +(st.start - c.start).toFixed(2), endShift: +(st.end - c.end).toFixed(2), cutText, hook: st.hook.text !== c.hookText ? { before: c.hookText, after: st.hook.text } : undefined, framing: st.layoutOps.length + st.streamOps.length > 0 } : null,
-      exported: mine.some((e) => e.kind === 'export'), playedSec: mine.reduce((s, e) => s + (e.kind === 'played' ? e.sec : 0), 0), fate: 'selected'
+      exported: mine.some((e) => e.kind === 'export'), playedSec: mine.reduce((s, e) => s + (e.kind === 'played' ? e.sec : 0), 0), fate: gone.some((g) => g.clip.id === c.id) ? 'deleted' : 'selected'
     }
     cands.push(rec)
     // „Meine Version“ als eigener Kandidat, sobald Grenzen oder Inhalt wirklich geändert wurden

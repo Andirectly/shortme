@@ -58,20 +58,24 @@ export interface ShortRow { id: string; title: string; views: number; likes: num
 interface ShortsCache { channelUrl: string; shorts: ShortRow[] }
 const REFRESH_DAYS = 14
 
-/** Alle Shorts eines Kanals mit Aufrufen, Likes, Kommentaren, Datum (zwischengespeichert; Zahlen werden nach 14 Tagen erneuert). */
-export async function channelShorts(channelUrl: string, onMsg: (m: string) => void = () => undefined): Promise<ShortRow[]> {
+/** Shorts eines Kanals ab `since` (ISO-Datum, leer = alle) mit Aufrufen, Likes, Kommentaren, Datum (zwischengespeichert; Zahlen werden nach 14 Tagen erneuert). */
+export async function channelShorts(channelUrl: string, since = '', onMsg: (m: string) => void = () => undefined): Promise<ShortRow[]> {
   const base = channelBase(channelUrl)
   const file = learnFile(`shorts-${base.replace(/[^\w@-]/g, '_').slice(-60)}.json`)
   const cache = await readJson<ShortsCache>(file, { channelUrl: base, shorts: [] })
   const list = (await ytJson(['--flat-playlist', `${base}/shorts`]).catch(() => ({ entries: [] }))).entries as Array<{ id: string }>
   const have = new Map(cache.shorts.map((s) => [s.id, s]))
-  const todo = [...list.map((e) => e.id).filter((id) => !have.has(id)), ...cache.shorts.filter((s) => Date.now() - Date.parse(s.fetchedAt) > REFRESH_DAYS * 86_400_000).map((s) => s.id)]
-  let n = 0
+  const stale = cache.shorts.filter((s) => s.date >= since && Date.now() - Date.parse(s.fetchedAt) > REFRESH_DAYS * 86_400_000).map((s) => s.id)
+  const todo = [...list.map((e) => e.id).filter((id) => !have.has(id)), ...stale]
+  let n = 0, older = 0
   for (const id of todo) {
+    // Liste ist neueste zuerst: nach 3 Shorts vor `since` ist der Rest für dieses Langvideo irrelevant (Zwischenspeicher füllt sich später weiter)
+    if (since && older >= 3) break
     onMsg(`Shorts des Kanals lesen (${++n}/${todo.length}) …`)
     try {
       const d = await ytJson(['--no-playlist', `https://www.youtube.com/shorts/${id}`])
       have.set(id, { id, title: String(d.title ?? ''), views: d.view_count ?? 0, likes: d.like_count ?? 0, comments: d.comment_count ?? 0, date: isoDate(d.upload_date), durationSec: d.duration ?? 0, fetchedAt: new Date().toISOString() })
+      if (since && have.get(id)!.date < since) older++; else older = 0
     } catch (e) { console.error('Short', id, e) }
     if (n % 20 === 0) await writeFileAtomic(file, JSON.stringify({ channelUrl: base, shorts: [...have.values()] }))
   }

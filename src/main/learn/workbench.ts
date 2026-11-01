@@ -122,7 +122,9 @@ async function processItem(it: WorkItem): Promise<void> {
     const channelUrl = it.channelUrl ?? (d.channel_url ? channelBase(d.channel_url) : '')
     await patch(it, { date, channel: d.channel ?? it.channel, channelUrl, durationSec: d.duration ?? it.durationSec })
     if (!channelUrl) return patch(it, { status: 'noshorts' })
-    const every = await channelShorts(channelUrl)
+    // Vergleichsfenster für die Leistung: 60 Tage vor dem Langvideo reichen (Median ±60 Tage)
+    const since = new Date(Date.parse(date) - 60 * 86_400_000).toISOString().slice(0, 10)
+    const every = await channelShorts(channelUrl, since)
     const shorts = every.filter((s) => s.date >= date)
     const allRatios = shortRatios(every)
     const audio = await downloadAudio(it.url, tmpAudioBase(`wb-${it.id}`))
@@ -178,7 +180,7 @@ export async function evaluateProject(hash: string): Promise<EvalFile | null> {
 
 const downloads = (): string => resolve(dataRoot(), 'downloads').toLowerCase()
 /** Videodatei löschen; Ton, Transkript, Schlüsselbilder und Datensatz bleiben. Blindtest/Editor laden sie bei Bedarf neu (ensureSource). */
-async function dropVideo(hash: string): Promise<void> {
+export async function dropVideo(hash: string): Promise<void> {
   const meta = await loadMeta(hash)
   if (meta && resolve(meta.sourcePath).toLowerCase().startsWith(downloads())) await rm(meta.sourcePath, { force: true })
 }

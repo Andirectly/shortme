@@ -17,8 +17,8 @@ import { loadStyle } from '../shortme/styleDefaults'
 import { loadTranscript } from '../shortme/transcription'
 import { writeFileAtomic } from '../shortme/atomic'
 import { projectFile } from '../shortme/project'
-import { datasetDir, learnFile, notifyLearnChange, readJson } from './store'
-import { ensureSource } from './workbench'
+import { datasetDir, learnFile, loadLearnSettings, notifyLearnChange, readJson } from './store'
+import { dropVideo, ensureSource } from './workbench'
 
 /** Verweis auf einen Moment: Shortme-Clip (`key` = Clip-Id) oder Creator/Referenz (`key` = `<Short-Id>:<Index>`). */
 export interface MomentRef { kind: 'shortme' | 'creator' | 'reference'; key: string }
@@ -86,6 +86,8 @@ export async function blindAnswer(testId: string, choice: 'left' | 'right' | 'ti
       await writeFileAtomic(join(datasetDir(), 'blind.jsonl'), JSON.stringify({ winner: w.candId, loser: l.candId, vid: t.hash, winnerKind: w.kind, loserKind: l.kind }) + '\n')
     })
   }
+  // für den Blindtest neu geladenes Video wieder freigeben (Schalter „Videodatei nach Auswertung löschen“)
+  if ((await loadLearnSettings()).deleteVideos) await dropVideo(t.hash)
   notifyLearnChange()
   return { left: t.left.kind, right: t.right.kind }
 }
