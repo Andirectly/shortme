@@ -311,6 +311,8 @@ export function EditorScreen(): React.JSX.Element {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Button variant="ghost" aria-label="Zurück" onClick={() => { videoRef.current?.pause(); go('clips') }}><ArrowLeft size={18} /></Button>
         <h2 style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{clip.title}</h2>
+        {/* Schnellwahl: Ausschnitt der aktuellen Einstellung (Szene) sofort ändern – derselbe Operationsweg wie im Reiter „Bildausschnitt“ */}
+        <Segmented options={Object.keys(LAYOUTS).filter((k) => k !== 'Facecam + Gameplay' || canStream)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} />
         <small style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{saved ? <><Check size={13} /> Gespeichert</> : 'Speichert …'}</small>
         <Button variant="ghost" aria-label="Rückgängig (Strg+Z)" disabled={!canUndo(log)} onClick={undo}><Undo2 size={16} /></Button>
         <Button variant="ghost" aria-label="Wiederholen (Strg+Y)" disabled={!canRedo(log)} onClick={redo}><Redo2 size={16} /></Button>
