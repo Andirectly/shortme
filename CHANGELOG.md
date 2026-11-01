@@ -6,6 +6,12 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.25.1] - 2026-11-01
+
+### Added
+
+- Upload: Zugangsdaten (Client key/secret) nachträglich ändern; die alte TikTok-Verbindung wird dabei getrennt.
+
 ## [0.25.0] - 2026-11-01
 
 ### Added
