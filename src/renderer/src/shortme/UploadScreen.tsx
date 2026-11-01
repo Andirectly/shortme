@@ -17,6 +17,7 @@ export function UploadScreen(): React.JSX.Element {
   const [tags, setTags] = useState('')
   const [keys, setKeys] = useState({ key: '', secret: '' })
   const [review, setReview] = useState(false)
+  const [editKeys, setEditKeys] = useState(false)
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -65,12 +66,13 @@ export function UploadScreen(): React.JSX.Element {
 
         {plat?.available && (
           <div style={{ display: 'grid', gap: 10 }}>
-            {plat.needsSetup ? (
+            {plat.needsSetup || editKeys ? (
               <>
                 <small>Einmalig: Client key und Client secret aus dem TikTok-Entwicklerportal (Sandbox). Anleitung: docs/UPLOAD-SETUP.md</small>
                 <input className="sm-input" aria-label="Client key" placeholder="Client key" value={keys.key} onChange={(e) => setKeys({ ...keys, key: e.target.value })} />
                 <input className="sm-input" aria-label="Client secret" type="password" placeholder="Client secret" value={keys.secret} onChange={(e) => setKeys({ ...keys, secret: e.target.value })} />
-                <Button variant="primary" disabled={busy || !keys.key.trim() || !keys.secret.trim()} onClick={() => void run(async () => { await api()!.saveCreds(platform, keys.key, keys.secret); setKeys({ key: '', secret: '' }); return null })}>Speichern</Button>
+                <Button variant="primary" disabled={busy || !keys.key.trim() || !keys.secret.trim()} onClick={() => void run(async () => { await api()!.saveCreds(platform, keys.key, keys.secret); setKeys({ key: '', secret: '' }); setEditKeys(false); return null })}>Speichern</Button>
+                {editKeys && <Button variant="secondary" onClick={() => setEditKeys(false)}>Abbrechen</Button>}
               </>
             ) : (
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -78,6 +80,7 @@ export function UploadScreen(): React.JSX.Element {
                 {plat.connected
                   ? <Button variant="secondary" disabled={busy} onClick={() => void run(async () => { await api()!.disconnect(platform); return null })}><Unlink size={14} /> Trennen</Button>
                   : <Button variant="primary" disabled={busy} onClick={() => void run(() => api()!.connect(platform))}><Link2 size={14} /> Verbinden</Button>}
+                <Button variant="secondary" disabled={busy} onClick={() => setEditKeys(true)}>Zugangsdaten ändern</Button>
                 {plat.message && <small>{plat.message}</small>}
                 <small style={{ marginLeft: 'auto' }}>{drafts} von {DRAFT_LIMIT} Entwürfen (24 h)</small>
               </div>

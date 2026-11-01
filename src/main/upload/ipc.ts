@@ -43,6 +43,7 @@ export function registerUploadIpc(): void {
   ipcMain.handle('upload:overview', overview)
   ipcMain.handle('upload:saveCreds', async (_e, id: PlatformId, key: string, secret: string) => {
     if (id !== 'tiktok' || !key.trim() || !secret.trim()) throw new Error('Client key und Client secret eintragen.')
+    await find(id).disconnect().catch(() => undefined)
     await saveAppCreds({ key, secret })
     return true
   })
