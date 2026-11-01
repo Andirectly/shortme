@@ -41,7 +41,19 @@ export async function modelsView(): Promise<ModelsView> {
 }
 
 /** Aktives Modell eines Platzes – die Pipeline nutzt immer dieses. Ohne Katalog/Zustand: Standard. */
-export async function activeModelId(slot: string): Promise<string> { try { return (await modelsView()).active[slot] ?? '' } catch { return '' } }
+export async function activeModelId(slot: string): Promise<string> {
+  try {
+    // Testlab aus: nur die Standard-Modelle laut Katalog (Entscheidungen/Alternativen wirken nicht); an: die im Testlab gewählten
+    if (!(await testlabEnabled())) return (await loadCatalog()).models.find((m) => m.slot === slot && m.status === 'aktiv')?.id ?? ''
+    return (await modelsView()).active[slot] ?? ''
+  } catch { return '' }
+}
+
+const flagFile = (): string => join(dataRoot(), 'testlab-enabled.json')
+/** null = noch nie gesetzt. Hauptprozess ist die Quelle der Wahrheit (die Pipeline liest sie). */
+export async function testlabFlag(): Promise<boolean | null> { try { return (JSON.parse(await readFile(flagFile(), 'utf8')) as { on?: boolean }).on === true } catch { return null } }
+export const testlabEnabled = async (): Promise<boolean> => (await testlabFlag()) === true
+export async function setTestlabEnabled(on: boolean): Promise<void> { await writeFileAtomic(flagFile(), JSON.stringify({ on })) }
 
 export async function recordMeasured(modelId: string, m: Measured): Promise<void> {
   const st = await loadState()

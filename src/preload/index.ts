@@ -195,6 +195,8 @@ const api = {
     feedbackSet: (hash: string, clipId: string, vote: -1 | 0 | 1): Promise<Record<string, -1 | 0 | 1>> => ipcRenderer.invoke('shortme:feedbackSet', hash, clipId, vote),
     testlab: {
       models: (): Promise<ModelsView> => ipcRenderer.invoke('testlab:models'),
+      enabled: (): Promise<boolean | null> => ipcRenderer.invoke('testlab:enabled'),
+      setEnabled: (on: boolean): Promise<void> => ipcRenderer.invoke('testlab:setEnabled', on),
       sources: (): Promise<LabSource[]> => ipcRenderer.invoke('testlab:sources'),
       run: (req: LabRunRequest): Promise<{ a: LabResult; b: LabResult }> => ipcRenderer.invoke('testlab:run', req),
       prepareRemotion: (): Promise<string> => ipcRenderer.invoke('testlab:prepareRemotion'),

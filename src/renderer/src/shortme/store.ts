@@ -64,7 +64,7 @@ export const useStore = create<State>((set, get) => ({
   setOpts: (o) => { const opts = { ...get().opts, ...o }; save('sm.opts', opts); set({ opts }) },
   toggleSelect: (id) => set((s) => ({ selected: s.selected.includes(id) ? s.selected.filter((x) => x !== id) : [...s.selected, id] })),
   setView: (view) => { save('sm.view', view); set({ view }) },
-  setTestlab: (testlab) => { save('sm.testlab', testlab); set((s) => ({ testlab, screen: !testlab && s.screen === 'testlab' ? 'settings' : s.screen })) },
+  setTestlab: (testlab) => { void window.cutawan?.shortme?.testlab?.setEnabled(testlab); save('sm.testlab', testlab); set((s) => ({ testlab, screen: !testlab && s.screen === 'testlab' ? 'settings' : s.screen })) },
   setPreset: (presetId) => { save('sm.preset', presetId); set({ presetId }) },
   openSheet: (sheetOpen) => set({ sheetOpen }),
   setProgress: (progress) => set({ progress }),

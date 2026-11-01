@@ -75,7 +75,7 @@ export function SettingsScreen(): React.JSX.Element {
         <Row label="Qualität"><Segmented options={['Normal', 'Hoch', 'Maximal']} value={quality} onChange={setQuality} /></Row>
         <Row label="Encoder"><Segmented options={['Auto', 'NVENC', 'CPU']} value={encoder} onChange={setEncoder} /></Row>
         <Row label="Untertitel"><Segmented options={['Eingebrannt', 'SRT', 'Beides']} value={subs} onChange={setSubs} /></Row>
-        <Row label="Testlab anzeigen" hint="Modelle nebeneinander vergleichen"><Switch on={testlab} onChange={setTestlab} label="Testlab anzeigen" /></Row>
+        <Row label="Testlab (Menü und gewählte Testlab-Modelle)"><Switch on={testlab} onChange={setTestlab} label="Testlab anzeigen" /></Row>
         <Row label="Dateinamen nach KI-Titel"><Switch on={names} onChange={setNames} label="Dateinamen nach KI-Titel" /></Row>
         <Row label="Zielordner"><div style={{ display: 'flex', gap: 10 }}><input className="sm-input" defaultValue="C:\Users\Andirectly\Videos\Shortme" aria-label="Zielordner" /><Button variant="secondary">Ändern</Button></div></Row>
       </div>

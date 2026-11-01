@@ -14,7 +14,7 @@ import { loadTranscript, runTranscription } from './transcription'
 import { loadClips, runAnalysis, layoutFile } from './clips/analysis'
 import { loadPersons, personsFile, replanWithPersons } from './clips/persons'
 import { writeFileAtomic } from './atomic'
-import { modelsView, decide, activeModelId } from '../testlab/registry'
+import { modelsView, decide, activeModelId, testlabFlag, setTestlabEnabled } from '../testlab/registry'
 import { labSources, runLab } from '../testlab/lab'
 import { prepareRemotionBrowser } from '../remotion/render'
 import type { LabRunRequest } from '../../shared/models'
@@ -110,6 +110,8 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('shortme:feedbackSet', (_e, hash: string, clipId: string, vote: number) => saveFeedback(hash, clipId, vote === 1 ? 1 : vote === -1 ? -1 : 0))
   // Testlab: Modell-Plätze, Quellen, Vergleich, Entscheidung
   ipcMain.handle('testlab:models', () => modelsView())
+  ipcMain.handle('testlab:enabled', () => testlabFlag())
+  ipcMain.handle('testlab:setEnabled', (_e, on: boolean) => setTestlabEnabled(on))
   ipcMain.handle('testlab:sources', async () => { const l = await labSources(); for (const s of l) allowMediaPath(s.path); return l })
   ipcMain.handle('testlab:run', (_e, req: LabRunRequest) => runLab(req, (p) => broadcast('testlab:progress', p)))
   ipcMain.handle('testlab:prepareRemotion', () => prepareRemotionBrowser((_f, message) => broadcast('testlab:progress', { side: 'B', message })).catch(() => ''))

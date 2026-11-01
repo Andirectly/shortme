@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useStore } from './store'
 import { FRAME_LABELS, frameFromLabel, type ContentType } from '@shared/videoKind'
 import type { StyleDefaults } from '@shared/edits'
 import type { PersonsPatch, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
@@ -120,6 +121,8 @@ export const useProject = create<ProjectState>((set, get) => ({
     set({ hasApi: !!a })
     if (!a) return
     void get().loadStyle()
+    // Testlab-Schalter: der Hauptprozess entscheidet (Pipeline nutzt nur dann Testlab-Entscheidungen); erste Nutzung übernimmt den alten Wert
+    void a.testlab.enabled().then((v) => { if (v === null) void a.testlab.setEnabled(useStore.getState().testlab); else useStore.setState({ testlab: v }) })
     unsub.forEach((u) => u())
     unsub = [
       a.onJob((j) => {
