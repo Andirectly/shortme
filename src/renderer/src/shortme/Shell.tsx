@@ -46,6 +46,7 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
           </button>
         ))}
       </nav>
+      <small className="sm-build" aria-label="Version">{__BUILD__}</small>
       <AnimatePresence mode="wait" initial={false}>
         <motion.main key={screen} className="sm-page sm-scroll-mask" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={base}>
           {children}

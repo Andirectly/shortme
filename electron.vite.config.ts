@@ -2,6 +2,12 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'node:path'
+import { execSync } from 'node:child_process'
+import pkg from './package.json'
+
+// Versionsanzeige unten links: Version + Commit + Datum des Builds
+const commit = (() => { try { return execSync('git rev-parse --short HEAD').toString().trim() } catch { return 'dev' } })()
+const BUILD = JSON.stringify(`v${pkg.version} · ${commit} · ${new Date().toLocaleDateString('de-DE')}`)
 
 export default defineConfig({
   main: {
@@ -30,6 +36,7 @@ export default defineConfig({
     }
   },
   renderer: {
+    define: { __BUILD__: BUILD },
     plugins: [react(), tailwindcss()],
     build: {
       rollupOptions: {

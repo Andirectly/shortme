@@ -10,7 +10,7 @@ import { guardEmptyShots } from '../src/shared/layoutPlan'
 import type { ShortmeShot } from '../src/shared/shortme'
 
 async function main(): Promise<void> {
-  const [hash, id, sec] = process.argv.slice(2)
+  const [hash, , sec] = process.argv.slice(2)
   const meta = (await loadMeta(hash))!
   const file = (await loadClips(hash))!
   let nOld = 0, sec0 = 0
