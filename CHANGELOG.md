@@ -6,6 +6,13 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.25.0] - 2026-11-01
+
+### Added
+
+- Tab "Upload": exportierte Clips als TikTok-Entwurf senden (Anmeldung im Browser, Tokens in der Windows-Anmeldeinformationsverwaltung, Teilstück-Upload mit Fortsetzen, Tageslimit, Bildunterschrift und Hashtags vom lokalen LLM).
+- Editor: Schnellwahl des Ausschnitts oben (Smart/Fest/Vollbild/Split).
+
 ## [0.24.0] - 2026-11-01
 
 ### Added
