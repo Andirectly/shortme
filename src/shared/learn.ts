@@ -29,3 +29,12 @@ export function fromThumbs(old: Record<string, unknown>): Ratings {
   for (const [id, v] of Object.entries(old)) if (v === 1 || v === -1) out[id] = { level: v === 1 ? 'strong' : 'bad', reasons: [], at: '' }
   return out
 }
+
+export interface LearnSettings {
+  /** „Daten sammeln“: Korrektur-Protokoll, Kandidaten-Spur, Datensatz-Aufbau. */
+  collect: boolean
+  /** Werkbank: Videodatei nach der Auswertung löschen (Ton, Transkript, Schlüsselbilder, Datensatz bleiben). */
+  deleteVideos: boolean
+  /** Erweitert: Trend-Signal über öffentliche YouTube-Suchvorschläge (schwach). */
+  trend: boolean
+}

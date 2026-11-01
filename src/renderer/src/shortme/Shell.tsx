@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Logo } from './Logo'
-import { Home, FolderOpen, Palette, Cpu, Settings, FlaskConical, Radio, Upload } from 'lucide-react'
+import { Home, FolderOpen, Palette, Cpu, Settings, FlaskConical, Radio, Upload, Layers, GraduationCap } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useStore, type NavId, type Screen } from './store'
 import { IMG } from './data'
@@ -14,6 +14,8 @@ const NAV: { id: NavId; label: string; icon: ReactNode }[] = [
   { id: 'studio', label: 'Stil-Studio', icon: <Palette size={20} /> },
   { id: 'live', label: 'Live', icon: <Radio size={20} /> },
   { id: 'upload', label: 'Upload', icon: <Upload size={20} /> },
+  { id: 'workbench', label: 'Werkbank', icon: <Layers size={20} /> },
+  { id: 'learn', label: 'Lernen', icon: <GraduationCap size={20} /> },
   { id: 'models', label: 'Modelle', icon: <Cpu size={20} /> },
   { id: 'testlab', label: 'Testlab', icon: <FlaskConical size={20} /> },
   { id: 'settings', label: 'Einstellungen', icon: <Settings size={20} /> }

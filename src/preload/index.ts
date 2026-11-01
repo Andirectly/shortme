@@ -29,6 +29,8 @@ import type { ContentType, FrameChoice, KindProfile } from '@shared/videoKind'
 import type { StreamLayout } from '@shared/streamLayout'
 import type { LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twitch'
 import type { PlatformId, UploadOverview } from '@shared/upload'
+import type { WbOverview, WbProject, WbStatus, WorkItem } from '@shared/workbench'
+import type { LearnSettings } from '@shared/learn'
 import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
 import type { PersonsPatch, PreviewPlan, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
@@ -218,6 +220,22 @@ const api = {
     channelLayoutDelete: (channel: string): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutDelete', channel),
     channelLayoutSave: (channel: string, layout: StreamLayout): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutSave', channel, layout),
     findStream: (hash: string): Promise<StreamLayout | null> => ipcRenderer.invoke('shortme:findStream', hash),
+    learn: {
+      settings: (): Promise<LearnSettings> => ipcRenderer.invoke('learn:settings'),
+      setSettings: (p: Partial<LearnSettings>): Promise<LearnSettings> => ipcRenderer.invoke('learn:setSettings', p),
+      wbList: (): Promise<WorkItem[]> => ipcRenderer.invoke('learn:wb:list'),
+      wbAdd: (urls: string[]): Promise<{ added: number; skipped: number }> => ipcRenderer.invoke('learn:wb:add', urls),
+      wbRetry: (id: string): Promise<void> => ipcRenderer.invoke('learn:wb:retry', id),
+      wbRemove: (id: string): Promise<void> => ipcRenderer.invoke('learn:wb:remove', id),
+      wbPause: (p: boolean): Promise<boolean> => ipcRenderer.invoke('learn:wb:pause', p),
+      wbStatus: (): Promise<WbStatus> => ipcRenderer.invoke('learn:wb:status'),
+      wbOverview: (): Promise<WbOverview> => ipcRenderer.invoke('learn:wb:overview'),
+      wbProject: (hash: string): Promise<WbProject | null> => ipcRenderer.invoke('learn:wb:project', hash),
+      wbReference: (hash: string, file: string): Promise<{ moments: number }> => ipcRenderer.invoke('learn:wb:reference', hash, file),
+      blindPrepare: (hash: string, a: { kind: string; key: string }, b: { kind: string; key: string }): Promise<{ testId: string; left: string; right: string }> => ipcRenderer.invoke('learn:blind:prepare', hash, a, b),
+      blindAnswer: (id: string, choice: 'left' | 'right' | 'tie'): Promise<{ left: string; right: string }> => ipcRenderer.invoke('learn:blind:answer', id, choice),
+      onWorkbench: (cb: (items: WorkItem[]) => void): (() => void) => { const h = (_e: unknown, v: WorkItem[]): void => cb(v); ipcRenderer.on('learn:workbench', h); return () => ipcRenderer.removeListener('learn:workbench', h) }
+    },
     upload: {
       overview: (): Promise<UploadOverview> => ipcRenderer.invoke('upload:overview'),
       saveCreds: (platform: PlatformId, key: string, secret: string): Promise<boolean> => ipcRenderer.invoke('upload:saveCreds', platform, key, secret),

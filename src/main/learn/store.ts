@@ -2,15 +2,9 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { dataRoot } from '../engines/paths'
 import { writeFileAtomic } from '../shortme/atomic'
+import type { LearnSettings } from '../../shared/learn'
+export type { LearnSettings }
 
-export interface LearnSettings {
-  /** „Daten sammeln“: Korrektur-Protokoll, Kandidaten-Spur, Datensatz-Aufbau. */
-  collect: boolean
-  /** Werkbank: Videodatei nach der Auswertung löschen (Ton, Transkript, Schlüsselbilder, Datensatz bleiben). */
-  deleteVideos: boolean
-  /** Erweitert: Trend-Signal über öffentliche YouTube-Suchvorschläge (schwach). */
-  trend: boolean
-}
 const DEFAULTS: LearnSettings = { collect: true, deleteVideos: true, trend: false }
 
 export const datasetDir = (): string => join(dataRoot(), 'dataset')
