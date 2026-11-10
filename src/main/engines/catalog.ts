@@ -11,7 +11,7 @@ export const CATALOG: AssetSpec[] = [
     name: 'Parakeet TDT 0.6B v3 (int8)',
     kind: 'transcription',
     note: 'Schnell (RTF 0,04), Wortzeiten, 25 Sprachen',
-    files: [{ url: `${GH_SHERPA}/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2`, name: 'parakeet.tar.bz2', size: 487170055, sha256: '5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf' }],
+    files: [{ url: `${GH_SHERPA}/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2`, name: 'parakeet.tar.bz2', size: 487211443, sha256: '1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9' }], // k2-fsa hat das Archiv am 2026-11-07 neu hochgeladen (andere Gewichte, gleiche Dateinamen)
     extract: true,
     expect: ['sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/encoder.int8.onnx', 'sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/decoder.int8.onnx', 'sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/joiner.int8.onnx', 'sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/tokens.txt'],
     recommendedFromVramMb: 0

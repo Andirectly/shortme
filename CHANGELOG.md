@@ -6,6 +6,14 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.26.1] - 2026-11-11
+
+### Fixed
+
+- Parakeet-Download schlug mit „SHA-256 stimmt nicht überein“ fehl, weil das Archiv bei k2-fsa am 07.11. neu hochgeladen wurde; neue Prüfsumme eingetragen (Modell mit Wortzeiten getestet).
+- Fehlt das Transkriptionsmodell, meldet der Job das jetzt klar statt „Please check your config!“.
+- YouTube-Links mit „Bot-Prüfung“: Einstellungen → „YouTube-Anmeldung“ (Firefox oder cookies.txt), gilt für Import und Werkbank; die Meldung nennt den Weg auf Deutsch.
+
 ## [0.26.0] - 2026-11-10
 
 ### Added

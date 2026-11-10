@@ -193,6 +193,8 @@ export function cookieCopyErrorHint(browser: BrowserCookieSource, hasCookiesFile
   return parts.join(' ')
 }
 
+const BOT_CHECK = /confirm you.?re not a bot/i
+
 export function runYtDlp(
   binPath: string,
   args: string[],
@@ -220,6 +222,7 @@ export function runYtDlp(
     child.on('error', reject)
     child.on('close', (code) => {
       if (code === 0) resolve(stdout)
+      else if (BOT_CHECK.test(stderr)) reject(new YtDlpError('YouTube verlangt eine Anmeldung (Bot-Prüfung). Einstellungen → YouTube-Anmeldung: Firefox wählen oder eine cookies.txt importieren.'))
       else reject(new YtDlpError(cleanYtDlpError(stderr) || `yt-dlp exited with code ${code}`))
     })
   })

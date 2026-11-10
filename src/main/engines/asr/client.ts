@@ -29,6 +29,8 @@ function nodeBinary(): string {
 /** Startet den Worker mit einer Anfrage; `onMessage` sieht alle Nachrichten, Rückgabe = erste Endnachricht. */
 function runWorker(req: AsrRequest, onMessage: (m: AsrMessage) => void, signal?: AbortSignal): Promise<AsrMessage> {
   signal?.throwIfAborted()
+  // Ohne Modelldateien meldet sherpa nur „Please check your config!“
+  if ('modelDir' in req && !existsSync(join(req.modelDir, 'encoder.int8.onnx'))) return Promise.reject(new Error('Transkriptionsmodell fehlt: Einstellungen → Modelle → „Alles laden“.'))
   const child: ChildProcess = fork(workerPath(), [], {
     execPath: nodeBinary(),
     execArgv: process.versions.electron ? [] : process.execArgv,

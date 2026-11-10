@@ -7,6 +7,7 @@ import { allowMediaPath } from '../mediaAccess'
 import { dataRoot } from '../engines/paths'
 import { probeVideo, runFfmpeg } from '../pipeline/ffmpeg'
 import { downloadUrlVideo, ensureYtDlp, fetchUrlMeta } from '../pipeline/ytdlp'
+import { savedCookieOpts } from './ytAuth'
 import { sectionArg } from '../../shared/twitch'
 import { fileHash, loadMeta, projectDir, projectFile, saveMeta, type ProjectMeta } from './project'
 import { preflight, type PreflightResult } from './preflight'
@@ -52,7 +53,7 @@ export async function importUrl(url: string, onProgress: (p: number, message: st
   onProgress(0, 'Downloader wird vorbereitet …')
   const bin = await ensureYtDlp((p) => onProgress(p.progress, p.message))
   onProgress(0, 'Video-Infos werden abgerufen …')
-  const meta = await fetchUrlMeta(bin, url, {}, opts.extraArgs ?? [])
+  const meta = await fetchUrlMeta(bin, url, savedCookieOpts(), opts.extraArgs ?? [])
   const dir = join(dataRoot(), 'downloads')
   await mkdir(dir, { recursive: true })
   const safe = meta.id.replace(/[^\w.-]/g, '_')
@@ -61,7 +62,7 @@ export async function importUrl(url: string, onProgress: (p: number, message: st
   if (!existsSync(target)) {
     const part = join(dir, `${safe}${tag}.part.mp4`)
     onProgress(0, `„${meta.title}“ wird heruntergeladen …`)
-    await downloadUrlVideo(bin, meta.webpageUrl, part, (p) => onProgress(p.progress, p.message), {}, [...(opts.section ? ['--download-sections', sectionArg(opts.section)] : []), ...(opts.extraArgs ?? [])])
+    await downloadUrlVideo(bin, meta.webpageUrl, part, (p) => onProgress(p.progress, p.message), savedCookieOpts(), [...(opts.section ? ['--download-sections', sectionArg(opts.section)] : []), ...(opts.extraArgs ?? [])])
     await rename(part, target)
   }
   onProgress(1, 'Video wird geprüft und Vorschaubild erstellt …')

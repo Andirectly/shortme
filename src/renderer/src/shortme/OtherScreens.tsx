@@ -57,6 +57,31 @@ function TwitchSettings(): React.JSX.Element {
   )
 }
 
+/** YouTube verlangt auf manchen Rechnern eine Anmeldung (Bot-Prüfung): Firefox-Cookies oder cookies.txt. Chrome/Edge scheiden unter Windows aus (verschlüsselt). */
+function YouTubeLogin(): React.JSX.Element {
+  const api = typeof window !== 'undefined' ? window.cutawan : undefined
+  const [mode, setMode] = useState('Aus')
+  const [msg, setMsg] = useState('')
+  const apply = (s: { importCookiesBrowser: string; hasImportCookiesFile: boolean }): void => setMode(s.hasImportCookiesFile ? 'Datei' : s.importCookiesBrowser === 'firefox' ? 'Firefox' : 'Aus')
+  useEffect(() => { void api?.getSettings().then(apply).catch(() => undefined) }, [api])
+  if (!api) return <></>
+  const choose = async (v: string): Promise<void> => {
+    setMsg('')
+    if (v === 'Datei') { apply(await api.importCookiesFile()); return }
+    await api.clearCookiesFile()
+    apply(await api.updateSettings({ importCookiesBrowser: v === 'Firefox' ? 'firefox' : '' }))
+  }
+  return (
+    <Row label="YouTube-Anmeldung (bei „Bot-Prüfung“)">
+      <div style={{ display: 'grid', gap: 6 }}>
+        <Segmented options={['Aus', 'Firefox', 'Datei']} value={mode} onChange={(v) => void choose(v).catch((e: unknown) => setMsg(e instanceof Error ? e.message : String(e)))} />
+        <small>{mode === 'Firefox' ? 'Nutzt die Anmeldung aus Firefox (dort bei YouTube angemeldet sein).' : mode === 'Datei' ? 'cookies.txt gespeichert. Erneut „Datei“ wählen, um sie zu ersetzen.' : 'Nur nötig, wenn YouTube-Links „Bot-Prüfung“ melden.'}</small>
+        {msg && <small role="alert" style={{ color: 'var(--warn)' }}>{msg}</small>}
+      </div>
+    </Row>
+  )
+}
+
 /** Fehlende Modelle anzeigen und mit einem Klick laden (Fortschritt liegt auf der Seite „Modelle“). */
 function ModelSettings(): React.JSX.Element {
   const { catalog, status, hw, installingAll, installRecommended } = useEngines()
@@ -138,6 +163,7 @@ export function SettingsScreen(): React.JSX.Element {
       <div className="sm-glass" style={{ padding: '4px 22px 16px' }}>
         <ModelSettings />
         <UpdateSettings />
+        <YouTubeLogin />
       </div>
       <h3 style={{ marginTop: 8 }}>Twitch</h3>
       <TwitchSettings />

@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { ensureYtDlp, runYtDlp } from '../pipeline/ytdlp'
+import { savedAuthArgs } from '../shortme/ytAuth'
 import { FFMPEG_PATH } from '../pipeline/ffmpeg'
 import { features } from '../../shared/audioMatch'
 import { learnFile, readJson } from './store'
@@ -13,7 +14,7 @@ import { ratios } from '../../shared/workbench'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function ytJson(args: string[]): Promise<any> {
   const bin = await ensureYtDlp(() => undefined)
-  return JSON.parse(await runYtDlp(bin, ['-J', '--no-warnings', ...args]))
+  return JSON.parse(await runYtDlp(bin, ['-J', '--no-warnings', ...savedAuthArgs(), ...args]))
 }
 
 export const isChannelUrl = (u: string): boolean => /youtube\.com\/(@|channel\/|c\/|user\/)/.test(u)
@@ -50,7 +51,7 @@ export async function cachedFeatures(file: string, cache: string): Promise<Float
 export async function downloadAudio(url: string, outBase: string): Promise<string> {
   const bin = await ensureYtDlp(() => undefined)
   await mkdir(dirname(outBase), { recursive: true })
-  const out = await runYtDlp(bin, ['-f', 'ba/b', '-o', `${outBase}.%(ext)s`, '--no-progress', '--quiet', '--no-warnings', '--print', 'after_move:filepath', url])
+  const out = await runYtDlp(bin, ['-f', 'ba/b', '-o', `${outBase}.%(ext)s`, '--no-progress', '--quiet', '--no-warnings', ...savedAuthArgs(), '--print', 'after_move:filepath', url])
   return out.trim().split('\n').pop()!.trim()
 }
 
