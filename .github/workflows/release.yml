@@ -15,12 +15,8 @@ name: Release
 # Uses the built-in GITHUB_TOKEN, so no extra secrets are required as long as
 # releases publish to this same repo (see the `publish` block in package.json).
 
+# Nur von Hand: Releases entstehen lokal mit `npm run release`.
 on:
-  push:
-    tags:
-      - 'v*'
-    branches:
-      - main
   workflow_dispatch: {}
 
 concurrency:

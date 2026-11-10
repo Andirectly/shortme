@@ -16,7 +16,7 @@ import type { ImportProgress, UpdateCheckResult, UpdateDownloadState } from '@sh
  * via electron-updater; source checkouts pull, rebuild and relaunch in place.
  */
 
-const REPO = 'JeremySNR/cutawan'
+const REPO = 'Andirectly/shortme'
 const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`
 const CHECK_TIMEOUT_MS = 10_000
 

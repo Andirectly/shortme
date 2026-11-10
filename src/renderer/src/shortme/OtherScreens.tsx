@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTwitch } from './twitchStore'
 import { CheckCircle2, XCircle, RefreshCw } from 'lucide-react'
-import { useEngines } from './engines'
+import type { UpdateCheckResult, UpdateDownloadState } from '@shared/types'
+import { fmtBytes, requiredIds, useEngines } from './engines'
 import { useStore } from './store'
 import { Button, Pill, Row, Segmented, Switch } from './ui'
 
@@ -56,6 +57,61 @@ function TwitchSettings(): React.JSX.Element {
   )
 }
 
+/** Fehlende Modelle anzeigen und mit einem Klick laden (Fortschritt liegt auf der Seite „Modelle“). */
+function ModelSettings(): React.JSX.Element {
+  const { catalog, status, hw, installingAll, installRecommended } = useEngines()
+  const rec = new Set(requiredIds(hw))
+  const missing = catalog.filter((c) => rec.has(c.id) && status[c.id]?.state !== 'installed')
+  const size = missing.reduce((n, c) => n + c.files.reduce((m, f) => m + f.size, 0), 0)
+  return (
+    <Row label="Modelle">
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <small style={{ flex: 1, color: missing.length ? 'var(--warn)' : undefined }}>{missing.length === 0 ? 'Alles bereit' : `${missing.length} fehlen (${fmtBytes(size)}): ${missing.map((c) => c.name).join(', ')}`}</small>
+        {missing.length > 0 && <Button variant="primary" disabled={installingAll} onClick={() => void installRecommended()}>{installingAll ? 'Lädt …' : 'Alles laden'}</Button>}
+      </div>
+    </Row>
+  )
+}
+
+/** Updates aus den GitHub-Releases: suchen, laden, neu starten. */
+function UpdateSettings(): React.JSX.Element {
+  const api = typeof window !== 'undefined' ? window.cutawan : undefined
+  const [res, setRes] = useState<UpdateCheckResult | null>(null)
+  const [dl, setDl] = useState<UpdateDownloadState>({ status: 'idle', progress: 0 })
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  useEffect(() => {
+    if (!api) return
+    void api.getUpdateDownloadState().then(setDl).catch(() => undefined)
+    return api.onUpdateDownloadState(setDl)
+  }, [api])
+  if (!api) return <></>
+  const run = async (fn: () => Promise<unknown>): Promise<void> => {
+    setBusy(true); setMsg('')
+    try { await fn() } catch (e) { setMsg(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e)) }
+    setBusy(false)
+  }
+  const downloading = dl.status === 'downloading'
+  const ready = dl.status === 'downloaded'
+  const err = msg || res?.error || (dl.status === 'error' ? dl.error : '')
+  return (
+    <Row label="Updates">
+      <div style={{ display: 'grid', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <small style={{ flex: 1 }}>{res ? `Version ${res.currentVersion}${res.latestVersion ? (res.updateAvailable ? ` · neu: ${res.latestVersion}` : ' · aktuell') : ''}` : 'Version prüfen'}</small>
+          {ready
+            ? <Button variant="primary" disabled={busy} onClick={() => void run(() => api.installUpdate())}>Neu starten und installieren</Button>
+            : res?.updateAvailable && !downloading
+              ? <Button variant="primary" disabled={busy} onClick={() => void run(() => api.downloadUpdate())}>Update laden</Button>
+              : <Button variant="secondary" disabled={busy || downloading} onClick={() => void run(async () => setRes(await api.checkForUpdates()))}>Nach Updates suchen</Button>}
+        </div>
+        {downloading && <div className="sm-bar" aria-label="Update-Download"><i style={{ width: `${Math.max(dl.progress, 0.02) * 100}%` }} /></div>}
+        {err && <small role="alert" style={{ color: 'var(--warn)' }}>{err}</small>}
+      </div>
+    </Row>
+  )
+}
+
 export function SettingsScreen(): React.JSX.Element {
   const [profile, setProfile] = useState('TikTok')
   const [quality, setQuality] = useState('Hoch')
@@ -78,6 +134,10 @@ export function SettingsScreen(): React.JSX.Element {
         <Row label="Testlab (Menü und gewählte Testlab-Modelle)"><Switch on={testlab} onChange={setTestlab} label="Testlab anzeigen" /></Row>
         <Row label="Dateinamen nach KI-Titel"><Switch on={names} onChange={setNames} label="Dateinamen nach KI-Titel" /></Row>
         <Row label="Zielordner"><div style={{ display: 'flex', gap: 10 }}><input className="sm-input" defaultValue="C:\Users\Andirectly\Videos\Shortme" aria-label="Zielordner" /><Button variant="secondary">Ändern</Button></div></Row>
+      </div>
+      <div className="sm-glass" style={{ padding: '4px 22px 16px' }}>
+        <ModelSettings />
+        <UpdateSettings />
       </div>
       <h3 style={{ marginTop: 8 }}>Twitch</h3>
       <TwitchSettings />

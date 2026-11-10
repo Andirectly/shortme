@@ -6,6 +6,13 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.26.0] - 2026-11-10
+
+### Added
+
+- Einstellungen: Updates aus GitHub (suchen, laden, neu starten) und Hinweis auf fehlende Modelle mit „Alles laden“.
+- `npm run release` baut den Installer und lädt ihn als GitHub-Release hoch (`Andirectly/shortme`).
+
 ## [0.25.1] - 2026-11-01
 
 ### Added

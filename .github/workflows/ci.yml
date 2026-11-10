@@ -1,11 +1,8 @@
 name: CI
 
+# Nur von Hand: Shortme wird lokal gebaut und getestet (Mac/Linux-Jobs sind vom Fork übrig).
 on:
-  push:
-    branches: [main]
-  pull_request:
-    # labeled/unlabeled so adding "no release notes" re-runs the check.
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch: {}
 
 jobs:
   release-notes:
