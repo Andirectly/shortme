@@ -14,6 +14,7 @@ import { loadTranscript, runTranscription } from './transcription'
 import { loadClips, runAnalysis, layoutFile } from './clips/analysis'
 import { loadPersons, personsFile, replanWithPersons } from './clips/persons'
 import { writeFileAtomic } from './atomic'
+import { defaultExportRoot, exportRoot, setExportRoot } from './exportDir'
 import { modelsView, decide, activeModelId, testlabFlag, setTestlabEnabled } from '../testlab/registry'
 import { labSources, runLab } from '../testlab/lab'
 import { prepareRemotionBrowser } from '../remotion/render'
@@ -156,7 +157,7 @@ export function registerShortmeIpc(): void {
     const transcript = await loadTranscript(hash)
     if (!meta || !file || !transcript) throw new Error('Projekt, Clips oder Transkript fehlen')
     const clips = file.clips.filter((c) => clipIds.includes(c.id))
-    const outDir = join(app.getPath('videos'), 'Shortme', safeFileName(meta.title, 'Projekt'))
+    const outDir = join(await exportRoot(), safeFileName(meta.title, 'Projekt'))
     return jobs.enqueue(hash, `Export: ${meta.title}`, async ({ signal, report }) => {
       const signals = await ensureSignals(meta)
       for (let i = 0; i < clips.length; i++) {
@@ -170,6 +171,14 @@ export function registerShortmeIpc(): void {
       void shell.openPath(outDir)
     })
   })
+  ipcMain.handle('shortme:exportDir', async () => ({ dir: await exportRoot(), isDefault: (await exportRoot()) === defaultExportRoot() }))
+  ipcMain.handle('shortme:exportDirChoose', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    const r = await dialog.showOpenDialog(win!, { title: 'Zielordner für Exporte', defaultPath: await exportRoot(), properties: ['openDirectory', 'createDirectory'] })
+    if (!r.canceled && r.filePaths[0]) await setExportRoot(r.filePaths[0])
+    return { dir: await exportRoot(), isDefault: (await exportRoot()) === defaultExportRoot() }
+  })
+  ipcMain.handle('shortme:exportDirReset', async () => { await setExportRoot(null); return { dir: await exportRoot(), isDefault: true } })
   /** Presets (renderer-unabhängiges JSON, Version 2): eingebaut + eigene; speichern, überschreiben, löschen, importieren, exportieren. */
   ipcMain.handle('shortme:presets', () => allPresets())
   ipcMain.handle('shortme:presetSave', async (_e, p: unknown, mode: 'new' | 'overwrite') => { const ok = sanitizePreset(p); if (!ok) throw new Error('Ungültiges Preset'); const saved = await saveUserPreset(ok, mode); return { saved, all: await allPresets() } })

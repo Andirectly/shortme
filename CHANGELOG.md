@@ -6,6 +6,18 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.27.0] - 2026-11-11
+
+### Fixed
+
+- Lange Videos (VODs, Podcasts): Von den gefundenen Kandidaten wurden nur die ersten behalten, das Ende des Videos kam nie dran (bei einer 1,8-h-Folge lagen alle Kandidaten in der ersten Hälfte). Die Kandidaten werden jetzt gleichmäßig über das ganze Video verteilt.
+
+### Added
+
+- Bis zu 50 Clips (vorher 30) und bis zu 90 bewertete Kandidaten (vorher 48); die automatische Zahl bleibt etwa ein Clip je 2,5 Minuten.
+- Kandidatensuche sucht gezielt nach spontanen Einlagen (Rappen, Imitationen, Rollenspiel, Ausraster) und verteilt die Treffer über das ganze Transkript.
+- Einstellungen: Zielordner für Exporte wählbar (vorher fest `Videos\Shortme`), „Standard“ setzt zurück.
+
 ## [0.26.2] - 2026-11-11
 
 ### Fixed

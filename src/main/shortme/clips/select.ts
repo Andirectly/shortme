@@ -96,11 +96,21 @@ export async function proofreadWords(url: string, words: string[], signal?: Abor
     return {}
   }
 }
-export const MAX_CLIPS = 30
+export const MAX_CLIPS = 50
 const WINDOW_WORDS = 3000
+/** Höchstzahl bewerteter Kandidaten: je Kandidat 3–5 LLM-Aufrufe, darüber wächst die Zeit bei sehr langen Videos zu stark. */
+export const MAX_CANDS = 90
 
-/** Automatische Clip-Anzahl: etwa ein Clip je 2,5 Minuten Material (mindestens 4, höchstens 30). */
+/** Automatische Clip-Anzahl: etwa ein Clip je 2,5 Minuten Material (mindestens 4, höchstens 50). */
 export const defaultWanted = (durationSec: number): number => Math.max(4, Math.min(MAX_CLIPS, Math.round(durationSec / 150)))
+export const candidateBudget = (wanted: number): number => Math.min(MAX_CANDS, Math.max(10, Math.ceil(wanted * 3)))
+
+/** Kandidaten (nach Zeit sortiert) gleichmäßig über das ganze Video ausdünnen – nie einfach den Rest abschneiden, sonst fehlt das Ende langer Videos. */
+export function thinEvenly<T>(items: T[], max: number): T[] {
+  if (items.length <= max) return items
+  if (max <= 1) return items.slice(0, Math.max(0, max))
+  return Array.from({ length: max }, (_, k) => items[Math.round((k * (items.length - 1)) / (max - 1))])
+}
 
 /** Transkript in LLM-Fenster teilen (Satzgrenzen, ≈ `maxWords` Wörter, 6 Sätze Überlappung). */
 export function buildWindows(sentences: Sentence[], maxWords = WINDOW_WORDS, overlap = 6): Array<{ from: number; to: number }> {
@@ -257,8 +267,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   // A: Kandidaten je Fenster (Satznummern)
   const windows = buildWindows(sentences)
   let cands: Cand[] = []
-  // höchstens 48 Kandidaten: bei langen Videos wächst sonst die Bewertungszeit linear weiter (je Kandidat 3–5 LLM-Aufrufe)
-  const maxCands = Math.min(48, Math.max(10, Math.ceil(wanted * 3)))
+  const maxCands = candidateBudget(wanted)
   for (let w = 0; w < windows.length; w++) {
     report('candidates', w / windows.length, `Kandidaten suchen (${w + 1}/${windows.length}) …`)
     const win = windows[w]
@@ -273,7 +282,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
       if (f && !cands.some((o) => overlaps(o, f) > 0.5)) cands.push(f)
     }
   }
-  cands = cands.slice(0, maxCands)
+  cands = thinEvenly(cands.sort((a, b) => a.first - b.first), maxCands)
   console.info(`[select] Kandidaten: ${cands.length} (Ziel ${wanted}, max ${maxCands}), Fenster: ${windows.length}`)
   if (cands.length === 0) return fallbackClips(input, sentences, wanted, minSec, maxSec, cuts, report)
 

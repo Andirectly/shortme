@@ -15,6 +15,8 @@ Regeln
 - Bereiche dürfen sich nicht überlappen.
 - Markierungen wie (laut) oder (Lachen?) zeigen auffällige Stellen im Ton; sie sind nur ein Hinweis.
 - [Chat lacht] bedeutet: Der Twitch-Chat hat hier mit Lach-Emotes (LUL, KEKW, OMEGALUL, ICANT) reagiert; die Stelle ist bereits auf den auslösenden Moment zurückgerechnet. Das ist ein starkes Zeichen für einen lustigen Moment.
+- Spontane Einlagen sind oft die besten Momente, auch ohne klassischen Aufbau: plötzliches Rappen oder Singen, Imitationen und verstellte Stimmen, Rollenspiel (z. B. ein Klischee-Streamer), Ausraster, Streit, peinliche oder absurde Situationen, schnelle Wortwechsel mit Pointe. Nimm sie mit, wenn sie sich ohne Vorwissen verstehen lassen.
+- Verteile die Kandidaten über das ganze Transkript; zähle nicht nur die ersten Treffer auf.
 - Erfinde nichts. Nutze nur Satznummern, die im Transkript vorkommen.
 {{query}}
 Gib höchstens {{max}} Kandidaten zurück, die besten zuerst. Wenn nichts Gutes dabei ist, gib weniger zurück.

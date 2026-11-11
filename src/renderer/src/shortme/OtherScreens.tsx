@@ -57,6 +57,22 @@ function TwitchSettings(): React.JSX.Element {
   )
 }
 
+/** Zielordner der Exporte (je Projekt ein Unterordner). */
+function ExportFolder(): React.JSX.Element {
+  const api = typeof window !== 'undefined' ? window.cutawan?.shortme : undefined
+  const [st, setSt] = useState<{ dir: string; isDefault: boolean } | null>(null)
+  useEffect(() => { void api?.exportDir().then(setSt).catch(() => undefined) }, [api])
+  return (
+    <Row label="Zielordner">
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <input className="sm-input" readOnly value={st?.dir ?? ''} aria-label="Zielordner" />
+        <Button variant="secondary" onClick={() => void api?.chooseExportDir().then(setSt)}>Ändern</Button>
+        {st && !st.isDefault && <Button variant="ghost" onClick={() => void api?.resetExportDir().then(setSt)}>Standard</Button>}
+      </div>
+    </Row>
+  )
+}
+
 /** YouTube verlangt auf manchen Rechnern eine Anmeldung (Bot-Prüfung): Firefox-Cookies oder cookies.txt. Chrome/Edge scheiden unter Windows aus (verschlüsselt). */
 function YouTubeLogin(): React.JSX.Element {
   const api = typeof window !== 'undefined' ? window.cutawan : undefined
@@ -158,7 +174,7 @@ export function SettingsScreen(): React.JSX.Element {
         <Row label="Untertitel"><Segmented options={['Eingebrannt', 'SRT', 'Beides']} value={subs} onChange={setSubs} /></Row>
         <Row label="Testlab (Menü und gewählte Testlab-Modelle)"><Switch on={testlab} onChange={setTestlab} label="Testlab anzeigen" /></Row>
         <Row label="Dateinamen nach KI-Titel"><Switch on={names} onChange={setNames} label="Dateinamen nach KI-Titel" /></Row>
-        <Row label="Zielordner"><div style={{ display: 'flex', gap: 10 }}><input className="sm-input" defaultValue="C:\Users\Andirectly\Videos\Shortme" aria-label="Zielordner" /><Button variant="secondary">Ändern</Button></div></Row>
+        <ExportFolder />
       </div>
       <div className="sm-glass" style={{ padding: '4px 22px 16px' }}>
         <ModelSettings />

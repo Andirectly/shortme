@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AsrWord } from '../src/main/engines/asr/protocol'
 import { splitSentences } from '../src/main/shortme/clips/sentences'
-import { CONNECTIVE_START, buildWindows, defaultWanted, finalScore, fitLength, formatSentence, lengthPenalty, mergeRatings, quoteOk, resolveTags } from '../src/main/shortme/clips/select'
+import { CONNECTIVE_START, buildWindows, candidateBudget, defaultWanted, thinEvenly, finalScore, fitLength, formatSentence, lengthPenalty, mergeRatings, quoteOk, resolveTags } from '../src/main/shortme/clips/select'
 import { topicBoundaries, topicClips, tokens } from '../src/main/shortme/clips/texttiling'
 import type { Signals } from '../src/main/shortme/clips/signals'
 
@@ -41,11 +41,27 @@ describe('Länge', () => {
     expect(s[f.last].end - s[f.first].start).toBeGreaterThanOrEqual(15)
     expect(fitLength({ first: 38, last: 38 }, s, 15, 60, 38)).toBeNull()
   })
-  it('Zielanzahl wächst mit der Dauer (≈ 1 je 2,5 Min), begrenzt auf 4–30', () => {
+  it('Ausdünnen behält Anfang UND Ende (früher wurde das Ende langer Videos abgeschnitten)', () => {
+    const items = Array.from({ length: 120 }, (_, i) => i)
+    const t = thinEvenly(items, 90)
+    expect(t).toHaveLength(90)
+    expect([t[0], t[89]]).toEqual([0, 119])
+    expect(new Set(t).size).toBe(90)
+    expect(t.every((v, i) => i === 0 || v > t[i - 1])).toBe(true)
+    expect(thinEvenly([1, 2, 3], 10)).toEqual([1, 2, 3])
+    expect(thinEvenly([1, 2, 3], 1)).toEqual([1])
+    // Hälfte der Auswahl liegt in der zweiten Videohälfte
+    expect(t.filter((v) => v >= 60)).toHaveLength(45)
+  })
+  it('Kandidaten-Budget: 3 je gewünschtem Clip, mindestens 10, höchstens 90', () => {
+    expect([candidateBudget(1), candidateBudget(10), candidateBudget(24), candidateBudget(50)]).toEqual([10, 30, 72, 90])
+  })
+  it('Zielanzahl wächst mit der Dauer (≈ 1 je 2,5 Min), begrenzt auf 4–50', () => {
     expect(defaultWanted(100)).toBe(4)
     expect(defaultWanted(729)).toBe(5)
     expect(defaultWanted(3600)).toBe(24)
-    expect(defaultWanted(100000)).toBe(30)
+    expect(defaultWanted(3 * 3600)).toBe(50)
+    expect(defaultWanted(100000)).toBe(50)
   })
 })
 
