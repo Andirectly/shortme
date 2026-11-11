@@ -3,6 +3,7 @@ import { useTwitch } from './twitchStore'
 import { CheckCircle2, XCircle, RefreshCw } from 'lucide-react'
 import type { UpdateCheckResult, UpdateDownloadState } from '@shared/types'
 import type { CatalogStatus } from '@shared/catalog'
+import { allVersions, NotesBlocks, notesOf } from './PatchNotes'
 import { fmtBytes, requiredIds, useEngines } from './engines'
 import { useStore } from './store'
 import { Button, Pill, Row, Segmented, Switch } from './ui'
@@ -55,6 +56,23 @@ function TwitchSettings(): React.JSX.Element {
         {msg && <small role="status">{msg}</small>}
       </Row>
     </div>
+  )
+}
+
+/** Patch Notes: die letzten Versionen aus dem Changelog (die aktuelle ist aufgeklappt). */
+function PatchNotesList(): React.JSX.Element {
+  const versions = allVersions().slice(0, 6)
+  return (
+    <Row label="Patch Notes">
+      <div style={{ display: 'grid', gap: 8 }}>
+        {versions.map((v) => (
+          <details key={v} open={v === __VERSION__}>
+            <summary style={{ cursor: 'pointer', fontSize: 14 }}>Version {v}{v === __VERSION__ ? ' (installiert)' : ''}</summary>
+            <div style={{ padding: '8px 0 4px' }}>{notesOf(v).length ? <NotesBlocks blocks={notesOf(v)} /> : <small>Keine Notizen.</small>}</div>
+          </details>
+        ))}
+      </div>
+    </Row>
   )
 }
 
@@ -224,6 +242,7 @@ export function SettingsScreen(): React.JSX.Element {
       <div className="sm-glass" style={{ padding: '4px 22px 16px' }}>
         <ModelSettings />
         <UpdateSettings />
+        <PatchNotesList />
         <YouTubeLogin />
         <CatalogSettings />
       </div>

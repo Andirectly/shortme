@@ -36,7 +36,7 @@ export default defineConfig({
     }
   },
   renderer: {
-    define: { __BUILD__: BUILD },
+    define: { __BUILD__: BUILD, __VERSION__: JSON.stringify(pkg.version) },
     plugins: [react(), tailwindcss()],
     build: {
       rollupOptions: {

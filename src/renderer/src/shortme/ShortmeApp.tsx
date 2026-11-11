@@ -15,6 +15,7 @@ import { WorkbenchScreen } from './WorkbenchScreen'
 import { LearnScreen } from './LearnScreen'
 import { ModelsScreen, SetupWizard } from './ModelsScreen'
 import { PersonsDialog } from './PersonsDialog'
+import { PatchNotesAfterUpdate } from './PatchNotes'
 import './tokens.css'
 
 export default function ShortmeApp(): React.JSX.Element {
@@ -37,6 +38,7 @@ export default function ShortmeApp(): React.JSX.Element {
       {screen === 'learn' && <LearnScreen />}
       {screen === 'settings' && <SettingsScreen />}
       <SetupWizard />
+      <PatchNotesAfterUpdate />
       <PersonsDialog />
     </Shell>
   )

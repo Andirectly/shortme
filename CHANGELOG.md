@@ -6,6 +6,17 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.31.0] - 2026-11-13
+
+### Added
+
+- Patch Notes in der App: Nach einem Update erscheint einmal „Neu in Version …“; die letzten Versionen stehen jederzeit in den Einstellungen unter „Patch Notes“.
+
+### Fixed
+
+- Export schlug auf Rechnern mit älterem FFmpeg fehl („Unrecognized option '/filter_complex'“). Der Export weicht jetzt automatisch auf die ältere Schreibweise aus.
+- Das Einrichtungsfenster für die Modelle erscheint nur noch beim allerersten Start. Fehlende Modelle zeigen weiter die Einstellungen und die Seite „Modelle“ mit „Alles laden“.
+
 ## [0.30.0] - 2026-11-12
 
 ### Added

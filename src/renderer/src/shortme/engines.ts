@@ -29,6 +29,11 @@ interface EnginesState {
 
 let unsub: (() => void) | null = null
 
+// Der Einrichtungs-Assistent erscheint nur beim ersten Start von selbst. Danach zeigen Einstellungen und Modelle-Seite, was fehlt.
+const SEEN = 'sm-wizard-seen'
+const wizardSeen = (): boolean => { try { return localStorage.getItem(SEEN) === '1' } catch { return false } }
+const markWizardSeen = (): void => { try { localStorage.setItem(SEEN, '1') } catch { /* ohne Speicher kommt der Assistent eben erneut */ } }
+
 export const useEngines = create<EnginesState>((set, get) => ({
   catalog: [],
   status: {},
@@ -37,7 +42,7 @@ export const useEngines = create<EnginesState>((set, get) => ({
   checking: false,
   loaded: false,
   installingAll: false,
-  wizardDismissed: false,
+  wizardDismissed: wizardSeen(),
   init: async () => {
     const e = api()
     if (!e) {
@@ -49,6 +54,8 @@ export const useEngines = create<EnginesState>((set, get) => ({
     unsub?.()
     unsub = e.onStatus((s) => set((st) => ({ status: { ...st.status, [s.id]: s } })))
     set({ catalog, status: Object.fromEntries(list.map((s) => [s.id, s])), hw, loaded: true })
+    // alles Nötige schon da (z. B. nach einem Update): Assistent gilt als erledigt
+    if (requiredIds(hw).every((id) => list.find((s) => s.id === id)?.state === 'installed')) markWizardSeen()
     void get().refreshCheck()
   },
   refreshCheck: async () => {
@@ -72,7 +79,7 @@ export const useEngines = create<EnginesState>((set, get) => ({
     set({ installingAll: true })
     try { await e.installRecommended() } finally { set({ installingAll: false }); await get().refreshCheck() }
   },
-  dismissWizard: () => set({ wizardDismissed: true })
+  dismissWizard: () => { markWizardSeen(); set({ wizardDismissed: true }) }
 }))
 
 /** Assets, die die Basis-Installation braucht (Hardware-abhängig). */

@@ -11,6 +11,7 @@ import type { ProjectMeta } from '../project'
 import type { Transcript } from '../transcription'
 import type { Signals } from '../clips/signals'
 import { buildFilterGraph, OUT_H, OUT_W } from './graph'
+import { runWithGraphFile } from './filterScript'
 import { captionPass } from './captionPass'
 import { buildAss, type CapWord } from './ass'
 import { renderTitleOverlay } from './titleOverlay'
@@ -131,14 +132,15 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
       const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, videoPost: post, overlay: title ? { x: title.x, y: title.y } : undefined })
       const scriptPath = join(work, `${basename(dest)}.graph.txt`)
       await writeFile(scriptPath, filter, 'utf8')
-      await runBinary(enc.bin, [
+      await runWithGraphFile((bin, args) => runBinary(bin, args, { signal: opts.signal }), enc.bin, [
         '-hide_banner', '-nostats', '-y',
         '-ss', clip.start.toFixed(3), '-t', (clip.end - clip.start).toFixed(3), '-i', meta.sourcePath,
-        ...(title ? ['-framerate', String(title.fps), '-i', title.pattern] : []),
-        '-/filter_complex', scriptPath, '-map', '[v]', '-map', '[a]',
+        ...(title ? ['-framerate', String(title.fps), '-i', title.pattern] : [])
+      ], scriptPath, [
+        '-map', '[v]', '-map', '[a]',
         ...encoderArgs(enc.kind, q), '-r', '30', ...audioArgs(q), '-ar', '48000',
         '-movflags', '+faststart', '-t', plan.duration.toFixed(3), dest
-      ], { signal: opts.signal })
+      ])
     }
 
     const fullAss = buildAss(capWords, { width: OUT_W, height: OUT_H, style: capStyle })
