@@ -1,7 +1,7 @@
 import { fork, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import { assetDir } from '../paths'
+import { assetDir, nodeRuntimeExe } from '../paths'
 import { track, killTree } from '../sidecars'
 import type { AsrMessage, AsrRequest, AsrSegment, Range, SpeakerTurn, VadParams } from './protocol'
 
@@ -21,7 +21,7 @@ const workerPath = (): string => {
  */
 function nodeBinary(): string {
   if (!process.versions.electron) return process.execPath
-  const exe = join(assetDir('node-runtime'), 'node-v22.23.3-win-x64', 'node.exe')
+  const exe = nodeRuntimeExe()
   if (!existsSync(exe)) throw new Error('Node-Laufzeit fehlt – bitte im Modell-Manager installieren')
   return exe
 }

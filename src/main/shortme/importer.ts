@@ -6,7 +6,7 @@ import { freeDiskGb } from '../engines/hardware'
 import { allowMediaPath } from '../mediaAccess'
 import { dataRoot } from '../engines/paths'
 import { probeVideo, runFfmpeg } from '../pipeline/ffmpeg'
-import { downloadUrlVideo, ensureYtDlp, fetchUrlMeta } from '../pipeline/ytdlp'
+import { downloadUrlVideo, ensureYtDlp, fetchUrlMeta, withSelfUpdateRetry } from '../pipeline/ytdlp'
 import { savedCookieOpts } from './ytAuth'
 import { sectionArg } from '../../shared/twitch'
 import { fileHash, loadMeta, projectDir, projectFile, saveMeta, type ProjectMeta } from './project'
@@ -53,7 +53,9 @@ export async function importUrl(url: string, onProgress: (p: number, message: st
   onProgress(0, 'Downloader wird vorbereitet …')
   const bin = await ensureYtDlp((p) => onProgress(p.progress, p.message))
   onProgress(0, 'Video-Infos werden abgerufen …')
-  const meta = await fetchUrlMeta(bin, url, savedCookieOpts(), opts.extraArgs ?? [])
+  // wie der alte Importpfad: bei yt-dlp-Fehlern einmal selbst aktualisieren und wiederholen (veraltete YouTube-Extraktoren)
+  const progress = (p: { progress: number; message: string }): void => onProgress(p.progress, p.message)
+  const meta = await withSelfUpdateRetry(bin, progress, () => fetchUrlMeta(bin, url, savedCookieOpts(), opts.extraArgs ?? []))
   const dir = join(dataRoot(), 'downloads')
   await mkdir(dir, { recursive: true })
   const safe = meta.id.replace(/[^\w.-]/g, '_')
@@ -62,7 +64,7 @@ export async function importUrl(url: string, onProgress: (p: number, message: st
   if (!existsSync(target)) {
     const part = join(dir, `${safe}${tag}.part.mp4`)
     onProgress(0, `„${meta.title}“ wird heruntergeladen …`)
-    await downloadUrlVideo(bin, meta.webpageUrl, part, (p) => onProgress(p.progress, p.message), savedCookieOpts(), [...(opts.section ? ['--download-sections', sectionArg(opts.section)] : []), ...(opts.extraArgs ?? [])])
+    await withSelfUpdateRetry(bin, progress, () => downloadUrlVideo(bin, meta.webpageUrl, part, progress, savedCookieOpts(), [...(opts.section ? ['--download-sections', sectionArg(opts.section)] : []), ...(opts.extraArgs ?? [])]))
     await rename(part, target)
   }
   onProgress(1, 'Video wird geprüft und Vorschaubild erstellt …')

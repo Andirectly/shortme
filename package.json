@@ -1,6 +1,6 @@
 {
   "name": "cutawan",
-  "version": "0.26.1",
+  "version": "0.26.2",
   "description": "Shortme – lokale Windows-App: lange Videos zu kurzen vertikalen Clips",
   "main": "out/main/index.js",
   "author": "Shortme",

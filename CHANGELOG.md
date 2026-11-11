@@ -6,6 +6,13 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.26.2] - 2026-11-11
+
+### Fixed
+
+- YouTube-Import ohne Anmeldung: yt-dlp lief ohne JavaScript-Laufzeit (nur eine Warnung, die wir unterdrückt haben) und bekam dadurch schneller die „Bot-Prüfung“. Es nutzt jetzt die mitgelieferte Node-Laufzeit; bei einem yt-dlp-Fehler wird wie früher einmal selbst aktualisiert und wiederholt. Die Anmeldung bleibt nur der letzte Ausweg.
+- `npm run release` nutzt die Repo-Route der GitHub-API (die `gh release create`-Route liefert 404).
+
 ## [0.26.1] - 2026-11-11
 
 ### Fixed

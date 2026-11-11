@@ -2,7 +2,7 @@
 // Aufruf: npm run release   (Version aus package.json, Notizen aus CHANGELOG.md)
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -23,5 +23,10 @@ for (const f of files) if (!existsSync(f)) throw new Error(`${f} fehlt nach dem 
 
 const notesFile = join(mkdtempSync(join(tmpdir(), 'shortme-rel-')), 'notes.md')
 writeFileSync(notesFile, notes)
-sh('gh', ['release', 'create', tag, ...files, '--title', tag, '--notes-file', notesFile, '--latest'])
+// `gh release create` liefert hier 404 (ID-Route), die Repo-Route der API geht: Entwurf anlegen, Dateien hochladen, veröffentlichen.
+// Der Stand muss vorher auf origin/main gepusht sein (Release zeigt auf main).
+const repo = 'Andirectly/shortme'
+const id = execFileSync('gh', ['api', '-X', 'POST', `repos/${repo}/releases`, '-f', `tag_name=${tag}`, '-f', `name=${tag}`, '-F', 'draft=true', '--jq', '.id'], { encoding: 'utf8' }).trim()
+for (const f of files) sh('gh', ['api', '-X', 'POST', `https://uploads.github.com/repos/${repo}/releases/${id}/assets?name=${basename(f)}`, '-H', 'Content-Type: application/octet-stream', '--input', f, '--silent'])
+sh('gh', ['api', '-X', 'PATCH', `repos/${repo}/releases/${id}`, '-F', 'draft=false', '-f', 'make_latest=true', '-f', 'target_commitish=main', '-F', `body=@${notesFile}`, '--silent'])
 console.log(`Veröffentlicht: ${tag}`)

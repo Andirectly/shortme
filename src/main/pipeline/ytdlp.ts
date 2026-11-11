@@ -9,6 +9,7 @@ import { app } from 'electron'
 import type { BrowserCookieSource, ImportProgress } from '@shared/types'
 import { CHROMIUM_BROWSERS } from '@shared/cookies'
 import { FFMPEG_PATH } from './ffmpeg'
+import { nodeRuntimeExe } from '../engines/paths'
 
 /**
  * yt-dlp integration for URL imports. The standalone binary (~30 MB per
@@ -195,13 +196,22 @@ export function cookieCopyErrorHint(browser: BrowserCookieSource, hasCookiesFile
 
 const BOT_CHECK = /confirm you.?re not a bot/i
 
+/**
+ * YouTube braucht für die Player-Challenges eine JavaScript-Laufzeit; ohne sie fällt yt-dlp auf schwächere
+ * Clients zurück und bekommt eher die „Bot-Prüfung“. Wir nutzen die ohnehin mitgelieferte Node-Laufzeit.
+ */
+function jsRuntimeArgs(): string[] {
+  const exe = nodeRuntimeExe()
+  return existsSync(exe) ? ['--js-runtimes', `node:${exe}`] : []
+}
+
 export function runYtDlp(
   binPath: string,
   args: string[],
   onLine?: (line: string) => void
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(binPath, args, { windowsHide: true })
+    const child = spawn(binPath, [...jsRuntimeArgs(), ...args], { windowsHide: true })
     let stdout = ''
     let stderr = ''
     let lineBuf = ''
@@ -222,7 +232,7 @@ export function runYtDlp(
     child.on('error', reject)
     child.on('close', (code) => {
       if (code === 0) resolve(stdout)
-      else if (BOT_CHECK.test(stderr)) reject(new YtDlpError('YouTube verlangt eine Anmeldung (Bot-Prüfung). Einstellungen → YouTube-Anmeldung: Firefox wählen oder eine cookies.txt importieren.'))
+      else if (BOT_CHECK.test(stderr)) reject(new YtDlpError('YouTube blockiert gerade diese Verbindung („Bot-Prüfung“), meist nur zeitweise. Später erneut versuchen; hilft das nicht: Einstellungen → YouTube-Anmeldung (Firefox oder cookies.txt).'))
       else reject(new YtDlpError(cleanYtDlpError(stderr) || `yt-dlp exited with code ${code}`))
     })
   })

@@ -11,4 +11,6 @@ export function dataRoot(): string {
 
 export const modelsRoot = (): string => join(dataRoot(), 'models')
 export const assetDir = (id: string): string => join(modelsRoot(), id)
+/** Gebündelte Node-Laufzeit (Asset 'node-runtime'): ASR-Worker und yt-dlp (YouTube-JS-Challenges). */
+export const nodeRuntimeExe = (): string => join(assetDir('node-runtime'), 'node-v22.23.3-win-x64', 'node.exe')
 export const runDir = (): string => join(dataRoot(), 'run')
