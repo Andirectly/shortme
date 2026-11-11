@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTwitch } from './twitchStore'
 import { CheckCircle2, XCircle, RefreshCw } from 'lucide-react'
 import type { UpdateCheckResult, UpdateDownloadState } from '@shared/types'
+import type { CatalogStatus } from '@shared/catalog'
 import { fmtBytes, requiredIds, useEngines } from './engines'
 import { useStore } from './store'
 import { Button, Pill, Row, Segmented, Switch } from './ui'
@@ -54,6 +55,50 @@ function TwitchSettings(): React.JSX.Element {
         {msg && <small role="status">{msg}</small>}
       </Row>
     </div>
+  )
+}
+
+/** Bewertungskatalog über ein privates GitHub-Repo auf allen Rechnern teilen (Token nur in der Windows-Anmeldeinformationsverwaltung). */
+function CatalogSettings(): React.JSX.Element {
+  const api = typeof window !== 'undefined' ? window.cutawan?.shortme?.catalog : undefined
+  const [st, setSt] = useState<CatalogStatus | null>(null)
+  const [repo, setRepo] = useState('Andirectly/shortme-data')
+  const [token, setToken] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  useEffect(() => { void api?.status().then(setSt).catch(() => undefined) }, [api])
+  if (!api) return <></>
+  const run = async (fn: () => Promise<CatalogStatus>): Promise<void> => {
+    setBusy(true); setMsg('')
+    try { setSt(await fn()); setToken('') } catch (e) { setMsg(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e)) }
+    setBusy(false)
+  }
+  const c = st?.counts
+  return (
+    <Row label="Bewertungen teilen (GitHub)">
+      <div style={{ display: 'grid', gap: 8 }}>
+        {st?.configured ? (
+          <>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span className="sm-tag">Verbunden · {st.repo}</span>
+              <Button variant="secondary" disabled={busy} onClick={() => void run(() => api.sync())}>{busy ? 'Gleicht ab …' : 'Jetzt abgleichen'}</Button>
+              <Button variant="ghost" disabled={busy} onClick={() => void run(() => api.disconnect())}>Trennen</Button>
+            </div>
+            <small>{st.entries} Bewertungen{c ? ` (stark ${c.strong} · mittel ${c.mid} · schlecht ${c.bad})` : ''}, davon {st.fromOthers} von anderen Rechnern{st.lastSync ? ` · zuletzt ${new Date(st.lastSync).toLocaleString('de-DE')}` : ''}</small>
+          </>
+        ) : (
+          <>
+            <input className="sm-input" aria-label="Repo" placeholder="Besitzer/Repo" value={repo} onChange={(e) => setRepo(e.target.value)} />
+            <input className="sm-input" aria-label="GitHub-Token" type="password" autoComplete="off" placeholder="GitHub-Token (Contents: Read and write, nur dieses Repo)" value={token} onChange={(e) => setToken(e.target.value)} />
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <Button variant="primary" disabled={busy || !repo.trim() || !token.trim()} onClick={() => void run(() => api.connect(repo, token))}>{busy ? 'Verbindet …' : 'Verbinden'}</Button>
+              <small>Einmal pro Rechner. Bewertungen: {st?.entries ?? 0} lokal.</small>
+            </div>
+          </>
+        )}
+        {(msg || st?.lastError) && <small role="alert" style={{ color: 'var(--warn)' }}>{msg || st?.lastError}</small>}
+      </div>
+    </Row>
   )
 }
 
@@ -180,6 +225,7 @@ export function SettingsScreen(): React.JSX.Element {
         <ModelSettings />
         <UpdateSettings />
         <YouTubeLogin />
+        <CatalogSettings />
       </div>
       <h3 style={{ marginTop: 8 }}>Twitch</h3>
       <TwitchSettings />

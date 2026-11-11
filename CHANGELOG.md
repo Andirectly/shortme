@@ -6,6 +6,12 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.30.0] - 2026-11-12
+
+### Added
+
+- Bewertungskatalog über GitHub: Bewertungen (stark/mittel/schlecht + Gründe) werden in ein privates Repo abgeglichen und auf allen Rechnern zusammengeführt (Einstellungen → „Bewertungen teilen“, Anleitung in docs/CATALOG.md). Bewertungen zu Videos, die es auf einem Rechner nicht gibt, zählen im Lernbereich mit.
+
 ## [0.29.0] - 2026-11-12
 
 ### Added

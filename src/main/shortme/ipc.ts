@@ -22,6 +22,7 @@ import type { LabRunRequest } from '../../shared/models'
 import { loadStyle, saveStyle } from './styleDefaults'
 import type { StyleDefaults } from '../../shared/edits'
 import { loadRatings, saveRating } from './clips/feedback'
+import { recordRating } from '../learn/catalog'
 import type { Level } from '../../shared/learn'
 import type { PersonsPatch, ShortmePersons } from '@shared/shortme'
 import { makeThumbs, thumbPath } from './clips/thumbs'
@@ -122,7 +123,11 @@ export function registerShortmeIpc(): void {
     return `@font-face { font-family: '${family}'; font-weight: 400 900; src: url(data:font/${otf ? 'otf' : 'ttf'};base64,${(await readFile(f.path)).toString('base64')}) format('${otf ? 'opentype' : 'truetype'}'); }`
   })
   ipcMain.handle('shortme:feedback', (_e, hash: string) => loadRatings(hash))
-  ipcMain.handle('shortme:feedbackSet', (_e, hash: string, clipId: string, rating: { level: Level; reasons: string[] } | null) => saveRating(hash, clipId, rating))
+  ipcMain.handle('shortme:feedbackSet', async (_e, hash: string, clipId: string, rating: { level: Level; reasons: string[] } | null) => {
+    const all = await saveRating(hash, clipId, rating)
+    void recordRating(hash, clipId, rating).catch((e) => console.error('Katalog:', e)) // Bewertungskatalog (Abgleich über GitHub)
+    return all
+  })
   // Testlab: Modell-Plätze, Quellen, Vergleich, Entscheidung
   ipcMain.handle('testlab:models', () => modelsView())
   ipcMain.handle('testlab:enabled', () => testlabFlag())

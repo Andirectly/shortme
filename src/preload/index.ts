@@ -31,6 +31,7 @@ import type { LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twi
 import type { PlatformId, UploadOverview } from '@shared/upload'
 import type { WbOverview, WbProject, WbStatus, WorkItem } from '@shared/workbench'
 import type { LearnSettings } from '@shared/learn'
+import type { CatalogStatus } from '@shared/catalog'
 import type { LearnStats } from '@shared/learnStats'
 import type { Rule } from '@shared/learnStats'
 import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
@@ -226,6 +227,12 @@ const api = {
     channelLayoutDelete: (channel: string): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutDelete', channel),
     channelLayoutSave: (channel: string, layout: StreamLayout): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutSave', channel, layout),
     findStream: (hash: string): Promise<StreamLayout | null> => ipcRenderer.invoke('shortme:findStream', hash),
+    catalog: {
+      status: (): Promise<CatalogStatus> => ipcRenderer.invoke('catalog:status'),
+      connect: (repo: string, token: string): Promise<CatalogStatus> => ipcRenderer.invoke('catalog:connect', repo, token),
+      sync: (): Promise<CatalogStatus> => ipcRenderer.invoke('catalog:sync'),
+      disconnect: (): Promise<CatalogStatus> => ipcRenderer.invoke('catalog:disconnect')
+    },
     learn: {
       settings: (): Promise<LearnSettings> => ipcRenderer.invoke('learn:settings'),
       setSettings: (p: Partial<LearnSettings>): Promise<LearnSettings> => ipcRenderer.invoke('learn:setSettings', p),

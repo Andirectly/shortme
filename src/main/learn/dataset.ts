@@ -14,6 +14,8 @@ import { loadEdits } from '../shortme/edits'
 import { loadCorrections, loadDeleted } from '../shortme/corrections'
 import type { CandTrace } from '../shortme/clips/select'
 import { collecting, datasetDir, readJson } from './store'
+import { loadCatalog } from './catalog'
+import { remoteCandidates, videoKey } from '../../shared/catalog'
 
 const yieldTurn = (): Promise<void> => new Promise((r) => setImmediate(r))
 const jsonl = (rows: unknown[]): string => rows.map((r) => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : '')
@@ -107,12 +109,21 @@ export function rebuildDataset(): Promise<BuildInfo> {
       const videos: unknown[] = []
       const cands: CandRecord[] = []
       const pairs: Pair[] = []
+      const localVideos = new Set<string>()
       for (const d of dirs) {
         const r = await projectRecords(d, split[d] ?? splitOf(d)).catch((e) => { console.error('Datensatz', d, e); return null })
         await yieldTurn()
         if (!r) continue
+        const m = await loadMeta(d)
+        if (m) localVideos.add(videoKey({ hash: d, sourceUrl: m.sourceUrl, twitch: m.twitch }))
         videos.push(r.video); cands.push(...r.cands); pairs.push(...videoPairs(r.cands))
       }
+      // Bewertungen anderer Rechner (Katalog über GitHub) zu Videos, die es hier nicht gibt: zählen in Lernbereich und Paare mit
+      const remote = remoteCandidates(await loadCatalog(), localVideos)
+      const byVideo = new Map<string, CandRecord[]>()
+      for (const c of remote) byVideo.set(c.vid, [...(byVideo.get(c.vid) ?? []), c])
+      for (const list of byVideo.values()) pairs.push(...videoPairs(list))
+      cands.push(...remote)
       pairs.push(...channelPairs(cands), ...(await blindPairs(split)))
       const dir = datasetDir()
       await writeFileAtomic(join(dir, 'videos.jsonl'), jsonl(videos))

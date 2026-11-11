@@ -10,6 +10,7 @@ import { overview, type EvalFile, type WorkItem } from '../../shared/workbench'
 import type { CandRecord, CreatorFile, Pair } from '../../shared/learnData'
 import { calibration, counts, MIN_PATTERNS, patterns, stages, suggestRules, type Rule } from '../../shared/learnStats'
 import { decideRule, loadRules, removeRule } from './rules'
+import { catalogStatus, connectCatalog, disconnectCatalog, syncNow } from './catalog'
 import { rebuildDataset, scheduleRebuild, setBusyProbe } from './dataset'
 import { collecting, datasetDir, learnFile, loadLearnSettings, onLearnChange, readJson, saveLearnSettings, type LearnSettings } from './store'
 import { addLinks, addReference, currentId, evaluateProject, isPaused, kick, loadEvals, removeItem, resetWorkbench, resumeWorkbench, retry, setPaused, storageBytes, workbenchItems } from './workbench'
@@ -27,7 +28,13 @@ export function registerLearnIpc(): void {
   // Beim Start nachträglich eintragen, was schon da ist (verzögert, damit der Start nicht langsamer wird)
   setTimeout(() => void collecting().then(async (on) => { if (on) await rebuildDataset() }).catch((e) => console.error('Datensatz:', e)), 120_000).unref()
   resumeWorkbench()
+  // Bewertungskatalog beim Start abgleichen (verzögert; nur wenn mit GitHub verbunden)
+  setTimeout(() => void catalogStatus().then(async (s) => { if (s.configured) await syncNow() }).catch(() => undefined), 45_000).unref()
 
+  ipcMain.handle('catalog:status', () => catalogStatus())
+  ipcMain.handle('catalog:connect', (_e, repo: string, token: string) => connectCatalog(repo, token))
+  ipcMain.handle('catalog:sync', () => syncNow())
+  ipcMain.handle('catalog:disconnect', () => disconnectCatalog())
   ipcMain.handle('learn:settings', () => loadLearnSettings())
   ipcMain.handle('learn:setSettings', async (_e, p: Partial<LearnSettings>) => { const s = await saveLearnSettings(p); if (s.collect) kick(); return s })
   ipcMain.handle('learn:rebuild', () => rebuildDataset())
@@ -74,11 +81,11 @@ export function registerLearnIpc(): void {
   /** Alles Gelernte entfernen (mit Rückfrage): Datensatz, Werkbank-Liste, Bewertungen, Korrekturen, Spuren. Projekte, Clips und Einstellungen bleiben. */
   ipcMain.handle('learn:clear', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
-    const box = { type: 'warning' as const, buttons: ['Alles löschen', 'Abbrechen'], defaultId: 1, cancelId: 1, title: 'Lerndaten löschen', message: 'Alle Lerndaten löschen?', detail: 'Bewertungen, Korrekturen, Datensatz, Werkbank-Liste und Blindtests werden entfernt. Projekte und Clips bleiben.' }
+    const box = { type: 'warning' as const, buttons: ['Alles löschen', 'Abbrechen'], defaultId: 1, cancelId: 1, title: 'Lerndaten löschen', message: 'Alle Lerndaten löschen?', detail: 'Bewertungen, Korrekturen, Datensatz, Werkbank-Liste und Blindtests werden entfernt. Projekte und Clips bleiben. Der Bewertungskatalog auf GitHub bleibt bestehen und kommt beim nächsten Abgleich zurück.' }
     if ((win ? await dialog.showMessageBox(win, box) : await dialog.showMessageBox(box)).response !== 0) return false
     await resetWorkbench()
     await rm(datasetDir(), { recursive: true, force: true })
-    for (const f of ['blind.json', 'rules.json', 'workbench.json']) await rm(learnFile(f), { force: true })
+    for (const f of ['blind.json', 'rules.json', 'workbench.json', 'catalog.json']) await rm(learnFile(f), { force: true })
     for (const d of ['sf', 'lf', 'tmp']) await rm(learnFile(d), { recursive: true, force: true })
     for (const h of await readdir(projectsRoot()).catch(() => [] as string[])) for (const f of ['ratings.json', 'feedback.json', 'corrections.jsonl', 'candidates.json', 'creator.json', 'eval.json', 'trend.json', 'features8k.f32']) await rm(projectFile(h, f), { force: true })
     return true
