@@ -63,14 +63,24 @@ export function registerShortmeIpc(): void {
   // Inhaltstyp-Vorschlag, Facecam-Layouts pro Kanal
   ipcMain.handle('shortme:suggestKind', async (_e, hash: string) => { const meta = await loadMeta(hash); if (!meta) throw new Error('Projekt nicht gefunden'); return suggestKind(meta) })
   /** Inhaltstyp nachträglich ändern: Ausschnitt und Ranking werden neu berechnet (Transkript bleibt). */
-  ipcMain.handle('shortme:reanalyze', async (_e, hash: string, kind: ContentType, frame?: FrameChoice) => {
+  ipcMain.handle('shortme:reanalyze', async (_e, hash: string, kindIn?: ContentType, frame?: FrameChoice) => {
     const meta = await loadMeta(hash)
     if (!meta) throw new Error('Projekt nicht gefunden')
+    // ohne Angabe (Rechtsklick „Neu analysieren“): bisheriger Inhaltstyp des Projekts, sonst Vorschlag
+    const kind = kindIn ?? meta.contentType ?? (await suggestKind(meta)).kind
     meta.contentType = kind
     await saveMeta(meta)
     const fr = frame ?? (await loadProfile(kind)).frame
     await rememberChoice(sourceKey({ channel: meta.twitch?.channel, url: meta.sourceUrl, path: meta.sourcePath }), { kind, frame: fr })
-    return jobs.enqueue(hash, meta.title, async ({ signal, report }) => { await runAnalysis(meta, { contentType: kind, frame: fr, signal, onProgress: report }) })
+    return jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
+      // Quellvideo gelöscht (z. B. Speicher sparen)? Bei Links neu laden, sonst klare Meldung
+      if (!existsSync(meta.sourcePath)) {
+        if (!meta.sourceUrl) throw new Error('Das Quellvideo gibt es nicht mehr. Bitte die Datei erneut importieren.')
+        report('audio', 0, 'Video wird neu geladen …')
+        await importUrl(meta.sourceUrl, (p, message) => report('audio', p, message))
+      }
+      await runAnalysis(meta, { contentType: kind, frame: fr, signal, onProgress: report })
+    })
   })
   ipcMain.handle('shortme:profile', (_e, kind: ContentType) => loadProfile(kind))
   ipcMain.handle('shortme:channelLayouts', () => channelLayouts())
@@ -221,13 +231,13 @@ export function registerShortmeIpc(): void {
     return true
   })
   ipcMain.handle('shortme:projects', async () => {
-    const out: Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null }> = []
+    const out: Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null; source: string; isUrl: boolean }> = []
     for (const d of await readdir(projectsRoot()).catch(() => [] as string[])) {
       const meta = await loadMeta(d)
       if (!meta) continue
       allowMediaPath(meta.sourcePath)
       const clips = await loadClips(d)
-      out.push({ hash: meta.hash, title: meta.title, durationSec: meta.durationSec, clips: clips?.clips.length ?? 0, created: meta.created, poster: await dataUrl(projectFile(meta.hash, 'poster.jpg')) })
+      out.push({ hash: meta.hash, title: meta.title, durationSec: meta.durationSec, clips: clips?.clips.length ?? 0, created: meta.created, poster: await dataUrl(projectFile(meta.hash, 'poster.jpg')), source: meta.sourceUrl ?? meta.sourcePath, isUrl: !!meta.sourceUrl })
     }
     return out.sort((a, b) => b.created.localeCompare(a.created))
   })

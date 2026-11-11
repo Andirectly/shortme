@@ -99,6 +99,15 @@ export function iouN(a: FaceN, b: FaceN): number {
 }
 
 /**
+ * „Gleiche Stelle“ für die Facecam: Mittelpunkte höchstens 1,5 Gesichtsgrößen auseinander. Ein Kamera-Gesicht ist klein (oft 4 % der Breite)
+ * und der Kopf bewegt sich um etwa eine Gesichtsbreite – die Überdeckung (IoU) der Rahmen wäre dann schon 0, obwohl es dieselbe Kamera ist.
+ */
+export function sameSpot(a: FaceN, b: FaceN): boolean {
+  const w = Math.max(a.x2 - a.x1, b.x2 - b.x1), h = Math.max(a.y2 - a.y1, b.y2 - b.y1)
+  return Math.abs((a.x1 + a.x2 - b.x1 - b.x2) / 2) < 1.5 * w && Math.abs((a.y1 + a.y2 - b.y1 - b.y2) / 2) < 1.5 * h
+}
+
+/**
  * Facecam-Gesicht wählen: ein kleines Gesicht (< 9 % der Bildfläche), das in vielen Stichproben an (fast) derselben Stelle sitzt.
  * `perFrame[i]` = alle Gesichter der Stichprobe i. Gibt den Mittelwert-Rahmen und den Anteil der Stichproben zurück.
  */
@@ -110,7 +119,7 @@ export function pickStableFace(perFrame: FaceN[][], minShare = 0.5): { face: Fac
     for (const cand of frame) {
       const area = (cand.x2 - cand.x1) * (cand.y2 - cand.y1)
       if (area > 0.09 || area < 0.0003) continue
-      const hits = perFrame.map((f) => f.find((g) => iouN(cand, g) > 0.5)).filter((g): g is FaceN => !!g)
+      const hits = perFrame.map((f) => f.find((g) => sameSpot(cand, g))).filter((g): g is FaceN => !!g)
       const share = hits.length / total
       if (share < minShare || (best && hits.length <= best.n)) continue
       const m = (k: keyof FaceN): number => hits.reduce((s, g) => s + g[k], 0) / hits.length

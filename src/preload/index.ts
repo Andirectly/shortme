@@ -195,7 +195,7 @@ const api = {
     presets: (): Promise<StylePreset[]> => ipcRenderer.invoke('shortme:presets'),
     presetSave: (p: StylePreset, mode: 'new' | 'overwrite'): Promise<{ saved: StylePreset; all: StylePreset[] }> => ipcRenderer.invoke('shortme:presetSave', p, mode),
     presetDelete: (id: string): Promise<StylePreset[]> => ipcRenderer.invoke('shortme:presetDelete', id),
-    projects: (): Promise<Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null }>> => ipcRenderer.invoke('shortme:projects'),
+    projects: (): Promise<Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null; source: string; isUrl: boolean }>> => ipcRenderer.invoke('shortme:projects'),
     editorAssets: (hash: string, clipId: string): Promise<{ peaks: number[]; step: number; strip: string[] }> => ipcRenderer.invoke('shortme:editorAssets', hash, clipId),
     previewPlan: (hash: string, clipId: string, log: EditLog, presetId?: string): Promise<PreviewPlan> => ipcRenderer.invoke('shortme:previewPlan', hash, clipId, log, presetId),
     styleGet: (): Promise<StyleDefaults> => ipcRenderer.invoke('shortme:styleGet'),
@@ -220,7 +220,7 @@ const api = {
     },
     /** Inhaltstyp: Vorschlag beim Import, Profile, Facecam-Layouts pro Kanal. */
     suggestKind: (hash: string): Promise<{ kind: ContentType; reason: string; source: 'twitch' | 'remembered' | 'detected'; frame: FrameChoice; detected: ContentType }> => ipcRenderer.invoke('shortme:suggestKind', hash),
-    reanalyze: (hash: string, kind: ContentType, frame?: FrameChoice): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:reanalyze', hash, kind, frame),
+    reanalyze: (hash: string, kind?: ContentType, frame?: FrameChoice): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:reanalyze', hash, kind, frame),
     profile: (kind: ContentType): Promise<KindProfile> => ipcRenderer.invoke('shortme:profile', kind),
     channelLayouts: (): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayouts'),
     channelLayoutDelete: (channel: string): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutDelete', channel),

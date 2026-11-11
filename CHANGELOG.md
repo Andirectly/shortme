@@ -6,6 +6,17 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.29.0] - 2026-11-12
+
+### Added
+
+- Rechtsklick auf ein Projekt: „Link kopieren“ (bei lokalen Dateien „Dateipfad kopieren“) und „Neu analysieren“ (mit dem bisherigen Inhaltstyp; fehlt das Quellvideo, wird es bei Links neu geladen).
+- Lange Videos: Bis zu 30 % der Kandidaten kommen allein aus Ton- und Chat-Spitzen (Lachen, Applaus, Lautstärke, Chat), unabhängig vom Transkript – für Stellen, die im Text flach wirken. Ab dem 13. Clip nur noch Clips über dem Median der Bewertungen, mindestens 90 s Abstand.
+
+### Fixed
+
+- Facecam bei Streams wurde oft nicht erkannt (mittiger Ausschnitt, Person fehlt oder verschoben): Das kleine Facecam-Gesicht bewegt sich mit dem Kopf, die Erkennung verlangte aber 50 % Überdeckung der Gesichtsrahmen. Jetzt zählt der Abstand der Mittelpunkte relativ zur Gesichtsgröße.
+
 ## [0.28.0] - 2026-11-11
 
 ### Added

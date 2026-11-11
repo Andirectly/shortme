@@ -9,6 +9,7 @@ import { snapClip, type Range } from './snap'
 import { topicClips } from './texttiling'
 import { chatJson, int, isObj, loadPrompt, str } from './llm'
 import { buildTopicMap, topicContext, topicOfRange, type TopicMap } from './topics'
+import { peakCandidate, signalPeaks } from './peaks'
 
 export interface SelectInput {
   /** „Most replayed“-Kurve (YouTube), falls vorhanden – starkes Ranking-Signal. */
@@ -25,7 +26,7 @@ export interface SelectInput {
   cuts: number[]
 }
 
-export interface CandTrace { start: number; end: number; criteria: ShortmeClip['criteria']; title: string; fate: 'rated' | 'finalist' | 'overlap' | 'selected' }
+export interface CandTrace { start: number; end: number; criteria: ShortmeClip['criteria']; title: string; fate: 'rated' | 'finalist' | 'overlap' | 'selected'; /** aus einer Signal-Spitze statt vom Sprachmodell */ peak?: boolean }
 
 export interface SelectOptions {
   /** URL des laufenden llama-server; null = Fallback (TextTiling). */
@@ -42,7 +43,7 @@ export interface SelectOptions {
   report?: (stage: string, fraction: number, message: string) => void
 }
 
-interface Cand { first: number; last: number } // Satzindizes (inklusive)
+interface Cand { first: number; last: number; /** Kandidat stammt aus einer Signal-Spitze (Ton/Chat), nicht vom Sprachmodell. */ peak?: boolean } // Satzindizes (inklusive)
 interface Rated extends Cand {
   criteria: ShortmeClip['criteria']
   sum: number
@@ -264,10 +265,13 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   const windows = buildWindows(sentences)
   let cands: Cand[] = []
   const maxCands = candidateBudget(wanted)
+  // ein Teil des Budgets geht an Stellen, die nur im Ton/Chat auffallen (Lachen, Applaus, Spitzen): im Transkript wirken Rap- oder Imitations-Einlagen oft flach
+  const peakTarget = Math.min(Math.ceil(maxCands * 0.3), Math.ceil(durationSec / 300))
+  const windowBudget = Math.max(5, maxCands - peakTarget)
   for (let w = 0; w < windows.length; w++) {
     report('candidates', w / windows.length, `Kandidaten suchen (${w + 1}/${windows.length}) …`)
     const win = windows[w]
-    const prompt = await loadPrompt('candidates', { minSec, maxSec, max: Math.ceil(maxCands / windows.length) + 1, query: queryLine(opts.query), transcript: sentences.slice(win.from, win.to + 1).map((s) => formatSentence(s, signals)).join('\n') })
+    const prompt = await loadPrompt('candidates', { minSec, maxSec, max: Math.ceil(windowBudget / windows.length) + 1, query: queryLine(opts.query), transcript: sentences.slice(win.from, win.to + 1).map((s) => formatSentence(s, signals)).join('\n') })
     const got = await chatJson(url, prompt, {
       signal, maxTokens: 800,
       schema: { type: 'object', additionalProperties: false, required: ['candidates'], properties: { candidates: { type: 'array', maxItems: 12, items: { type: 'object', additionalProperties: false, required: ['start', 'end'], properties: { start: { type: 'integer' }, end: { type: 'integer' } } } } } },
@@ -276,10 +280,18 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
     for (const c of got) {
       const f = fitLength({ first: Math.max(win.from, Math.min(c.first, c.last)), last: Math.min(win.to, Math.max(c.first, c.last)) }, sentences, minSec, maxSec, win.to)
       if (f && !cands.some((o) => overlaps(o, f) > 0.5)) cands.push(f)
+
     }
   }
+  let fromPeaks = 0
+  for (const t of signalPeaks(signals, input.events, input.chat, durationSec, peakTarget * 2)) {
+    if (fromPeaks >= peakTarget) break
+    const c = peakCandidate(sentences, t)
+    const f = c && fitLength(c, sentences, minSec, maxSec, sentences.length - 1)
+    if (f && !cands.some((o) => overlaps(o, f) > 0.3)) { cands.push({ ...f, peak: true }); fromPeaks++ }
+  }
   cands = thinEvenly(cands.sort((a, b) => a.first - b.first), maxCands)
-  console.info(`[select] Kandidaten: ${cands.length} (Ziel ${wanted}, max ${maxCands}), Fenster: ${windows.length}`)
+  console.info(`[select] Kandidaten: ${cands.length} (Ziel ${wanted}, max ${maxCands}), Fenster: ${windows.length}, davon aus Signal-Spitzen: ${fromPeaks}`)
   if (cands.length === 0) return fallbackClips(input, sentences, wanted, minSec, maxSec, cuts, report)
 
   // B: Anfang prüfen (Kontext davor) → C: Bewertung (2 Proben, Belege) → D: Ende prüfen
@@ -327,7 +339,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
       if (extended > 0) merged = { ...merged, criteria: { ...merged.criteria, payoff: Math.max(merged.criteria.payoff, 10) } }
     }
     const m = merged.meta
-    rated.push({ first, last, criteria: merged.criteria, title: m.title, hookText: m.hookText, reason: m.reason, tags: m.tags, sum: critSum(merged.criteria), extended: extended + startExt, rank: 0, samples, text: textNow(), ctx: ctx() })
+    rated.push({ first, last, peak: cands[i].peak, criteria: merged.criteria, title: m.title, hookText: m.hookText, reason: m.reason, tags: m.tags, sum: critSum(merged.criteria), extended: extended + startExt, rank: 0, samples, text: textNow(), ctx: ctx() })
   }
 
   // C2: zweite Probe für die obere Hälfte (bessere Trennschärfe dort, wo es um die Plätze geht)
@@ -378,7 +390,16 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   const scored = pool.map((f) => ({ f, score: Math.max(0, finalScore(f.sum, f.rank, pool.length, (secOf(signals.loudness, sentences[f.first].start, sentences[f.last].end) + secOf(signals.burst, sentences[f.first].start, sentences[f.last].end)) / 2, ((input.heat ? heatBonus(heatScore(input.heat, sentences[f.first].start, sentences[f.last].end)) : 0) * (input.weights?.heat ?? 1)) + ((input.chat ? chatBonus(heatScore(input.chat, sentences[f.first].start, sentences[f.last].end)) : 0) * (input.weights?.chat ?? 1)), input.weights?.signal ?? 5) - lengthPenalty(dur(sentences, f.first, f.last))) }))
   // Qualitätsschwelle: Clips mit schwachem Hook UND/ODER nicht eigenständigem Anfang erst nehmen, wenn zu wenige gute da sind
   const solid = (f: Rated): boolean => f.criteria.standalone >= 8 && f.criteria.hook >= 8
-  scored.sort((a, b) => Number(solid(b.f)) - Number(solid(a.f)) || b.score - a.score)
+  // Lange Videos (viele Clips): Streams liefern fast nur schwache Hooks (Sätze beginnen mit „Und“, „Also“ …), „solide“ ist dort selten (im Test 3 von 80).
+  // Stattdessen eine relative Schwelle: ab dem 13. Clip nur noch Clips über dem Median aller Bewertungen, und Abstand zwischen den Clips.
+  const long = wanted > 12
+  const minFill = Math.min(wanted, 12)
+  const bar = long ? [...rated].map((r) => r.sum).sort((a, b) => a - b)[Math.floor(rated.length / 2)] : 0
+  const gap = long ? 90 : 0
+  const byQuality = (a: { f: Rated }, b: { f: Rated }): number => (long ? 0 : Number(solid(b.f)) - Number(solid(a.f)))
+  const peakSums = rated.filter((r) => r.peak).map((r) => r.sum)
+  console.info(`[select] Median der Bewertung: ${bar}; Signal-Kandidaten bewertet: ${peakSums.length}, Mittel ${peakSums.length ? (peakSums.reduce((a, b) => a + b, 0) / peakSums.length).toFixed(1) : '–'} (alle: ${(rated.reduce((a, r) => a + r.sum, 0) / rated.length).toFixed(1)})`)
+  scored.sort((a, b) => byQuality(a, b) || b.score - a.score)
   report('snap', 0.9, 'Grenzen einrasten …')
   const taken: Range[] = []
   const out: ShortmeClip[] = []
@@ -390,10 +411,11 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   const perTopic = new Map<number, number>()
   const adj = (x: { f: Rated; score: number }): number => x.score - (tmap && tmap.topics.length > 1 ? 7 * (perTopic.get(topicOf(x.f)) ?? 0) : 0)
   while (scored.length && out.length < wanted) {
-    scored.sort((a, b) => Number(solid(b.f)) - Number(solid(a.f)) || adj(b) - adj(a))
+    scored.sort((a, b) => byQuality(a, b) || adj(b) - adj(a))
     const { f, score } = scored.shift()!
+    if (long && out.length >= minFill && f.sum < bar) continue
     const snapped = snapClip({ start: sentences[f.first].start, end: sentences[f.last].end }, { ...sctx, neighbors: taken, maxLen: MAX_CLIP_SEC })
-    if (snapped.end - snapped.start < minSec * 0.6 || taken.some((t) => snapped.start < t.end && snapped.end > t.start)) { lost.add(f); console.info(`[select] verworfen (Überlappung/zu kurz): ${snapped.start.toFixed(1)}–${snapped.end.toFixed(1)}`); continue }
+    if (snapped.end - snapped.start < minSec * 0.6 || taken.some((t) => snapped.start < t.end + gap && snapped.end > t.start - gap)) { lost.add(f); console.info(`[select] verworfen (Überlappung/zu kurz): ${snapped.start.toFixed(1)}–${snapped.end.toFixed(1)}`); continue }
     taken.push({ start: snapped.start, end: snapped.end })
     chosen.add(f)
     perTopic.set(topicOf(f), (perTopic.get(topicOf(f)) ?? 0) + 1)
@@ -407,7 +429,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
     })
   }
   // Spur für das Lernen: alle bewerteten Kandidaten und wie weit sie kamen (Stufe, an der ein Moment verloren geht)
-  opts.trace?.(pool.map((f) => ({ start: sentences[f.first].start, end: sentences[f.last].end, criteria: f.criteria, title: f.title, fate: chosen.has(f) ? 'selected' : lost.has(f) ? 'overlap' : finalists.includes(f) ? 'finalist' : 'rated' })))
+  opts.trace?.(pool.map((f) => ({ start: sentences[f.first].start, end: sentences[f.last].end, criteria: f.criteria, title: f.title, ...(f.peak ? { peak: true } : {}), fate: chosen.has(f) ? 'selected' : lost.has(f) ? 'overlap' : finalists.includes(f) ? 'finalist' : 'rated' })))
   // F: Untertitel-Korrektur je Clip (Zeichensetzung, Schreibweise, Erkennungsfehler) – als Vorbelegung, im Editor änderbar
   for (let i = 0; i < out.length; i++) {
     report('proofread', i / out.length, `Untertitel prüfen (${i + 1}/${out.length}) …`)

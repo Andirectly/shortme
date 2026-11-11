@@ -24,6 +24,7 @@ interface ProjectState {
   projects: ProjectCard[]
   loadProjects: () => Promise<void>
   deleteProject: (hash: string) => Promise<boolean>
+  reanalyze: (hash: string) => Promise<boolean>
   /** Titel des geöffneten Projekts (Clip-Übersicht). */
   currentTitle: string | null
   openProject: (hash: string) => Promise<boolean>
@@ -67,7 +68,7 @@ interface ProjectState {
   discard: () => Promise<void>
 }
 
-export interface ProjectCard { hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null }
+export interface ProjectCard { hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null; /** Link (Web-Import) oder Dateipfad. */ source: string; isUrl: boolean }
 
 let unsub: Array<() => void> = []
 let lastRefresh = 0
@@ -108,6 +109,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   currentTitle: null,
   deleteProject: async (hash) => { const a = api(); if (!a) return false; const ok = await a.deleteProject(hash); if (ok) { if (get().clipsFile?.hash === hash) set({ clipsFile: null, persons: null }); await get().loadProjects() } return ok },
   loadProjects: async () => { const a = api(); if (a) set({ projects: await a.projects() }) },
+  /** Projekt mit seinem bisherigen Inhaltstyp neu analysieren (Rechtsklick); der Verlauf zeigt sich im Verarbeitungsbild. */
+  reanalyze: async (hash) => { const a = api(); if (!a) return false; set({ job: await a.reanalyze(hash), clipsFile: null, transcript: null }); return true },
   openProject: async (hash) => {
     const a = api()
     if (!a) return false
