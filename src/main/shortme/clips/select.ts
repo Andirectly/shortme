@@ -1,4 +1,5 @@
 import type { ClipTagKind, ShortmeClip } from '@shared/shortme'
+import { MAX_CANDS, MAX_CLIPS, candidateBudget, defaultWanted } from '@shared/estimate'
 import { marksBySentence, type AudioEvent } from './audioEvents'
 import { chatBonus, heatBonus, heatScore, type HeatPoint } from './heat'
 import type { AsrWord } from '../../engines/asr/protocol'
@@ -96,14 +97,9 @@ export async function proofreadWords(url: string, words: string[], signal?: Abor
     return {}
   }
 }
-export const MAX_CLIPS = 50
 const WINDOW_WORDS = 3000
-/** Höchstzahl bewerteter Kandidaten: je Kandidat 3–5 LLM-Aufrufe, darüber wächst die Zeit bei sehr langen Videos zu stark. */
-export const MAX_CANDS = 90
-
-/** Automatische Clip-Anzahl: etwa ein Clip je 2,5 Minuten Material (mindestens 4, höchstens 50). */
-export const defaultWanted = (durationSec: number): number => Math.max(4, Math.min(MAX_CLIPS, Math.round(durationSec / 150)))
-export const candidateBudget = (wanted: number): number => Math.min(MAX_CANDS, Math.max(10, Math.ceil(wanted * 3)))
+// Clip-Anzahl und Kandidatenbudget liegen in shared/estimate.ts (auch für die Dauer-Schätzung der Oberfläche)
+export { MAX_CLIPS, MAX_CANDS, defaultWanted, candidateBudget }
 
 /** Kandidaten (nach Zeit sortiert) gleichmäßig über das ganze Video ausdünnen – nie einfach den Rest abschneiden, sonst fehlt das Ende langer Videos. */
 export function thinEvenly<T>(items: T[], max: number): T[] {

@@ -169,6 +169,7 @@ export function registerShortmeIpc(): void {
         await addExport({ hash, clipId: clips[i].id, title: eff.title, hookText: st.hook.text || eff.hookText, path: exp.path, durationSec: exp.durationSec })
       }
       void shell.openPath(outDir)
+      return `${clips.length === 1 ? 'Clip' : `${clips.length} Clips`} exportiert nach ${outDir}`
     })
   })
   ipcMain.handle('shortme:exportDir', async () => ({ dir: await exportRoot(), isDefault: (await exportRoot()) === defaultExportRoot() }))

@@ -16,7 +16,8 @@ export interface JobInfo {
 }
 
 export interface JobContext { signal: AbortSignal; report: (stage: string, progress: number, message: string) => void }
-type Runner = (ctx: JobContext) => Promise<void>
+/** Rückgabe (optional) = Abschlussmeldung des Jobs, z. B. „Exportiert nach …“. */
+type Runner = (ctx: JobContext) => Promise<void | string>
 
 interface Entry { info: JobInfo; run: Runner; ac: AbortController | null; onDiscard?: () => Promise<void> }
 
@@ -63,8 +64,8 @@ export class JobQueue extends EventEmitter {
     e.ac = ac
     this.set(e, { state: 'running', error: undefined })
     try {
-      await e.run({ signal: ac.signal, report: (stage, progress, message) => this.set(e, { stage, progress, message }) })
-      this.set(e, { state: 'done', progress: 1, message: 'Fertig' })
+      const done = await e.run({ signal: ac.signal, report: (stage, progress, message) => this.set(e, { stage, progress, message }) })
+      this.set(e, { state: 'done', progress: 1, message: typeof done === 'string' ? done : 'Fertig' })
     } catch (err) {
       const reason = ac.signal.aborted ? String(ac.signal.reason) : ''
       if (reason === 'pause') this.set(e, { state: 'paused', message: 'Pausiert' })

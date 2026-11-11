@@ -6,6 +6,18 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.28.0] - 2026-11-11
+
+### Added
+
+- Dauer der Analyse: vor dem Start „Dauer etwa …“ (nach Videolänge und Clip-Anzahl), während des Laufs „Noch … Min“. Die Schätzung lernt aus dem letzten kompletten Lauf auf diesem Rechner.
+- Clip-Anzahl bis 50 wählbar (vorher 30).
+- Nach dem Export steht der Zielpfad in der Leiste (Clip-Liste und Editor); Fehler beim Export werden im Editor angezeigt.
+
+### Fixed
+
+- Fortschrittsbalken: Themenkarte und Untertitel-Prüfung fehlten in der Anzeige, der Balken sprang dort auf etwa 3 % zurück. Der Balken ist jetzt nach der echten Dauer der Stufen gewichtet (bei langen Videos dauern Kamerawechsel und Bewertung am längsten).
+
 ## [0.27.0] - 2026-11-11
 
 ### Fixed

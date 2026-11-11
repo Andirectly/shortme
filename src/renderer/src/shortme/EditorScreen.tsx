@@ -323,6 +323,8 @@ export function EditorScreen(): React.JSX.Element {
         <small style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{saved ? <><Check size={13} /> Gespeichert</> : 'Speichert …'}</small>
         <Button variant="ghost" aria-label="Rückgängig (Strg+Z)" disabled={!canUndo(log)} onClick={undo}><Undo2 size={16} /></Button>
         <Button variant="ghost" aria-label="Wiederholen (Strg+Y)" disabled={!canRedo(log)} onClick={redo}><Redo2 size={16} /></Button>
+        {exportJob?.state === 'done' && exportJob.message.includes('exportiert nach') && <small role="status" title={exportJob.message} style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exportJob.message}</small>}
+        {exportJob?.state === 'error' && <small role="alert" style={{ color: 'var(--warn)', maxWidth: 260 }} title={exportJob.error}>Export fehlgeschlagen: {exportJob.error}</small>}
         <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportNow()}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
       </div>
 

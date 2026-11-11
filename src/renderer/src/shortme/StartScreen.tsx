@@ -13,6 +13,8 @@ import { IMG } from './data'
 import { Button, Pill, Segmented, Switch, Row } from './ui'
 import { ProjectGrid } from './ProjectGrid'
 import { useSprings } from './motion'
+import { estimateStages, fmtEta, totalSec } from '@shared/estimate'
+import { getSpeed } from './speed'
 
 export function StartScreen(): React.JSX.Element {
   const openSheet = useStore((s) => s.openSheet)
@@ -197,7 +199,7 @@ function CreateSheet(): React.JSX.Element {
                 </div>
               </Row>
               <Row label="Titel einblenden" hint="Standard für alle neuen Clips; pro Clip im Editor änderbar"><Switch on={!!style.titleEnabled} onChange={(b) => void saveStyle({ ...style, titleEnabled: b })} label="Titel einblenden" /></Row>
-              <Row label="Anzahl Clips" hint="Auto ≈ 1 je 2,5 Min"><Segmented options={['Auto', '5', '10', '15', '20', '30']} value={opts.count ?? 'Auto'} onChange={(count) => setOpts({ count })} /></Row>
+              <Row label="Anzahl Clips" hint="Auto ≈ 1 je 2,5 Min"><Segmented options={['Auto', '5', '10', '15', '20', '30', '40', '50']} value={opts.count ?? 'Auto'} onChange={(count) => setOpts({ count })} /></Row>
               <Row label="Sprechpausen entfernen"><Switch on={opts.removePauses} onChange={(removePauses) => setOpts({ removePauses })} label="Sprechpausen entfernen" /></Row>
               <Row label="Workflow"><Segmented options={['Automatisch', 'Prüfen & Bearbeiten']} value={opts.workflow} onChange={(workflow) => setOpts({ workflow })} /></Row>
               <Row label="Wonach suchen?" hint="optional">
@@ -218,6 +220,7 @@ function CreateSheet(): React.JSX.Element {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 24px', borderTop: '1px solid var(--edge)' }}>
+              {imported && <small style={{ marginRight: 'auto', alignSelf: 'center' }} title="Grobe Schätzung; sie passt sich nach dem ersten kompletten Lauf an diesen Rechner an.">Dauer etwa {fmtEta(totalSec(estimateStages(imported.meta.durationSec, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined, getSpeed())))}</small>}
               <Button variant="secondary" onClick={() => openSheet(false)}>Abbrechen</Button>
               <Button variant="primary" disabled={!!imported && !imported.preflight.ok} onClick={() => void start()}><Sparkles size={16} /> Clips finden</Button>
             </div>

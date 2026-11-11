@@ -9,6 +9,8 @@ import { useClipList } from './clipData'
 import { ProjectGrid } from './ProjectGrid'
 import { Button, Pill, Score } from './ui'
 import { useSprings } from './motion'
+import { estimateStages, fmtEta, fractionOf, remainingSec, spans, totalSec } from '@shared/estimate'
+import { getSpeed, saveSpeed } from './speed'
 
 const STAGES = [
   { id: 'transcribe', label: 'Transkribieren', from: 0, to: 0.3 },
@@ -169,7 +171,7 @@ export function ClipsScreen(): React.JSX.Element {
       <AnimatePresence>
         {selected.length > 0 && (
           <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }} transition={base} className="sm-glass" style={{ position: 'fixed', bottom: 20, left: '50%', translate: '-50% 0', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderRadius: 999, zIndex: 30, background: 'rgba(24,24,32,0.9)' }}>
-            <small style={{ color: 'var(--text-1)', paddingLeft: 8 }}>{selected.length} ausgewählt</small>
+            <small style={{ color: 'var(--text-1)', paddingLeft: 8, maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={exportJob?.state === 'done' ? exportJob.message : undefined}>{exportJob?.state === 'done' && exportJob.message.includes('exportiert nach') ? exportJob.message : `${selected.length} ausgewählt`}</small>
             <Button variant="secondary"><Wand2 size={15} /> Auf alle anwenden</Button>
             <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportClips(selected, presetId, false)}><Download size={15} /> {exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
           </motion.div>
@@ -188,33 +190,50 @@ export function ProjectsScreen(): React.JSX.Element {
   )
 }
 
-const STAGE_RANGE: Record<string, [number, number, number]> = {
-  // [Zeile, von, bis] – Anteil an der Gesamtanzeige
-  audio: [0, 0, 0.03], asr: [0, 0.03, 0.45], gaps: [0, 0.45, 0.49], speakers: [0, 0.49, 0.52], finalize: [0, 0.52, 0.55],
-  signals: [1, 0.55, 0.6], shots: [1, 0.6, 0.8], layout: [2, 0.95, 0.97], llm: [2, 0.8, 0.8], texttiling: [2, 0.8, 0.95], candidates: [2, 0.8, 0.85], rate: [2, 0.85, 0.93], compare: [2, 0.93, 0.95], snap: [2, 0.95, 0.97], thumbs: [2, 0.97, 1], done: [2, 1, 1]
-}
 const ROWS = ['Transkribieren', 'Analysieren', 'Clips finden']
-const ROW_SPAN: Array<[number, number]> = [[0, 0.55], [0.55, 0.8], [0.8, 1]]
+/** Start und letzter Stand je Job (außerhalb von React, damit Neuzeichnen nichts zurücksetzt). */
+const runs = new Map<string, { at: number; f0: number; last: number; saved: boolean }>()
 
-/** Echte Verarbeitung (M3/M4): Fortschritt aus dem Job; Rendern folgt in M6. */
+function trackRun(id: string, total: number, done: boolean, refSec: number): void {
+  const r = runs.get(id) ?? { at: Date.now(), f0: total, last: total, saved: false }
+  r.last = Math.max(r.last, total)
+  // ganzer Lauf von Anfang an gemessen → Tempo dieses Rechners merken (nächste Schätzung)
+  if (done && !r.saved && r.f0 < 0.05) { r.saved = true; saveSpeed((Date.now() - r.at) / 1000 / refSec) }
+  runs.set(id, r)
+}
+
+/** Echte Verarbeitung (M3/M4): Balken zeitgewichtet nach der Schätzung (shared/estimate.ts), dazu die Restzeit. */
 function RealProcessing(): React.JSX.Element {
   const job = useProject((s) => s.job)!
   const pause = useProject((s) => s.pause)
   const resume = useProject((s) => s.resume)
   const stop = useProject((s) => s.stop)
   const discard = useProject((s) => s.discard)
+  const imported = useProject((s) => s.imported)
+  const projects = useProject((s) => s.projects)
+  const count = useStore((s) => s.opts.count)
   const go = useStore((s) => s.go)
-  const r = STAGE_RANGE[job.stage] ?? [0, 0, 0.03]
-  const total = job.state === 'done' ? 1 : r[1] + (r[2] - r[1]) * job.progress
+  const dur = imported?.meta.hash === job.hash ? imported.meta.durationSec : projects.find((p) => p.hash === job.hash)?.durationSec ?? 3600
+  const wanted = count && count !== 'Auto' ? Number(count) : undefined
+  const est = estimateStages(dur, wanted)
+  const sp = spans(est)
+  const run = runs.get(job.id)
+  const f = fractionOf(job.stage, job.progress, sp.stage)
+  const total = job.state === 'done' ? 1 : f ?? run?.last ?? 0
+  const [now, setNow] = useState(0)
+  useEffect(() => { const tick = (): void => setNow(Date.now()); tick(); const i = setInterval(tick, 5000); return () => clearInterval(i) }, [])
+  const refSec = totalSec(est)
+  useEffect(() => trackRun(job.id, total, job.state === 'done', refSec), [job.id, job.state, total, refSec])
+  const eta = remainingSec(est, total, run?.f0 ?? total, run ? (now - run.at) / 1000 : 0, getSpeed())
   const busy = job.state === 'running' || job.state === 'queued'
   const title = job.state === 'done' ? 'Clips gefunden' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : 'Transkribiert …'
   const later = ['Rendern']
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 24, paddingTop: 12 }}>
-      <div><h1>{title}</h1><small>{job.title} · {job.message}</small></div>
+      <div><h1>{title}</h1><small>{job.title} · {job.message}</small>{busy && total < 1 && <small style={{ display: 'block', marginTop: 4 }}>Noch {fmtEta(eta)}{total < 0.05 ? ' (Schätzung)' : ''}</small>}</div>
       <div className="sm-glass" style={{ padding: 22, display: 'grid', gap: 18 }}>
         {ROWS.map((label, i) => {
-          const [a, b] = ROW_SPAN[i]
+          const [a, b] = sp.row[i]
           const p = Math.max(0, Math.min(1, (total - a) / (b - a)))
           const done = p >= 1 || job.state === 'done'
           return (
