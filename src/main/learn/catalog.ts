@@ -3,7 +3,7 @@
 import { readdir } from 'node:fs/promises'
 import { hostname } from 'node:os'
 import { loadMeta, projectsRoot } from '../shortme/project'
-import { loadClips } from '../shortme/clips/analysis'
+import { findClip } from '../shortme/clips/analysis'
 import { loadTranscript } from '../shortme/transcription'
 import { loadRatings } from '../shortme/clips/feedback'
 import { writeFileAtomic } from '../shortme/atomic'
@@ -33,8 +33,8 @@ export async function catalogStatus(): Promise<CatalogStatus> {
 
 /** Bewertung eines Clips in den Katalog schreiben (`null` = zurückgenommen) und einen Abgleich vormerken. */
 export async function recordRating(hash: string, clipId: string, rating: { level: Level; reasons: string[] } | null, at = new Date().toISOString()): Promise<void> {
-  const [meta, clips] = await Promise.all([loadMeta(hash), loadClips(hash)])
-  const clip = clips?.clips.find((c) => c.id === clipId)
+  const [meta, found] = await Promise.all([loadMeta(hash), findClip(hash, clipId)])
+  const clip = found?.clip
   if (!meta || !clip) return
   const tr = await loadTranscript(hash)
   const text = (tr?.words ?? []).filter((w) => w.start >= clip.start - 0.05 && w.end <= clip.end + 0.05).map((w) => w.w).join(' ').slice(0, 400)

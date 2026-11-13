@@ -6,6 +6,8 @@ import { PAIR_WEIGHT } from '../../shared/learnData'
 import { writeFileAtomic } from '../shortme/atomic'
 import { loadMeta, projectFile, projectsRoot } from '../shortme/project'
 import { loadClips } from '../shortme/clips/analysis'
+import { loadState } from '../shortme/clips/engines/state'
+import { LEGACY_RUN_ID } from '../../shared/engine'
 import { loadEvents, MARK } from '../shortme/clips/audioEvents'
 import { loadHeat, heatStats } from '../shortme/clips/heat'
 import { loadRatings } from '../shortme/clips/feedback'
@@ -35,7 +37,10 @@ const textIn = (words: Array<{ w: string; start: number; end: number }>, a: numb
 
 /** Alle Datensätze eines Projekts (Shortme-Kandidaten, Creator-/Referenz-Momente) plus Video-Zeile im Rhapsody-Format. */
 export async function projectRecords(hash: string, split: 'train' | 'test'): Promise<{ video: Record<string, unknown>; cands: CandRecord[] } | null> {
-  const [meta, clipsFile, tr] = await Promise.all([loadMeta(hash), loadClips(hash), loadTranscript(hash)])
+  const [meta, tr, state] = await Promise.all([loadMeta(hash), loadTranscript(hash), loadState(hash)])
+  // alle Läufe des Projekts (bisherige Engine und neue Engine getrennt gekennzeichnet); das Video bleibt ein einziger Split
+  const runIds = [LEGACY_RUN_ID, ...state.runs.filter((r) => r.engineId !== 'legacy' && (r.clipCount ?? 0) > 0).map((r) => r.runId)]
+  const runFiles = (await Promise.all(runIds.map((id) => loadClips(hash, id)))).filter((f): f is NonNullable<typeof f> => !!f)
   if (!meta || !tr) return null
   const [heat, events, ratings, corr, trace, creator, trend] = await Promise.all([
     loadHeat(hash), loadEvents(hash), loadRatings(hash), loadCorrections(hash),
@@ -52,18 +57,18 @@ export async function projectRecords(hash: string, split: 'train' | 'test'): Pro
   const cands: CandRecord[] = []
 
   const gone = await loadDeleted(hash)
-  for (const c of [...(clipsFile?.clips ?? []), ...gone.map((g) => g.clip)]) {
+  for (const c of [...runFiles.flatMap((f) => f.clips), ...gone.map((g) => g.clip)]) {
     const log = await loadEdits(hash, c.id)
     const st = stateOf(baseState(c), log)
     const cut = new Set(st.cutWords)
     const cutText: string[] = []
     for (const i of st.cutWords) if (words[i]) cutText.push(words[i].w)
-    const changed = Math.abs(st.start - c.start) > 0.05 || Math.abs(st.end - c.end) > 0.05 || cutText.length > 0 || st.hook.text !== c.hookText || st.layoutOps.length + st.streamOps.length > 0
+    const changed = Math.abs(st.start - c.start) > 0.05 || Math.abs(st.end - c.end) > 0.05 || cutText.length > 0 || st.hook.text !== c.hookText || st.layoutOps.length + st.streamOps.length > 0 || st.autoCuts.length !== (c.autoCuts?.length ?? 0)
     const mine = corr.filter((e) => e.clipId === c.id)
     const rec: CandRecord = {
       ...base, id: `${hash}:${c.id}`, source: 'shortme', start: c.start, end: c.end, transcript: textIn(words, c.start, c.end), marks: marks(c.start, c.end),
-      rubric: c.criteria, heat: h(c.start, c.end), rating: ratings[c.id] ? { level: ratings[c.id].level, reasons: ratings[c.id].reasons } : null,
-      corrections: changed ? { startShift: +(st.start - c.start).toFixed(2), endShift: +(st.end - c.end).toFixed(2), cutText, hook: st.hook.text !== c.hookText ? { before: c.hookText, after: st.hook.text } : undefined, framing: st.layoutOps.length + st.streamOps.length > 0 } : null,
+      rubric: c.v2 ? null : c.criteria, ...(c.v2 ? { engine: 'multimodal-v2', runId: c.runId, eventId: c.v2.eventId, variantId: c.v2.variantId } : {}), heat: h(c.start, c.end), rating: ratings[c.id] ? { level: ratings[c.id].level, reasons: ratings[c.id].reasons } : null,
+      corrections: changed ? { startShift: +(st.start - c.start).toFixed(2), endShift: +(st.end - c.end).toFixed(2), cutText, hook: st.hook.text !== c.hookText ? { before: c.hookText, after: st.hook.text } : undefined, framing: st.layoutOps.length + st.streamOps.length > 0, ...(st.autoCuts.length < (c.autoCuts?.length ?? 0) ? { autoCutsRestored: true } : {}) } : null,
       exported: mine.some((e) => e.kind === 'export'), playedSec: mine.reduce((s, e) => s + (e.kind === 'played' ? e.sec : 0), 0), fate: gone.some((g) => g.clip.id === c.id) ? 'deleted' : 'selected'
     }
     cands.push(rec)
@@ -73,7 +78,7 @@ export async function projectRecords(hash: string, split: 'train' | 'test'): Pro
     }
   }
   // nicht gewählte Kandidaten aus der Auswahl-Spur (ältere Projekte haben keine)
-  const chosen = cands.filter((x) => x.source === 'shortme')
+  const chosen = cands.filter((x) => x.source === 'shortme' && !x.engine) // Spur gehört nur zur bisherigen Engine
   for (const t of trace) {
     if (t.fate === 'selected' || chosen.some((x) => overlap(x, t) > 0.5)) continue
     cands.push({ ...base, id: `${hash}:t${Math.round(t.start * 10)}`, source: 'shortme', start: t.start, end: t.end, transcript: textIn(words, t.start, t.end), marks: marks(t.start, t.end), rubric: t.criteria, heat: h(t.start, t.end), rating: null, corrections: null, exported: false, playedSec: 0, fate: t.fate })

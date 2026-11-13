@@ -67,6 +67,31 @@ export const CATALOG: AssetSpec[] = [
     vramMb: 3500
   },
   {
+    id: 'qwen3-vl-4b',
+    name: 'Qwen3-VL 4B Instruct (Q4_K_M + Projektor F16)',
+    kind: 'vision',
+    note: 'Neue Engine (Beta): Bildbeobachtungen (Frames, Reaktionen, Gameplay) über llama-server · Apache-2.0 · ca. 4 GB VRAM mit Projektor',
+    // Version fest an den geprüften Stand des Repos gebunden (kein wechselnder „main“-Download)
+    files: [
+      { url: `${HF}/Qwen/Qwen3-VL-4B-Instruct-GGUF/resolve/1cd86afb9a95c410a6038ab3b40d8b578c892266/Qwen3VL-4B-Instruct-Q4_K_M.gguf`, name: 'Qwen3VL-4B-Instruct-Q4_K_M.gguf', size: 2497281664, sha256: '66358cb18bb6b3b1b6675aa412c7a88ef01d228f481184d13668e5201c730a0a' },
+      { url: `${HF}/Qwen/Qwen3-VL-4B-Instruct-GGUF/resolve/1cd86afb9a95c410a6038ab3b40d8b578c892266/mmproj-Qwen3VL-4B-Instruct-F16.gguf`, name: 'mmproj-Qwen3VL-4B-Instruct-F16.gguf', size: 836180256, sha256: '256f3a43bd4205ffef48d6b92715e1e70b5b0e9aef06522584967513a9985331' }
+    ],
+    expect: ['Qwen3VL-4B-Instruct-Q4_K_M.gguf', 'mmproj-Qwen3VL-4B-Instruct-F16.gguf'],
+    vramMb: 4500
+  },
+  {
+    id: 'voxtral-mini-3b',
+    name: 'Voxtral Mini 3B (Q4_K_M + Projektor Q8)',
+    kind: 'llm',
+    note: 'Neue Engine (Beta): Audioverständnis kurzer Ausschnitte (Gesang/Rap, Stimmwechsel, Reaktionen) über llama-server · Original Apache-2.0, die GGUF-Karte von ggml-org nennt keine Lizenz · ca. 4 GB VRAM',
+    files: [
+      { url: `${HF}/ggml-org/Voxtral-Mini-3B-2507-GGUF/resolve/20616573013f28229fff61de74359d3eeff61f6a/Voxtral-Mini-3B-2507-Q4_K_M.gguf`, name: 'Voxtral-Mini-3B-2507-Q4_K_M.gguf', size: 2473001920, sha256: '4705be8ec22ca23d12632f4b4a3691faa95917d90a06d3cf3c3ec0e91958f1a8' },
+      { url: `${HF}/ggml-org/Voxtral-Mini-3B-2507-GGUF/resolve/20616573013f28229fff61de74359d3eeff61f6a/mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf`, name: 'mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf', size: 715714080, sha256: '4f24c4ef3ce929d02ed9d1cfb050ae9a7365f057c0ddec0d489580982ebe0d02' }
+    ],
+    expect: ['Voxtral-Mini-3B-2507-Q4_K_M.gguf', 'mmproj-Voxtral-Mini-3B-2507-Q8_0.gguf'],
+    vramMb: 4500
+  },
+  {
     id: 'qwen3-8b',
     name: 'Qwen3-8B (Q4_K_M)',
     kind: 'llm',

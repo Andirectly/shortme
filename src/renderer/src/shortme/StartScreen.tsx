@@ -15,6 +15,7 @@ import { ProjectGrid } from './ProjectGrid'
 import { useSprings } from './motion'
 import { estimateStages, fmtEta, totalSec } from '@shared/estimate'
 import { getSpeed } from './speed'
+import { EngineSwitch } from './EngineSwitch'
 
 export function StartScreen(): React.JSX.Element {
   const openSheet = useStore((s) => s.openSheet)
@@ -112,6 +113,9 @@ function CreateSheet(): React.JSX.Element {
   const go = useStore((s) => s.go)
   const imported = useProject((s) => s.imported)
   const startTranscribe = useProject((s) => s.startTranscribe)
+  const startEngine = useProject((s) => s.startEngine)
+  const startMissing = useProject((s) => s.startMissing)
+  const setStartEngine = useProject((s) => s.setStartEngine)
   const contentType = useProject((s) => s.contentType)
   const setContentType = useProject((s) => s.setContentType)
   const kindSource = useProject((s) => s.kindSource)
@@ -186,6 +190,17 @@ function CreateSheet(): React.JSX.Element {
               <Row label="Was ist das für ein Video?" toggle={suggesting ? <small>wird eingeschätzt …</small> : kindSource && kindSource !== 'manual' ? <span className="sm-tag" title={kindReason}>{kindSource === 'remembered' ? 'zuletzt gewählt' : 'erkannt'}</span> : undefined}>
                 <Segmented options={CONTENT_TYPES.map((c) => c.label)} value={contentLabel(contentType)} onChange={(n) => void setContentType(CONTENT_TYPES.find((c) => c.label === n)!.id)} />
               </Row>
+              <Row label="Auswahl-Engine">
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <EngineSwitch value={startEngine} onSelect={(e) => void setStartEngine(e)} />
+                  {startEngine === 'multimodal-v2' && startMissing.length > 0 && (
+                    <div role="alert" style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
+                      <small style={{ color: 'var(--warn)' }}>Für die neue Engine fehlt: {startMissing.map((m) => m.name).join(', ')}.</small>
+                      <Button variant="secondary" onClick={() => { openSheet(false); go('models') }}>Modell-Manager öffnen</Button>
+                    </div>
+                  )}
+                </div>
+              </Row>
               <Row label="Format"><Segmented options={['9:16', '1:1', '16:9']} value={opts.format} onChange={(format) => setOpts({ format })} /></Row>
               <Row label="Bildausschnitt"><Segmented options={Object.values(FRAME_LABELS)} value={frame} onChange={setFrame} /></Row>
               <Row label="Cliplänge"><Segmented options={['Automatisch', '≤ 30 s', '30–60 s', '60–90 s']} value={opts.length} onChange={(length) => setOpts({ length })} /></Row>
@@ -222,7 +237,7 @@ function CreateSheet(): React.JSX.Element {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 24px', borderTop: '1px solid var(--edge)' }}>
               {imported && <small style={{ marginRight: 'auto', alignSelf: 'center' }} title="Grobe Schätzung; sie passt sich nach dem ersten kompletten Lauf an diesen Rechner an.">Dauer etwa {fmtEta(totalSec(estimateStages(imported.meta.durationSec, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined, getSpeed())))}</small>}
               <Button variant="secondary" onClick={() => openSheet(false)}>Abbrechen</Button>
-              <Button variant="primary" disabled={!!imported && !imported.preflight.ok} onClick={() => void start()}><Sparkles size={16} /> Clips finden</Button>
+              <Button variant="primary" disabled={(!!imported && !imported.preflight.ok) || (startEngine === 'multimodal-v2' && startMissing.length > 0)} onClick={() => void start()}><Sparkles size={16} /> Clips finden</Button>
             </div>
           </motion.div>
         </>

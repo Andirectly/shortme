@@ -51,7 +51,7 @@ export function EditorScreen(): React.JSX.Element {
   // ---------- Nicht-destruktive Bearbeitung: Operationslog, Autosave ----------
   const origStart = real?.start ?? 0
   const D = real ? real.end - real.start : clip.duration
-  const baseSt = useMemo(() => baseState({ start: origStart, end: real?.end ?? clip.duration, hookText: clip.hook, corrections: real?.corrections }, useStore.getState().presetId, styleDefaults), [origStart, real?.end, clip.duration, clip.hook, real?.corrections, styleDefaults])
+  const baseSt = useMemo(() => baseState({ start: origStart, end: real?.end ?? clip.duration, hookText: clip.hook, corrections: real?.corrections, autoCuts: real?.autoCuts }, useStore.getState().presetId, styleDefaults), [origStart, real?.end, clip.duration, clip.hook, real?.corrections, real?.autoCuts, styleDefaults])
   const [log, setLog] = useState<EditLog>(emptyLog(clipId))
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(true)
@@ -346,6 +346,7 @@ export function EditorScreen(): React.JSX.Element {
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             <Pill onClick={() => { const w = words.find((x) => x.g === sel); if (w) startEdit(w.g, w.w) }}>Text ändern</Pill>
             <Pill onClick={() => { if (sel !== null) toggleCut(sel) }}>{sel !== null && cut.includes(sel) ? 'Wieder einfügen' : 'Herausschneiden'}</Pill>
+            {!!real?.autoCuts?.length && <Pill onClick={() => commit({ t: 'autoCuts', ranges: real.autoCuts ?? [], cut: st.autoCuts.length === 0 })}>{st.autoCuts.length ? `Automatische Kürzung zurücknehmen (${st.autoCuts.length})` : 'Automatische Kürzung anwenden'}</Pill>}
           </div>
         </div>
 

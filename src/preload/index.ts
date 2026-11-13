@@ -32,6 +32,7 @@ import type { PlatformId, UploadOverview } from '@shared/upload'
 import type { WbOverview, WbProject, WbStatus, WorkItem } from '@shared/workbench'
 import type { LearnSettings } from '@shared/learn'
 import type { CatalogStatus } from '@shared/catalog'
+import type { AnalysisState, EngineSwitchResult, SelectionEngineId } from '@shared/engine'
 import type { LearnStats } from '@shared/learnStats'
 import type { Rule } from '@shared/learnStats'
 import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
@@ -177,7 +178,13 @@ const api = {
   shortme: {
     importFile: (path: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importFile', path),
     importUrl: (url: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importUrl', url),
-    transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
+    transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice; engine?: SelectionEngineId }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
+    engineState: (hash: string): Promise<{ state: AnalysisState; busy: boolean }> => ipcRenderer.invoke('shortme:engineState', hash),
+    engineSelect: (req: { hash: string; engine: SelectionEngineId; query?: string; contentType?: string | null; frame?: string | null; wanted?: number | null }): Promise<EngineSwitchResult> => ipcRenderer.invoke('shortme:engineSelect', req),
+    engineDefault: (): Promise<SelectionEngineId> => ipcRenderer.invoke('shortme:engineDefault'),
+    engineMissing: (engine: SelectionEngineId): Promise<Array<{ id: string; name: string; sizeBytes: number }>> => ipcRenderer.invoke('shortme:engineMissing', engine),
+    engineSetDefault: (engine: SelectionEngineId): Promise<SelectionEngineId> => ipcRenderer.invoke('shortme:engineSetDefault', engine),
+    recompute: (hash: string, o: { query?: string; contentType?: ContentType; frame?: FrameChoice; wanted?: number; engine?: SelectionEngineId }): Promise<{ jobId: string | null; missing?: Array<{ id: string; name: string; sizeBytes: number }> }> => ipcRenderer.invoke('shortme:recompute', hash, o),
     jobs: (): Promise<ShortmeJob[]> => ipcRenderer.invoke('shortme:jobs'),
     pause: (id: string): Promise<void> => ipcRenderer.invoke('shortme:pause', id),
     resume: (id: string): Promise<void> => ipcRenderer.invoke('shortme:resume', id),
@@ -221,7 +228,7 @@ const api = {
     },
     /** Inhaltstyp: Vorschlag beim Import, Profile, Facecam-Layouts pro Kanal. */
     suggestKind: (hash: string): Promise<{ kind: ContentType; reason: string; source: 'twitch' | 'remembered' | 'detected'; frame: FrameChoice; detected: ContentType }> => ipcRenderer.invoke('shortme:suggestKind', hash),
-    reanalyze: (hash: string, kind?: ContentType, frame?: FrameChoice): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:reanalyze', hash, kind, frame),
+    reanalyze: (hash: string, kind?: ContentType, frame?: FrameChoice, engine?: SelectionEngineId): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:reanalyze', hash, kind, frame, engine),
     profile: (kind: ContentType): Promise<KindProfile> => ipcRenderer.invoke('shortme:profile', kind),
     channelLayouts: (): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayouts'),
     channelLayoutDelete: (channel: string): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutDelete', channel),

@@ -9,6 +9,7 @@ import { useClipList } from './clipData'
 import { ProjectGrid } from './ProjectGrid'
 import { Button, Pill, Score } from './ui'
 import { useSprings } from './motion'
+import { EngineBar } from './EngineSwitch'
 import { estimateStages, fmtEta, fractionOf, remainingSec, spans, totalSec } from '@shared/estimate'
 import { getSpeed, saveSpeed } from './speed'
 
@@ -114,6 +115,7 @@ function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: b
                 <span style={{ textAlign: 'right' }}>{k.value}</span>
               </div>
             ))}
+            {c.notes?.map((n, i) => <small key={i} style={{ color: 'var(--text-2)' }}>{n}</small>)}
             <small style={{ color: 'var(--text-1)' }}>{c.reason}</small>
           </motion.div>
         )}
@@ -145,10 +147,13 @@ export function ClipsScreen(): React.JSX.Element {
     <div style={{ display: 'grid', gap: 18, paddingTop: 12, paddingBottom: 90 }}>
       <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}>
         <div><h1>{title ?? PROJECTS[0].name}</h1><small>{pending ? `${list.length - pending} von ${list.length} fertig · Analyse läuft` : `${list.length} Clips · nach Score sortiert`}</small></div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {persons && persons.persons.length > 0 && <Pill onClick={openPersons}>Wer ist wer?{persons.needsReview ? ' ·  prüfen' : ''}</Pill>}
-          <Pill pressed={view === 'grid'} onClick={() => setView('grid')}><LayoutGrid size={14} /> Raster</Pill>
-          <Pill pressed={view === 'list'} onClick={() => setView('list')}><List size={14} /> Liste</Pill>
+        <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
+          <EngineBar />
+          <div style={{ display: 'flex', gap: 8 }}>
+            {persons && persons.persons.length > 0 && <Pill onClick={openPersons}>Wer ist wer?{persons.needsReview ? ' ·  prüfen' : ''}</Pill>}
+            <Pill pressed={view === 'grid'} onClick={() => setView('grid')}><LayoutGrid size={14} /> Raster</Pill>
+            <Pill pressed={view === 'list'} onClick={() => setView('list')}><List size={14} /> Liste</Pill>
+          </div>
         </div>
       </div>
       {view === 'grid' ? (

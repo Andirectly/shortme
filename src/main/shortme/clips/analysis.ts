@@ -193,7 +193,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   let trace: CandTrace[]
   let runPatch: Awaited<ReturnType<typeof runSelection>>['run']
   try {
-    const out = await runSelection({ engine, runId, input, options: sel, noLlm: opts.noLlm, signal: opts.signal, report, project: { hash: meta.hash, sourcePath: meta.sourcePath, durationSec: meta.durationSec, hasAudio: meta.hasAudio } })
+    const out = await runSelection({ engine, runId, input, options: sel, noLlm: opts.noLlm, contentType: opts.contentType ?? null, signal: opts.signal, report, project: { hash: meta.hash, sourcePath: meta.sourcePath, durationSec: meta.durationSec, hasAudio: meta.hasAudio } })
     clips = out.clips; mode = out.mode; trace = out.trace ?? []; runPatch = out.run
   } catch (e) {
     if (engine !== 'legacy') await patchRun(meta.hash, runId, { status: opts.signal?.aborted ? 'stopped' : 'failed', error: e instanceof Error ? e.message : String(e), finishedAt: new Date().toISOString() })

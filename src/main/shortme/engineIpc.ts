@@ -34,6 +34,7 @@ export function enqueueAnalysis(jobs: JobQueue, meta: ProjectMeta, o: { engine: 
 export function registerEngineControlIpc(jobs: JobQueue): void {
   ipcMain.handle('shortme:engineDefault', () => loadDefaultEngine())
   ipcMain.handle('shortme:engineSetDefault', (_e, engine: SelectionEngineId) => saveDefaultEngine(engine))
+  ipcMain.handle('shortme:engineMissing', (_e, engine: SelectionEngineId) => (engine === 'multimodal-v2' ? v2MissingModels() : []))
 
   /** Zustand für die Oberfläche: Auswahl, angezeigter Lauf, Läufe, ob gerade ein Job läuft. */
   ipcMain.handle('shortme:engineState', async (_e, hash: string): Promise<{ state: AnalysisState; busy: boolean }> => {

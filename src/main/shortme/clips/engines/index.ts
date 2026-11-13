@@ -21,6 +21,8 @@ export interface SelectionRequest {
   input: SelectInput
   options: Omit<SelectOptions, 'baseUrl'>
   noLlm?: boolean
+  /** Inhaltstyp des Videos (steuert u. a. die Bewertungsart der neuen Engine). */
+  contentType?: string | null
   signal?: AbortSignal
   report: (stage: string, fraction: number, message: string) => void
   /** Projektdaten, die nur die neue Engine braucht. */

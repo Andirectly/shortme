@@ -26,6 +26,8 @@ export type Op =
   | { t: 'trim'; start: number; end: number }
   /** Wörter (globale Wortindizes) herausschneiden (cut=true) oder wiederherstellen (cut=false). */
   | { t: 'cutWords'; words: number[]; cut: boolean }
+  /** Automatisch entfernte Abschnitte (Quellzeit) wiederherstellen (cut=false) oder erneut anwenden (cut=true); getrennt von cutWords, nichts wird doppelt angewendet. */
+  | { t: 'autoCuts'; ranges: Array<{ start: number; end: number }>; cut: boolean }
   | { t: 'hook'; text?: string; seconds?: number; enabled?: boolean }
   /** Untertitel-Text eines Wortes ändern (Tippfehler der Erkennung); Transkript bleibt unverändert. */
   | { t: 'editWord'; word: number; text: string }
@@ -44,6 +46,8 @@ export interface EditState {
   start: number
   end: number
   cutWords: number[]
+  /** Aktive automatische Kürzungen der neuen Engine (Quellsekunden), unabhängig von den Wortlöschungen. */
+  autoCuts: Array<{ start: number; end: number }>
   hook: { text: string; seconds: number; enabled: boolean }
   /** Globaler Wortindex → geänderter Untertitel-Text. */
   wordEdits: Record<number, string>
@@ -58,13 +62,13 @@ export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops:
 /** Globale Standardwerte (Stil-Studio → „Als Standard festlegen“, Erstellen-Dialog): Preset, Änderungen daran, Titel an/aus. */
 export interface StyleDefaults { presetId?: string; style?: PresetPatch; titleEnabled?: boolean }
 
-export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string> }, presetId = 'glow-karaoke', defaults: StyleDefaults = {}): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [] }
+export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string>; autoCuts?: ShortmeClip['autoCuts'] }, presetId = 'glow-karaoke', defaults: StyleDefaults = {}): EditState {
+  return { start: clip.start, end: clip.end, cutWords: [], autoCuts: (clip.autoCuts ?? []).map((c) => ({ start: c.start, end: c.end })), hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */
 export function reduce(base: EditState, ops: Op[]): EditState {
-  const s: EditState = { ...base, cutWords: [...base.cutWords], hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption, style: { ...base.caption.style } }, layoutOps: [...base.layoutOps], streamOps: [...(base.streamOps ?? [])] }
+  const s: EditState = { ...base, cutWords: [...base.cutWords], autoCuts: (base.autoCuts ?? []).map((c) => ({ ...c })), hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption, style: { ...base.caption.style } }, layoutOps: [...base.layoutOps], streamOps: [...(base.streamOps ?? [])] }
   for (const op of ops) {
     switch (op.t) {
       case 'trim': s.start = Math.min(op.start, op.end - 0.5); s.end = op.end; break
@@ -72,6 +76,12 @@ export function reduce(base: EditState, ops: Op[]): EditState {
         const set = new Set(s.cutWords)
         for (const w of op.words) op.cut ? set.add(w) : set.delete(w)
         s.cutWords = [...set].sort((a, b) => a - b)
+        break
+      }
+      case 'autoCuts': {
+        const same = (a: { start: number; end: number }, b: { start: number; end: number }): boolean => Math.abs(a.start - b.start) < 0.01 && Math.abs(a.end - b.end) < 0.01
+        if (op.cut) { for (const r of op.ranges) if (!s.autoCuts.some((c) => same(c, r))) s.autoCuts.push({ start: r.start, end: r.end }) } else s.autoCuts = s.autoCuts.filter((c) => !op.ranges.some((r) => same(c, r)))
+        s.autoCuts.sort((a, b) => a.start - b.start)
         break
       }
       case 'hook': s.hook = { text: op.text ?? s.hook.text, seconds: op.seconds ?? s.hook.seconds, enabled: op.enabled ?? s.hook.enabled }; break
@@ -125,6 +135,7 @@ export function effectiveClip<C extends Pick<ShortmeClip, 'start' | 'end' | 'fir
   for (let i = from; i <= to; i++) if (inRange(i)) { if (a < 0) a = i; b = i }
   if (a >= 0) { first = a; last = b }
   const removed: Array<[number, number]> = st.cutWords.filter((i) => i >= first && i <= last && words[i]).map((i) => [words[i].start, words[i].end] as [number, number])
+  for (const c of st.autoCuts ?? []) if (c.end > st.start && c.start < st.end) removed.push([Math.max(c.start, st.start), Math.min(c.end, st.end)])
   // Shots auf absolute Zeit, dann Überschreibungen, dann auf neuen Beginn beziehen
   const abs = (clip.shots ?? []).map((s) => ({ ...s, start: clip.start + s.start, end: clip.start + s.end }))
   const shots = applyStreamOps(applyLayoutOps(abs, st.layoutOps, st.start, st.end, layout ? { input: layout, clipStart: clip.start } : undefined), st.streamOps ?? [], (clip as { stream?: StreamLayout }).stream).map((s) => ({ ...s, start: s.start - st.start, end: s.end - st.start }))

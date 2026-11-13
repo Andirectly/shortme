@@ -6,7 +6,7 @@ import { BrowserWindow, clipboard, ipcMain } from 'electron'
 import { withLlm } from '../engines'
 import { allowMediaPath } from '../mediaAccess'
 import { FFPROBE_PATH } from '../pipeline/ffmpeg'
-import { loadClips } from '../shortme/clips/analysis'
+import { findClip } from '../shortme/clips/analysis'
 import { chatJson, loadPrompt, str } from '../shortme/clips/llm'
 import { loadTranscript } from '../shortme/transcription'
 import { DRAFT_LIMIT, draftsIn24h, type FileFacts, type PlatformId, type UploadJob, type UploadOverview } from '../../shared/upload'
@@ -54,8 +54,8 @@ export function registerUploadIpc(): void {
   ipcMain.handle('upload:suggest', async (_e, exportId: string) => {
     const rec = (await loadExports()).find((x) => x.id === exportId)
     if (!rec) throw new Error('Export nicht gefunden')
-    const [file, tr] = await Promise.all([loadClips(rec.hash), loadTranscript(rec.hash)])
-    const clip = file?.clips.find((c) => c.id === rec.clipId)
+    const [found, tr] = await Promise.all([findClip(rec.hash, rec.clipId), loadTranscript(rec.hash)])
+    const clip = found?.clip
     const text = clip && tr ? tr.words.slice(clip.firstWord, clip.lastWord + 1).map((w) => w.w).join(' ').slice(0, 3000) : rec.title
     const prompt = await loadPrompt('caption', { title: rec.title, hook: rec.hookText, text })
     const r = await withLlm((url) => chatJson(url, prompt, {

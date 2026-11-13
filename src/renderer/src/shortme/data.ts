@@ -25,6 +25,8 @@ export interface Clip {
   tags: string[]
   reason: string
   criteria: { label: string; value: number }[]
+  /** Neue Engine: Klartext statt Kriterienbalken (Ereignisqualität, Prüfung, Belege, Unsicherheit). */
+  notes?: string[]
   /** Layout-Analyse läuft noch (ausgegraut, nicht anklickbar). */
   pending?: boolean
 }

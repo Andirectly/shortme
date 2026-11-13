@@ -47,6 +47,29 @@ export async function withLlmModel<T>(assetId: string, fn: (baseUrl: string) => 
   await vram.releaseAll()
   try { return await withLlm(fn) } finally { llmOverride = null; await vram.releaseAll() }
 }
+/**
+ * Neue Engine: Bild- und Audiomodell als eigene Residenten im selben Sequencer (kein zweiter GPU-Lock). Jede Modellphase erwirbt die Ressource selbst;
+ * `use()` entlädt vorher LLM/ASR/das andere Modell. Nicht aus einem `withLlm`-Callback heraus aufrufen (würde auf sich selbst warten).
+ */
+const mmResident = (name: string, assetId: string, ctx: number): void => {
+  vram.register({
+    name,
+    load: async () => {
+      const spec = CATALOG.find((c) => c.id === assetId)
+      if (!spec) throw new Error(`Modell nicht im Katalog: ${assetId}`)
+      if (!(await assets.isInstalled(assetId))) throw new Error(`Modell fehlt: ${spec.name}`)
+      const hw = await hardware()
+      const mm = spec.expect.find((e) => e.startsWith('mmproj'))
+      await llama.start({ model: join(assetDir(assetId), spec.expect[0]), ctx, kvQuant: hw.kvQuant, ...(mm ? { mmproj: join(assetDir(assetId), mm) } : {}) })
+    },
+    unload: () => llama.stop()
+  })
+}
+mmResident('v2-vision', 'qwen3-vl-4b', 16384)
+mmResident('v2-audio', 'voxtral-mini-3b', 8192)
+export const withVision = <T>(fn: (baseUrl: string) => Promise<T>): Promise<T> => vram.use('v2-vision', () => fn(llama.baseUrl!))
+export const withAudio = <T>(fn: (baseUrl: string) => Promise<T>): Promise<T> => vram.use('v2-audio', () => fn(llama.baseUrl!))
+
 /** Exklusiv: ASR-Stufe (llama-server wird vorher entladen). */
 export const withAsr = <T>(fn: () => Promise<T>): Promise<T> => vram.use('asr', fn)
 

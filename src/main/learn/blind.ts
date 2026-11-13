@@ -9,7 +9,7 @@ import type { CreatorFile } from '../../shared/learnData'
 import { blindWinRate, type BlindResult } from '../../shared/workbench'
 import { allowMediaPath } from '../mediaAccess'
 import { loadProfile } from '../shortme/profiles'
-import { loadClips, ensureShots, ensureSignals } from '../shortme/clips/analysis'
+import { findClip, ensureShots, ensureSignals } from '../shortme/clips/analysis'
 import { layoutForClip } from '../shortme/layout/run'
 import { exportClip } from '../shortme/render/exporter'
 import { allPresets, effectivePreset } from '../shortme/presets'
@@ -26,7 +26,7 @@ interface Resolved extends MomentRef { start: number; end: number; candId: strin
 
 async function resolveMoment(hash: string, r: MomentRef): Promise<Resolved> {
   if (r.kind === 'shortme') {
-    const c = (await loadClips(hash))?.clips.find((x) => x.id === r.key)
+    const c = (await findClip(hash, r.key))?.clip
     if (!c) throw new Error('Clip nicht gefunden')
     return { ...r, start: c.start, end: c.end, candId: `${hash}:${c.id}` }
   }

@@ -7,7 +7,7 @@ export type PairSource = 'rating' | 'correction' | 'creator' | 'heatmap' | 'blin
 /** Gewicht je Quelle: eigene Urteile > Creator > Heatmap > Referenz-Blindtest. */
 export const PAIR_WEIGHT: Record<PairSource, number> = { rating: 1, correction: 1, creator: 0.6, heatmap: 0.35, blind: 0.2 }
 
-export interface Corrected { startShift: number; endShift: number; cutText: string[]; hook?: { before: string; after: string }; framing: boolean }
+export interface Corrected { startShift: number; endShift: number; cutText: string[]; hook?: { before: string; after: string }; framing: boolean; /** Neue Engine: Nutzer hat automatische Kürzungen zurückgenommen. */ autoCutsRestored?: boolean }
 
 export interface CandRecord {
   id: string
@@ -30,6 +30,11 @@ export interface CandRecord {
   fate?: string
   /** Creator/Referenz: Kanal, Aufrufe, Leistung relativ zum Kanal-Median (null = zu jung/zu wenig Vergleich). */
   creator?: { channel: string; views: number; likes: number; comments: number; date: string; ratio: number | null }
+  /** Auswahl-Engine, Lauf, Ereignis und Schnittvariante (nur Shortme-Kandidaten der neuen Engine); Bewertungen und Korrekturen bleiben so dem Lauf zugeordnet. */
+  engine?: string
+  runId?: string
+  eventId?: string
+  variantId?: string
   /** Nur Variante „meine Version“ eines korrigierten Vorschlags: Id des Vorschlags. */
   correctionOf?: string
   split: 'train' | 'test'

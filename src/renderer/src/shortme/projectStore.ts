@@ -3,6 +3,7 @@ import type { Level, Ratings } from '@shared/learn'
 import { useStore } from './store'
 import { FRAME_LABELS, frameFromLabel, type ContentType } from '@shared/videoKind'
 import type { StyleDefaults } from '@shared/edits'
+import type { AnalysisState, SelectionEngineId } from '@shared/engine'
 import type { PersonsPatch, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
 const api = (): Window['cutawan']['shortme'] | null => (typeof window !== 'undefined' && window.cutawan?.shortme ? window.cutawan.shortme : null)
@@ -18,7 +19,16 @@ interface ProjectState {
   clipsFile: ShortmeClips | null
   transcript: ShortmeTranscript | null
   hasApi: boolean
-  loadResults: (hash: string) => Promise<void>
+  loadResults: (hash: string, force?: boolean) => Promise<void>
+  /** Engine-Wahl und Läufe des Projekts (Schalter in Clipliste und Erstellen-Dialog); getrennt von Job und angezeigter Clipliste. */
+  engine: { hash: string | null; state: AnalysisState | null; pending: boolean; msg: string; missing: Array<{ id: string; name: string; sizeBytes: number }> }
+  /** Engine für neue Projekte (Erstellen-Dialog); wird als Standard gespeichert, zunächst die bisherige Engine. */
+  startEngine: SelectionEngineId
+  startMissing: Array<{ id: string; name: string; sizeBytes: number }>
+  setStartEngine: (e: SelectionEngineId) => Promise<void>
+  loadEngine: (hash: string) => Promise<void>
+  selectEngine: (engine: SelectionEngineId, cur: { query?: string; wanted?: number }) => Promise<void>
+  recompute: (cur: { query?: string; wanted?: number }) => Promise<void>
   /** Nur die Clipliste neu laden (während die Analyse noch läuft). */
   refreshClips: (hash: string) => Promise<void>
   projects: ProjectCard[]
@@ -119,16 +129,69 @@ export const useProject = create<ProjectState>((set, get) => ({
     set({ currentTitle: p?.title ?? null })
     return !!get().clipsFile
   },
+  engine: { hash: null, state: null, pending: false, msg: '', missing: [] },
+  startEngine: 'legacy',
+  startMissing: [],
+  setStartEngine: async (e) => {
+    const a = api()
+    set({ startEngine: e, startMissing: [] })
+    if (!a) return
+    await a.engineSetDefault(e)
+    // Voraussetzungen sofort zeigen (keine Überraschung erst beim Start)
+    const missing = await a.engineMissing(e)
+    if (get().startEngine === e) set({ startMissing: missing })
+  },
+  loadEngine: async (hash) => {
+    const a = api()
+    if (!a) return
+    const r = await a.engineState(hash)
+    // verspätete Antwort für ein anderes Projekt überschreibt die aktuelle Ansicht nicht
+    const cur = get().engine
+    if (cur.hash && cur.hash !== hash && get().clipsFile?.hash !== hash) return
+    set({ engine: { ...cur, hash, state: r.state } })
+  },
+  selectEngine: async (engine, cur) => {
+    const a = api()
+    const hash = get().clipsFile?.hash ?? get().imported?.meta.hash
+    if (!a || !hash || get().engine.pending) return
+    set((s) => ({ engine: { ...s.engine, hash, pending: true, msg: '', missing: [] } }))
+    try {
+      const r = await a.engineSelect({ hash, engine, query: cur.query, contentType: get().contentType, frame: frameFromLabel(get().frame), wanted: cur.wanted })
+      const msg = r.kind === 'busy' ? 'Es läuft gerade eine Analyse. Der Wechsel ist erst nach „Stoppen & behalten“ oder nach dem Ende möglich.' : ''
+      set({ engine: { hash, state: r.state, pending: false, msg, missing: r.kind === 'needs-models' ? r.missing : [] } })
+      if (r.kind === 'shown') await get().loadResults(hash, true)
+      if (r.kind === 'started') { const live = (await a.jobs()).find((j) => j.id === r.jobId); if (live) set({ job: live }) }
+    } catch (e) {
+      set((s) => ({ engine: { ...s.engine, pending: false, msg: e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e) } }))
+    }
+  },
+  recompute: async (cur) => {
+    const a = api()
+    const hash = get().clipsFile?.hash ?? get().imported?.meta.hash
+    if (!a || !hash || get().engine.pending) return
+    set((s) => ({ engine: { ...s.engine, hash, pending: true, msg: '', missing: [] } }))
+    try {
+      const r = await a.recompute(hash, { query: cur.query, contentType: get().contentType, frame: frameFromLabel(get().frame), wanted: cur.wanted })
+      set((s) => ({ engine: { ...s.engine, pending: false, missing: r.missing ?? [] } }))
+      if (r.jobId) { const live = (await a.jobs()).find((j) => j.id === r.jobId); if (live) set({ job: live }); await get().loadEngine(hash) }
+    } catch (e) {
+      set((s) => ({ engine: { ...s.engine, pending: false, msg: e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e) } }))
+    }
+  },
   refreshClips: async (hash) => {
     const a = api()
     if (!a) return
     const clipsFile = await a.clips(hash)
-    if (clipsFile) set({ clipsFile })
+    // Verspätete Antwort eines anderen Projekts/Laufs darf die aktuelle Ansicht nicht überschreiben
+    const cur = get().clipsFile
+    if (clipsFile && (!cur || cur.hash === hash)) set({ clipsFile })
   },
-  loadResults: async (hash) => {
+  loadResults: async (hash, force = false) => {
     const a = api()
     if (!a) return
     const [clipsFile, transcript, persons, feedback] = await Promise.all([a.clips(hash), a.transcript(hash), a.persons(hash), a.feedback(hash)])
+    const cur = get().clipsFile
+    if (!force && cur && cur.hash !== hash && get().engine.hash !== hash) return
     set({ clipsFile, transcript, persons, feedback })
   },
   init: () => {
@@ -136,6 +199,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     set({ hasApi: !!a })
     if (!a) return
     void get().loadStyle()
+    void a.engineDefault().then(async (e) => { set({ startEngine: e }); set({ startMissing: await a.engineMissing(e) }) })
     // Testlab-Schalter: der Hauptprozess entscheidet (Pipeline nutzt nur dann Testlab-Entscheidungen); erste Nutzung übernimmt den alten Wert
     void a.testlab.enabled().then((v) => { if (v === null) void a.testlab.setEnabled(useStore.getState().testlab); else useStore.setState({ testlab: v }) })
     unsub.forEach((u) => u())
@@ -143,6 +207,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       a.onJob((j) => {
         if (j.title.startsWith('Export')) { set({ exportJob: j }); return }
         set((s) => (s.job && s.job.id !== j.id && s.job.state === 'running' ? s : { job: j }))
+        if (['done', 'error', 'stopped'].includes(j.state)) void get().loadEngine(j.hash)
         if (j.state === 'done') void get().loadResults(j.hash)
         // Clips erscheinen, sobald sie fertig sind: Übersicht öffnet sich beim ersten fertigen Clip
         else if (j.stage === 'layout' && j.state === 'running') {
@@ -229,7 +294,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     const a = api()
     const imp = get().imported
     if (!a || !imp) return false
-    const job = await a.transcribe(imp.meta.hash, { diarize, query, wanted, contentType: get().contentType, frame: frameFromLabel(get().frame) })
+    const job = await a.transcribe(imp.meta.hash, { diarize, query, wanted, contentType: get().contentType, frame: frameFromLabel(get().frame), engine: get().startEngine })
     set({ job, clipsFile: null, transcript: null })
     return true
   },
