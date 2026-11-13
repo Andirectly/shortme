@@ -6,6 +6,17 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.32.0] - 2026-11-13
+
+### Added
+
+- Neue Auswahl-Engine (Beta): schaut sich Bild und Ton wirklich an (Qwen3-VL und Voxtral, lokal), sucht über das ganze Video, plant Schnitte und vergleicht die Vorschläge. Umschalter im Erstellen-Dialog und in der Clip-Liste neben „Neu berechnen“; die bisherige Engine bleibt unverändert und ihre Ergebnisse bleiben erhalten. Die zwei neuen Modelle (ca. 6,5 GB) werden im Modell-Manager geladen.
+- Editor: automatische Kürzungen der neuen Engine lassen sich zurücknehmen und wieder anwenden (mit Rückgängig).
+
+### Changed
+
+- Clips werden je Lauf getrennt gespeichert; Bewertungen und Lernen merken sich Engine und Lauf.
+
 ## [0.31.0] - 2026-11-13
 
 ### Added
