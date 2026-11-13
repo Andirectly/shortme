@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import type { ShortmeClip } from '@shared/shortme'
-import { withLlm } from '../../engines'
 import { assets } from '../../engines'
 import { markStage, projectFile, type ProjectMeta } from '../project'
 import { writeFileAtomic } from '../atomic'
@@ -11,7 +11,7 @@ import { detectShots } from './scenes'
 import { collecting, notifyLearnChange } from '../../learn/store'
 import { applyAcceptedRules } from '../../learn/rules'
 import { fetchTrend } from '../../learn/trend'
-import { selectClips, type CandTrace } from './select'
+import type { CandTrace } from './select'
 import { makeThumbs } from './thumbs'
 import { layoutForClip } from '../layout/run'
 import { applyPersons, buildPersons } from './persons'
@@ -28,8 +28,14 @@ import { overlapsSilence } from '../../twitch/silence'
 import { detectAudioEvents, loadEvents, saveEvents, yamnetAvailable, type AudioEvent } from './audioEvents'
 import { loadTopics, saveTopics, type TopicMap } from './topics'
 import type { PlanInput } from '../../../shared/layoutPlan'
+import { displayedRunId, LEGACY_RUN_ID, newRunId, V2_ENGINE_VERSION, type RunInfo, type SelectionEngineId } from '../../../shared/engine'
+import { clipsPathFor, loadState, patchRun, registerRun, showRun } from './engines/state'
+import { analysisFingerprint } from './engines/control'
+import { engineRevisions, runSelection } from './engines'
 
 export interface AnalysisOptions {
+  /** Auswahl-Engine dieses Laufs (beim Jobstart festgelegt; Standard: bisherige Engine). */
+  engine?: SelectionEngineId
   query?: string
   /** Inhaltstyp → Profil (Tracking, Ton-Markierungen, Ranking-Gewichte, Prompt-Variante). Standard: Podcast / Interview. */
   contentType?: ContentType
@@ -71,10 +77,43 @@ export function ensureLayoutInput(meta: ProjectMeta, clip: ShortmeClip): Promise
   return p
 }
 
-export interface ClipsFile { version: 1; hash: string; query: string; createdAt: string; mode: 'llm' | 'texttiling'; clips: ShortmeClip[] }
+export interface ClipsFile {
+  version: 1
+  hash: string
+  query: string
+  createdAt: string
+  /** `llm`/`texttiling`: bisherige Engine; `v2`: neue Engine (eigene Datenverträge, siehe `engine`/`runId`). */
+  mode: 'llm' | 'texttiling' | 'v2'
+  engine?: SelectionEngineId
+  runId?: string
+  clips: ShortmeClip[]
+}
 
-export async function loadClips(hash: string): Promise<ClipsFile | null> {
-  try { return JSON.parse(await readFile(projectFile(hash, 'clips.json'), 'utf8')) as ClipsFile } catch { return null }
+/** Clipliste des angezeigten Laufs (oder eines bestimmten). Ohne Angabe: der Lauf, der laut Projektzustand gerade angezeigt wird (bisher: clips.json). */
+export async function loadClips(hash: string, runId?: string): Promise<ClipsFile | null> {
+  const rid = runId ?? displayedRunId(await loadState(hash))
+  if (!rid) return null
+  try { return JSON.parse(await readFile(clipsPathFor(hash, rid), 'utf8')) as ClipsFile } catch { return null }
+}
+
+/** Clipliste eines Laufs zurückschreiben (Löschen, Personen-Nachplanung): immer in den Lauf, aus dem sie gelesen wurde – nie ins bisherige Ergebnis eines anderen Laufs. */
+export async function saveClips(hash: string, file: ClipsFile): Promise<void> {
+  const rid = file.runId ?? LEGACY_RUN_ID
+  const path = clipsPathFor(hash, rid)
+  await mkdir(dirname(path), { recursive: true })
+  await writeFileAtomic(path, JSON.stringify(file, null, 1))
+}
+
+/** Findet Clips über alle Läufe (angezeigter zuerst): für Export und Editor, die an eine Clip-ID gebunden sind und nach einem Enginewechsel nicht plötzlich andere Clips lesen dürfen. */
+export async function findClip(hash: string, clipId: string): Promise<{ clip: ShortmeClip; runId: string } | null> {
+  const state = await loadState(hash)
+  const ids = [state.shown, LEGACY_RUN_ID, ...state.runs.map((r) => r.runId)].filter((x, i, a): x is string => !!x && a.indexOf(x) === i)
+  for (const rid of ids) {
+    const f = await loadClips(hash, rid)
+    const clip = f?.clips.find((c) => c.id === clipId)
+    if (clip) return { clip, runId: rid }
+  }
+  return null
 }
 
 async function cached<T>(hash: string, name: string, make: () => Promise<T>): Promise<T> {
@@ -135,25 +174,36 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   if (chat) report('signals', 1, `Chat-Signal gefunden (${chat.messages} Nachrichten) – fließt ins Ranking ein`)
   if (heat) report('signals', 1, 'Most-replayed-Kurve gefunden – fließt ins Ranking ein')
   const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat, events, chat: chat?.heat ?? null, weights: profile.ranking }
-  let trace: CandTrace[] = []
-  const sel = { query: [profile.prompt, opts.query].filter(Boolean).join(' ') || undefined, wanted: opts.wanted, signal: opts.signal, report, trace: (rows: CandTrace[]) => { trace = rows }, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
+  const sel = { query: [profile.prompt, opts.query].filter(Boolean).join(' ') || undefined, wanted: opts.wanted, signal: opts.signal, report, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
 
-  let mode: ClipsFile['mode'] = 'llm'
-  let clips: ShortmeClip[]
-  const llmReady = !opts.noLlm && (await assets.isInstalled('llama-server'))
-  if (!llmReady) { mode = 'texttiling'; clips = await selectClips(input, { ...sel, baseUrl: null }) }
-  else {
-    try { clips = await withLlm((url) => selectClips(input, { ...sel, baseUrl: url })) } catch (e) {
-      if (opts.signal?.aborted) throw e
-      report('llm', 0, `KI nicht verfügbar (${e instanceof Error ? e.message.slice(0, 80) : e}) – Fallback`)
-      mode = 'texttiling'
-      clips = await selectClips(input, { ...sel, baseUrl: null })
+  // Engine und Lauf stehen ab hier fest. Legacy schreibt wie bisher nach clips.json, die neue Engine in ihren eigenen Lauf-Ordner.
+  const engine: SelectionEngineId = opts.engine ?? 'legacy'
+  const runId = engine === 'legacy' ? LEGACY_RUN_ID : newRunId()
+  const clipsPath = clipsPathFor(meta.hash, runId)
+  if (engine !== 'legacy') {
+    const run: RunInfo = {
+      runId, engineId: engine, engineVersion: V2_ENGINE_VERSION, schema: 1, createdAt: new Date().toISOString(), status: 'running',
+      fingerprint: analysisFingerprint({ hash: meta.hash, engine, transcriptVersion: t.version, wordCount: t.words.length, asrModel: t.model, query: opts.query, contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, revisions: engineRevisions(engine) }),
+      options: { query: opts.query ?? '', contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, minSec: 15, maxSec: 75 }, models: {}, modalities: {}
     }
+    await registerRun(meta.hash, run)
   }
-  // Bestätigte Lern-Regeln (Lernen → Regeln) auf die neuen Grenzen anwenden; ohne bestätigte Regel bleibt alles unverändert
-  clips = await applyAcceptedRules(clips, t.words, meta.durationSec)
-  // Testlab „Clip-Transkription“: nur wenn dort der zweite Durchgang aktiv gewählt wurde (Standard: Parakeet-Transkript bleibt)
-  const spKind = clips.length ? await secondPassKind() : null
+  let mode: ClipsFile['mode']
+  let clips: ShortmeClip[]
+  let trace: CandTrace[]
+  let runPatch: Awaited<ReturnType<typeof runSelection>>['run']
+  try {
+    const out = await runSelection({ engine, runId, input, options: sel, noLlm: opts.noLlm, signal: opts.signal, report, project: { hash: meta.hash, sourcePath: meta.sourcePath, durationSec: meta.durationSec, hasAudio: meta.hasAudio } })
+    clips = out.clips; mode = out.mode; trace = out.trace ?? []; runPatch = out.run
+  } catch (e) {
+    if (engine !== 'legacy') await patchRun(meta.hash, runId, { status: opts.signal?.aborted ? 'stopped' : 'failed', error: e instanceof Error ? e.message : String(e), finishedAt: new Date().toISOString() })
+    throw e
+  }
+  // Nur Legacy: bestätigte Lern-Regeln (Lernen → Regeln) auf die neuen Grenzen anwenden; ohne bestätigte Regel bleibt alles unverändert
+  if (engine === 'legacy') clips = await applyAcceptedRules(clips, t.words, meta.durationSec)
+  // Testlab „Clip-Transkription“: nur wenn dort der zweite Durchgang aktiv gewählt wurde (Standard: Parakeet-Transkript bleibt).
+  // Der zweite Durchgang schreibt das gemeinsame Transkript um – deshalb nie in einem Lauf der neuen Engine.
+  const spKind = clips.length && engine === 'legacy' ? await secondPassKind() : null
   if (spKind) {
     report('layout', 0, 'Clips noch einmal transkribieren …')
     try {
@@ -178,11 +228,14 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     report('layout', 0, streamBase ? 'Facecam gefunden' : 'Keine Facecam gefunden – Gameplay-Ausschnitt')
   }
   // Fortschrittliche Übersicht: Clips sofort veröffentlichen (ausgegraut), jeder wird fertig, sobald sein Layout berechnet ist
-  const clipsPath = projectFile(meta.hash, 'clips.json')
+  await mkdir(dirname(clipsPath), { recursive: true })
+  const meta0 = { engine, runId }
   let writing: Promise<unknown> = Promise.resolve()
-  const publish = (): Promise<unknown> => (writing = writing.then(() => writeFileAtomic(clipsPath, JSON.stringify({ version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, clips: [...clips].sort((x, y) => y.score - x.score) } satisfies ClipsFile, null, 1))))
+  const publish = (): Promise<unknown> => (writing = writing.then(() => writeFileAtomic(clipsPath, JSON.stringify({ version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, ...meta0, clips: [...clips].sort((x, y) => y.score - x.score) } satisfies ClipsFile, null, 1))))
   clips = clips.map((c) => ({ ...c, pending: true }))
   await publish()
+  // Ab hier gibt es Clips dieses Laufs: sie erscheinen fortlaufend in der Übersicht (bis dahin blieb die bisherige Anzeige stehen)
+  await showRun(meta.hash, runId)
   const layouts: Awaited<ReturnType<typeof layoutForClip>>[] = new Array(clips.length)
   let nextClip = 0
   let doneClips = 0
@@ -218,6 +271,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     // Abbruch/Fehler: unfertige Clips verwerfen, fertige bleiben (Stoppen & behalten)
     clips = clips.filter((c) => !c.pending)
     await publish()
+    if (engine !== 'legacy') await patchRun(meta.hash, runId, { status: opts.signal?.aborted ? 'incomplete' : 'failed', error: e instanceof Error ? e.message : String(e), finishedAt: new Date().toISOString(), clipCount: clips.length })
     throw e
   }
   // Personen über das ganze Video (Wiedererkennung) → persons.json; Plan-Eingaben tragen die Personen
@@ -226,12 +280,18 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     if (pf) for (let i = 0; i < clips.length; i++) await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(applyPersons(layouts[i].input, clips[i].id, pf)))
   }
   clips.sort((x, y) => y.score - x.score)
-  const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, clips }
-  await writeFileAtomic(projectFile(meta.hash, 'clips.json'), JSON.stringify(file, null, 1))
-  if (trace.length && (await collecting())) await writeFileAtomic(projectFile(meta.hash, 'candidates.json'), JSON.stringify(trace))
+  const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, ...meta0, clips }
+  await writeFileAtomic(clipsPath, JSON.stringify(file, null, 1))
+  if (engine === 'legacy') {
+    if (trace.length && (await collecting())) await writeFileAtomic(projectFile(meta.hash, 'candidates.json'), JSON.stringify(trace))
+    // „clips“ gilt nur für das bisherige Ergebnis; für die neue Engine zählt der Zustand ihres Laufs
+    await markStage(meta.hash, 'clips', true)
+  } else {
+    const incomplete = runPatch?.status === 'incomplete'
+    await patchRun(meta.hash, runId, { ...runPatch, status: incomplete ? 'incomplete' : 'done', finishedAt: new Date().toISOString(), clipCount: clips.length })
+  }
   notifyLearnChange()
   void fetchTrend(meta.hash).catch(() => undefined)
-  await markStage(meta.hash, 'clips', true)
   stageSec[curStage] = (stageSec[curStage] ?? 0) + (Date.now() - curAt) / 1000
   console.info(`[perf] Analyse ${Math.round(meta.durationSec / 60)} min Video: ${Object.entries(stageSec).map(([k, v]) => `${k} ${v.toFixed(0)} s`).join(' · ')}`)
   return file

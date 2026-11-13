@@ -11,7 +11,14 @@ import { editorAssets } from './editorAssets'
 import { planExport } from './render/exporter'
 import { sanitizeLog } from '../../shared/edits'
 import { loadTranscript, runTranscription } from './transcription'
-import { loadClips, runAnalysis, layoutFile } from './clips/analysis'
+import { findClip, loadClips, saveClips, layoutFile } from './clips/analysis'
+import { LEGACY_RUN_ID } from '../../shared/engine'
+import { registerEngineControlIpc, hasActiveJob, recomputeProject } from './engineIpc'
+import { loadDefaultEngine } from './clips/engines/control'
+import { setSelected } from './clips/engines/state'
+import { v2MissingModels } from './clips/engines/v2/models'
+import { runAnalysis } from './clips/analysis'
+import type { SelectionEngineId } from '../../shared/engine'
 import { loadPersons, personsFile, replanWithPersons } from './clips/persons'
 import { writeFileAtomic } from './atomic'
 import { defaultExportRoot, exportRoot, setExportRoot } from './exportDir'
@@ -55,6 +62,7 @@ export async function withStills(r: ImportResult): Promise<ImportResult & { post
 }
 
 export function registerShortmeIpc(): void {
+  registerEngineControlIpc(jobs)
   const broadcast = (channel: string, payload: unknown): void => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send(channel, payload) }
   jobs.on('job', (j) => broadcast('shortme:job', j))
   jobs.on('removed', (id) => broadcast('shortme:job-removed', id))
@@ -64,24 +72,16 @@ export function registerShortmeIpc(): void {
   // Inhaltstyp-Vorschlag, Facecam-Layouts pro Kanal
   ipcMain.handle('shortme:suggestKind', async (_e, hash: string) => { const meta = await loadMeta(hash); if (!meta) throw new Error('Projekt nicht gefunden'); return suggestKind(meta) })
   /** Inhaltstyp nachträglich ändern: Ausschnitt und Ranking werden neu berechnet (Transkript bleibt). */
-  ipcMain.handle('shortme:reanalyze', async (_e, hash: string, kindIn?: ContentType, frame?: FrameChoice) => {
+  ipcMain.handle('shortme:reanalyze', async (_e, hash: string, kindIn?: ContentType, frame?: FrameChoice, engine?: SelectionEngineId) => {
     const meta = await loadMeta(hash)
     if (!meta) throw new Error('Projekt nicht gefunden')
-    // ohne Angabe (Rechtsklick „Neu analysieren“): bisheriger Inhaltstyp des Projekts, sonst Vorschlag
+    // Quellvideo gelöscht (z. B. Speicher sparen)? Bei Links vor der Analyse neu laden (im Job), sonst klare Meldung
+    if (!existsSync(meta.sourcePath) && !meta.sourceUrl) throw new Error('Das Quellvideo gibt es nicht mehr. Bitte die Datei erneut importieren.')
+    // ohne Angabe (Rechtsklick „Neu analysieren“): bisheriger Inhaltstyp des Projekts, sonst Vorschlag; Engine = die für das Projekt gewählte
     const kind = kindIn ?? meta.contentType ?? (await suggestKind(meta)).kind
-    meta.contentType = kind
-    await saveMeta(meta)
-    const fr = frame ?? (await loadProfile(kind)).frame
-    await rememberChoice(sourceKey({ channel: meta.twitch?.channel, url: meta.sourceUrl, path: meta.sourcePath }), { kind, frame: fr })
-    return jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
-      // Quellvideo gelöscht (z. B. Speicher sparen)? Bei Links neu laden, sonst klare Meldung
-      if (!existsSync(meta.sourcePath)) {
-        if (!meta.sourceUrl) throw new Error('Das Quellvideo gibt es nicht mehr. Bitte die Datei erneut importieren.')
-        report('audio', 0, 'Video wird neu geladen …')
-        await importUrl(meta.sourceUrl, (p, message) => report('audio', p, message))
-      }
-      await runAnalysis(meta, { contentType: kind, frame: fr, signal, onProgress: report })
-    })
+    const r = await recomputeProject(jobs, hash, { contentType: kind, frame, engine })
+    if (r.jobId === null) throw new Error(`Für die neue Engine fehlen Modelle: ${r.missing.map((m) => m.name).join(', ')}. Bitte im Modell-Manager installieren.`)
+    return jobs.get(r.jobId)!
   })
   ipcMain.handle('shortme:profile', (_e, kind: ContentType) => loadProfile(kind))
   ipcMain.handle('shortme:channelLayouts', () => channelLayouts())
@@ -95,9 +95,17 @@ export function registerShortmeIpc(): void {
     return f ? defaultStream({ width: meta.width, height: meta.height }, f.cam) : null
   })
   /** Verarbeitung: Transkription (0–55 %), dann Analyse + Clip-Auswahl (55–100 %). */
-  ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice }) => {
+  ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice; engine?: SelectionEngineId }) => {
     const meta = await loadMeta(hash)
     if (!meta) throw new Error('Projekt nicht gefunden')
+    if (hasActiveJob(jobs, hash)) throw new Error('Für dieses Projekt läuft schon eine Analyse.')
+    // Engine: Wahl im Erstellen-Dialog, sonst Standard für neue Projekte (zunächst die bisherige Engine); sie bleibt als Projektauswahl gespeichert
+    const engine = opts?.engine ?? (await loadDefaultEngine())
+    if (engine === 'multimodal-v2') {
+      const missing = await v2MissingModels()
+      if (missing.length) throw new Error(`Für die neue Engine fehlen Modelle: ${missing.map((m) => m.name).join(', ')}. Bitte im Modell-Manager installieren.`)
+    }
+    await setSelected(hash, engine)
     // Inhaltstyp am Projekt merken und als letzte Auswahl dieser Quelle (Twitch: des Kanals) speichern
     if (opts?.contentType) {
       meta.contentType = opts.contentType
@@ -106,7 +114,7 @@ export function registerShortmeIpc(): void {
     }
     return jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
       await runTranscription(meta, { diarize: !!opts?.diarize, signal, onProgress: (p) => report(p.stage, p.fraction, p.message) })
-      await runAnalysis(meta, { query: opts?.query, contentType: opts?.contentType, frame: opts?.frame, wanted: opts?.wanted, signal, onProgress: report })
+      await runAnalysis(meta, { engine, query: opts?.query, contentType: opts?.contentType, frame: opts?.frame, wanted: opts?.wanted, signal, onProgress: report })
     }, () => discardProject(hash))
   })
   const personsView = async (hash: string): Promise<ShortmePersons | null> => {
@@ -148,7 +156,7 @@ export function registerShortmeIpc(): void {
     pf.confirmed = true
     await writeFileAtomic(personsFile(hash), JSON.stringify(pf, null, 1))
     const clips = await replanWithPersons(hash, file.clips, (id) => loadLayoutInput(hash, id), (id, input) => writeFileAtomic(layoutFile(hash, id), JSON.stringify(input)))
-    await writeFileAtomic(projectFile(hash, 'clips.json'), JSON.stringify({ ...file, clips }, null, 1))
+    await saveClips(hash, { ...file, clips })
     return personsView(hash)
   })
   ipcMain.handle('shortme:clips', async (_e, hash: string) => {
@@ -163,15 +171,17 @@ export function registerShortmeIpc(): void {
     }
     const thumbs: Record<string, string | null> = {}
     for (const c of file.clips) thumbs[c.id] = await dataUrl(thumbPath(hash, c.id))
-    return { ...file, contentType: m?.contentType ?? null, channel: m?.twitch?.channel ?? null, thumbs, source: m ? { path: resolve(m.sourcePath), width: m.width, height: m.height, title: m.title, durationSec: m.durationSec } : null }
+    // `engine`/`runId` kommen aus der Datei; ältere Projekte haben sie nicht und gelten als bisherige Engine
+    return { ...file, engine: file.engine ?? 'legacy', runId: file.runId ?? LEGACY_RUN_ID, contentType: m?.contentType ?? null, channel: m?.twitch?.channel ?? null, thumbs, source: m ? { path: resolve(m.sourcePath), width: m.width, height: m.height, title: m.title, durationSec: m.durationSec } : null }
   })
   /** Export: ausgewählte Clips nacheinander rendern (Pausen entfernt, −14 LUFS, Untertitel eingebrannt). */
   ipcMain.handle('shortme:export', async (_e, hash: string, clipIds: string[], opts: { srt?: boolean; captions?: boolean }) => {
     const meta = await loadMeta(hash)
-    const file = await loadClips(hash)
     const transcript = await loadTranscript(hash)
-    if (!meta || !file || !transcript) throw new Error('Projekt, Clips oder Transkript fehlen')
-    const clips = file.clips.filter((c) => clipIds.includes(c.id))
+    if (!meta || !transcript) throw new Error('Projekt, Clips oder Transkript fehlen')
+    // Clips werden jetzt über alle Läufe gefunden und für den Job festgehalten: ein späterer Enginewechsel ändert diesen Export nicht
+    const clips = (await Promise.all(clipIds.map((id) => findClip(hash, id)))).flatMap((f) => (f ? [f.clip] : []))
+    if (!clips.length) throw new Error('Projekt, Clips oder Transkript fehlen')
     const outDir = join(await exportRoot(), safeFileName(meta.title, 'Projekt'))
     return jobs.enqueue(hash, `Export: ${meta.title}`, async ({ signal, report }) => {
       const signals = await ensureSignals(meta)
@@ -249,16 +259,15 @@ export function registerShortmeIpc(): void {
   /** Editor: echte Wellenform und Filmstreifen des Clips. */
   ipcMain.handle('shortme:editorAssets', async (_e, hash: string, clipId: string) => {
     const meta = await loadMeta(hash)
-    const clip = (await loadClips(hash))?.clips.find((c) => c.id === clipId)
+    const clip = (await findClip(hash, clipId))?.clip
     if (!meta || !clip) throw new Error('Clip nicht gefunden')
     return editorAssets(meta, clip)
   })
   /** Editor: exakt der Plan, den der Export verwendet (Pausenschnitte, Stücke mit Ausschnitt/Zoom) → Vorschau = Export. */
   ipcMain.handle('shortme:previewPlan', async (_e, hash: string, clipId: string, rawLog: unknown, presetId?: string) => {
     const meta = await loadMeta(hash)
-    const file = await loadClips(hash)
     const transcript = await loadTranscript(hash)
-    const clip = file?.clips.find((c) => c.id === clipId)
+    const clip = (await findClip(hash, clipId))?.clip
     if (!meta || !clip || !transcript) throw new Error('Clip nicht gefunden')
     allowMediaPath(meta.sourcePath)
     const st = stateOf(baseState(clip, presetId, await loadStyle()), sanitizeLog(rawLog, clipId))

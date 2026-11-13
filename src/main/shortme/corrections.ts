@@ -4,7 +4,7 @@ import { diffStates, type CorrEvent, type CorrRecord } from '../../shared/correc
 import { projectFile } from './project'
 import { writeFileAtomic } from './atomic'
 import type { ShortmeClip } from '../../shared/shortme'
-import { loadClips } from './clips/analysis'
+import { findClip, loadClips, saveClips } from './clips/analysis'
 import { readJson } from '../learn/store'
 import { loadTranscript } from './transcription'
 import { loadStyle } from './styleDefaults'
@@ -26,7 +26,7 @@ export async function loadCorrections(hash: string): Promise<CorrRecord[]> {
 /** Beim Speichern des Operationslogs: Zustand davor/danach vergleichen und die Unterschiede protokollieren. */
 export async function logEditDiff(hash: string, before: EditLog, after: EditLog): Promise<void> {
   try {
-    const clip = (await loadClips(hash))?.clips.find((c) => c.id === after.clipId)
+    const clip = (await findClip(hash, after.clipId))?.clip
     const tr = await loadTranscript(hash)
     if (!clip || !tr) return
     const base = baseState(clip, undefined, await loadStyle())
@@ -39,11 +39,12 @@ export const loadDeleted = (hash: string): Promise<DeletedClip[]> => readJson<De
 
 /** Clip aus der Liste nehmen. Der Clip bleibt mit Wiedergabedauer in `deleted.json` (Lerndaten); Bewertung und Edits bleiben liegen. */
 export async function deleteClip(hash: string, clipId: string): Promise<void> {
-  const file = await loadClips(hash)
-  const clip = file?.clips.find((c) => c.id === clipId)
+  const found = await findClip(hash, clipId)
+  const file = found ? await loadClips(hash, found.runId) : null
+  const clip = found?.clip
   if (!file || !clip) return
   const playedSec = (await loadCorrections(hash)).reduce((s, e) => s + (e.clipId === clipId && e.kind === 'played' ? e.sec : 0), 0)
   await writeFileAtomic(projectFile(hash, 'deleted.json'), JSON.stringify([...(await loadDeleted(hash)), { clip, at: new Date().toISOString(), playedSec }]))
-  await writeFileAtomic(projectFile(hash, 'clips.json'), JSON.stringify({ ...file, clips: file.clips.filter((c) => c.id !== clipId) }, null, 1))
+  await saveClips(hash, { ...file, clips: file.clips.filter((c) => c.id !== clipId) })
   await logCorrection(hash, clipId, [{ kind: 'delete', playedSec }])
 }

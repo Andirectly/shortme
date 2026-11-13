@@ -2,6 +2,7 @@
 import type { TwitchMeta } from './twitch'
 import type { StreamLayout } from './streamLayout'
 import type { ContentType } from './videoKind'
+import type { SelectionEngineId } from './engine'
 
 export interface ShortmeMeta {
   hash: string
@@ -60,6 +61,22 @@ export interface ShortmeTranscript {
 
 export type ClipTagKind = 'emphasis' | 'entity' | 'hook'
 
+/** Neue Engine: Herkunft eines Vorschlags (Belege im Lauf-Ordner `analysis/runs/<runId>/`). */
+export interface ClipV2Info {
+  eventId: string
+  variantId: string
+  kind: string
+  summary: string
+  /** Prüfung des tatsächlich erhaltenen Materials (nach dem Kürzen). */
+  verification: 'verified' | 'needs-review' | 'failed'
+  evidenceIds: string[]
+  /** Welche Beobachtungswege den Vorschlag stützen. */
+  modalities: Array<'text' | 'audio' | 'visual' | 'chat'>
+  /** Ereignisqualität (nicht die Qualität des Schnitts) und Gründe/Unsicherheit in Klartext. */
+  eventNote: string
+  uncertainty: string[]
+}
+
 export interface ShortmeClip {
   id: string
   /** „Most replayed“-Stärke 0..1 über den Clip (nur YouTube-Importe). */
@@ -81,7 +98,20 @@ export interface ShortmeClip {
   reason: string
   /** Schlüsselwörter für Untertitel (Wortindex im Transkript). */
   tags: Array<{ word: number; kind: ClipTagKind }>
-  source: 'llm' | 'texttiling'
+  /** `llm`/`texttiling`: bisherige Engine, `v2`: neue Engine (Details in `v2`). */
+  source: 'llm' | 'texttiling' | 'v2'
+  /** Engine und Lauf, zu denen der Clip gehört (fehlt bei alten Projekten = bisherige Engine). */
+  engine?: SelectionEngineId
+  runId?: string
+  /** Neue Engine: Ereignis, Schnittvariante, Prüfung und Belege des Vorschlags. */
+  v2?: ClipV2Info
+  /**
+   * Automatisch entfernte Abschnitte innerhalb des Clips (Quellsekunden) – getrennt von manuell gelöschten Wörtern (`cutWords` im Editor),
+   * damit nichts doppelt angewendet wird. Im Editor sichtbar und wiederherstellbar.
+   */
+  autoCuts?: Array<{ start: number; end: number }>
+  /** Keine Sprache im Clip (z. B. Gameplay-Szene): `firstWord`/`lastWord` bilden dann einen leeren Bereich (`lastWord = firstWord - 1`), es gibt keine Wörter und keine Untertitel. */
+  wordless?: boolean
   /** Durchlaufene Einrast-Stufen, z. B. ['word','sentence','silence_end']. */
   snap: string[]
   /** Ende wurde im Schritt „Ende prüfen“ um n Sätze verlängert. */
@@ -119,7 +149,10 @@ export interface ShortmeClips {
   hash: string
   query: string
   createdAt: string
-  mode: 'llm' | 'texttiling'
+  mode: 'llm' | 'texttiling' | 'v2'
+  /** Engine und Lauf der angezeigten Clipliste. */
+  engine?: SelectionEngineId
+  runId?: string
   clips: ShortmeClip[]
   /** Gewählter Inhaltstyp des Projekts und (bei Twitch) der Kanal. */
   contentType?: ContentType | null
