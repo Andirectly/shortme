@@ -45,7 +45,7 @@ projects/<hash>/
 
 GPU-Phasen laufen nacheinander über den vorhandenen `VramSequencer` (Residents `llm`, `v2-vision`, `v2-audio`, `asr`); keine verschachtelten `use()`-Aufrufe. `LlamaServer.start()` vergleicht Modell, Projektor, Kontext, KV-Quantisierung und GPU-Schichten (`serverSignature`) und startet bei Abweichung neu.
 
-Prompts: `resources/prompts/v2/*.md` (Revision `prompts-v2.1`, Teil des Fingerabdrucks). Video- und Chattexte sind DATEN; Antworten werden gegen JSON-Schemas geprüft (ein Wiederholungsversuch, dann verständlicher Fehler).
+Prompts: `resources/prompts/v2/*.md` (Revision `prompts-v2.2`, Teil des Fingerabdrucks). Video- und Chattexte sind DATEN; Antworten werden gegen JSON-Schemas geprüft (ein Wiederholungsversuch, dann verständlicher Fehler).
 
 ## Regeln, die die Ergebnisse ehrlich halten
 - Fehlender Ton-/Bildbeleg = **ungeprüft**, nie Note 0 und nie eine erfundene Pointe. Ein Signal allein (YAMNet, Bildänderung) zählt nicht als geprüft.

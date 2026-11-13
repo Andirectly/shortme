@@ -87,8 +87,24 @@ export async function observeAudio(baseUrl: string, wav: string, ev: HighlightEv
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 // Ton-Prüfung einer Schnittnaht
 
-interface SeamAnswer { natuerlich: boolean; abgeschnitten: boolean; grund: string; unsicher: boolean }
-const SEAM_SCHEMA = { type: 'object', additionalProperties: false, required: ['natuerlich', 'abgeschnitten', 'grund', 'unsicher'], properties: { natuerlich: { type: 'boolean' }, abgeschnitten: { type: 'boolean' }, grund: { type: 'string' }, unsicher: { type: 'boolean' } } }
+/** Lautstärke-Verhältnis an einer Schnittstelle: Effektivwert ±60 ms um  im Vergleich zu ±1,5 s. Kleine Werte = der Schnitt liegt in einer Pause. */
+export async function seamLevel(wav: string, t: number, signal?: AbortSignal): Promise<{ ratio: number; centerRms: number }> {
+  const buf = await cutWav(wav, Math.max(0, t - 1.5), t + 1.5, signal)
+  const n = Math.floor((buf.length - 44) / 2)
+  const at = Math.min(n - 1, Math.round((t - Math.max(0, t - 1.5)) * 16000))
+  const rms = (a: number, b: number): number => { let sum = 0, c = 0; for (let i = Math.max(0, a); i < Math.min(n, b); i++) { const v = buf.readInt16LE(44 + i * 2) / 32768; sum += v * v; c++ } return c ? Math.sqrt(sum / c) : 0 }
+  const center = rms(at - 960, at + 960), around = rms(0, n)
+  return { ratio: around > 1e-6 ? center / around : 0, centerRms: center }
+}
+/** Liegt der Schnittpunkt in einer Pause? (Das Tonmodell allein konnte saubere Nähte nicht von Schnitten mitten im Wort trennen.) */
+export async function seamQuiet(wav: string, t: number, signal?: AbortSignal): Promise<boolean> {
+  const { ratio, centerRms } = await seamLevel(wav, t, signal)
+  return ratio <= 0.45 || centerRms < 0.004
+}
+
+// Nur Wahrheitswerte: freie Textfelder ließen das Tonmodell bis zur Token-Grenze ausschweifen (gemessen, siehe docs/ENGINE_V2_STATUS.md).
+interface SeamAnswer { natuerlich: boolean; abgeschnitten: boolean; unsicher: boolean }
+const SEAM_SCHEMA = { type: 'object', additionalProperties: false, required: ['natuerlich', 'abgeschnitten', 'unsicher'], properties: { natuerlich: { type: 'boolean' }, abgeschnitten: { type: 'boolean' }, unsicher: { type: 'boolean' } } }
 
 /**
  * Prüft den Übergang zwischen zwei erhaltenen Stücken am zusammengesetzten Ton: `before` Sekunden Ende des ersten + `after` Sekunden Anfang des zweiten.
@@ -96,12 +112,15 @@ const SEAM_SCHEMA = { type: 'object', additionalProperties: false, required: ['n
  */
 export async function checkSeam(baseUrl: string, wav: string, endOfFirst: number, startOfSecond: number, signal?: AbortSignal, span = 3): Promise<{ confirmed: boolean; reason: string }> {
   try {
+    // 1) messbar: beide Schnittpunkte müssen in einer Pause liegen
+    if (!(await seamQuiet(wav, endOfFirst, signal)) || !(await seamQuiet(wav, startOfSecond, signal))) return { confirmed: false, reason: 'Schnittpunkt liegt nicht in einer Pause' }
+    // 2) Tonmodell als zusätzliches Veto
     const clip = await seamWav(wav, [[Math.max(0, endOfFirst - span), endOfFirst], [startOfSecond, startOfSecond + span]], signal)
-    const a = await chatMm<SeamAnswer>(baseUrl, `Du hörst einen zusammengeschnittenen Tonausschnitt: ${span} Sekunden aus dem Ende eines Stücks, direkt danach ${span} Sekunden aus dem Anfang eines späteren Stücks. Der Schnitt liegt bei Sekunde ${span}. Beantworte nur nach dem, was du hörst. Wird bei Sekunde ${span} mitten in einem Wort oder Satz abgeschnitten, klingt es abgehackt oder doppelt? natuerlich = der Übergang klingt wie ein sauberer Schnitt oder eine normale Pause. abgeschnitten = ein Wort oder Satz bricht hörbar ab. unsicher = du kannst es nicht sicher beurteilen. Antworte als JSON.`, [audioPart(clip)], {
-      noSystem: true, schema: SEAM_SCHEMA, maxTokens: 200, signal,
-      validate: (x) => { const o = x as Record<string, unknown>; if (!o || typeof o.natuerlich !== 'boolean') throw new Error('natuerlich fehlt'); return { natuerlich: o.natuerlich, abgeschnitten: o.abgeschnitten === true, grund: txt(o.grund), unsicher: o.unsicher === true } }
+    const a = await chatMm<SeamAnswer>(baseUrl, `Du hörst einen zusammengeschnittenen Tonausschnitt: ${span} Sekunden aus dem Ende eines Stücks, direkt danach ${span} Sekunden aus dem Anfang eines späteren Stücks. Der Schnitt liegt bei Sekunde ${span}. Beantworte nur nach dem, was du hörst. Wird bei Sekunde ${span} mitten in einem Wort oder Satz abgeschnitten, klingt es abgehackt oder doppelt? natuerlich = der Übergang klingt wie ein sauberer Schnitt oder eine normale Pause. abgeschnitten = ein Wort oder Satz bricht hörbar ab. unsicher = du kannst es nicht sicher beurteilen. Antworte nur als JSON.`, [audioPart(clip)], {
+      noSystem: true, schema: SEAM_SCHEMA, maxTokens: 60, signal,
+      validate: (x) => { const o = x as Record<string, unknown>; if (!o || typeof o.natuerlich !== 'boolean') throw new Error('natuerlich fehlt'); return { natuerlich: o.natuerlich, abgeschnitten: o.abgeschnitten === true, unsicher: o.unsicher === true } }
     })
-    return { confirmed: a.natuerlich && !a.abgeschnitten && !a.unsicher, reason: a.grund || (a.unsicher ? 'Modell unsicher' : a.natuerlich ? 'sauberer Übergang' : 'Übergang auffällig') }
+    return { confirmed: a.natuerlich && !a.abgeschnitten && !a.unsicher, reason: a.unsicher ? 'Modell unsicher' : a.abgeschnitten ? 'Wort/Satz bricht hörbar ab' : a.natuerlich ? 'sauberer Übergang' : 'Übergang auffällig' }
   } catch (e) {
     if (signal?.aborted) throw e
     return { confirmed: false, reason: `Nahtprüfung fehlgeschlagen: ${e instanceof Error ? e.message.slice(0, 100) : e}` }

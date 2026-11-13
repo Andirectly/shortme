@@ -108,7 +108,7 @@ const VERIFY_SCHEMA = { type: 'object', additionalProperties: false, required: [
 /** Textprüfung des tatsächlich erhaltenen Materials (Einstieg, Setup, Kern, Abschluss, Nähte). Der Code verschärft das Urteil des Modells nach den Einzelprüfungen. */
 export async function verifyKeep(baseUrl: string, keep: Piece[], evidence: Map<string, Evidence>, evidenceIds: string[], sentences: Sentence[], signal?: AbortSignal): Promise<{ verification: EditorialPlan['verification']; notes: string[] }> {
   const kept = evidenceIds.filter((id) => { const e = evidence.get(id); return e && evidenceInKeep(e, keep) })
-  const prompt = await loadPrompt('v2/verify', { text: keptText(keep, sentences), evidence: evidenceLines(kept, evidence) })
+  const prompt = await loadPrompt('v2/verify', { seams: keep.length - 1, text: keptText(keep, sentences), evidence: evidenceLines(kept, evidence) })
   const v = await chatJson<Verdict>(baseUrl, prompt, {
     schema: VERIFY_SCHEMA, maxTokens: 500, temperature: 0.1, signal,
     validate: (x) => {
@@ -118,10 +118,14 @@ export async function verifyKeep(baseUrl: string, keep: Piece[], evidence: Map<s
     }
   })
   const notes = (['einstieg', 'setup', 'kern', 'abschluss'] as const).filter((k) => !v[k].ok).map((k) => `${k}: ${v[k].grund || 'nicht erfüllt'}`)
-  if (v.naht !== null) notes.push(`Naht ${v.naht} unnatürlich`)
-  let verification = v.verdict
+  // Ohne Schnitt gibt es keine Naht (das Modell darf sie nicht erfinden); Nähte nur bei gekürzten Varianten.
+  const naht = keep.length > 1 ? v.naht : null
+  if (naht !== null) notes.push(`Naht ${naht} unnatürlich`)
+  // Pflicht im erhaltenen Material: Setup, Kern, Abschluss. Ein unklarer Einstieg allein ist ein Hinweis, kein Mangel.
+  let verification: EditorialPlan['verification']
   if (!v.kern.ok || !v.abschluss.ok) verification = 'failed'
-  else if (verification === 'verified' && (notes.length || v.naht !== null)) verification = 'needs-review'
+  else if (!v.setup.ok || naht !== null) verification = 'needs-review'
+  else verification = 'verified'
   return { verification, notes }
 }
 
