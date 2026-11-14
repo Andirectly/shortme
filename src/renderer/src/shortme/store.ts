@@ -38,6 +38,9 @@ interface State {
   apply: (op: Op) => void
   undo: () => void
   redo: () => void
+  /** Darstellung: Glas (transparent) oder Schwarz. */
+  theme: 'glass' | 'black'
+  setTheme: (t: 'glass' | 'black') => void
   setTrim: (t: [number, number]) => void
   setHook: (t: string) => void
 }
@@ -53,6 +56,8 @@ export const useStore = create<State>((set, get) => ({
   activeClip: CLIPS[0].id,
   presetId: load('sm.preset', 'glow-karaoke'),
   testlab: load('sm.testlab', false),
+  theme: load<'glass' | 'black'>('sm.theme', 'glass'),
+  setTheme: (theme) => { save('sm.theme', theme); set({ theme }) },
   progress: 0,
   paused: false,
   opts: load('sm.opts', { format: '9:16', frame: 'Smart', length: 'Automatisch', captions: 'preset', removePauses: true, workflow: 'Prüfen & Bearbeiten', query: '', count: 'Auto' }),

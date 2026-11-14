@@ -185,7 +185,7 @@ export function TestlabScreen(): React.JSX.Element {
   const sel: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 10px', color: 'inherit' }
   const optionsFor = (other: string): React.JSX.Element[] => models.map((m) => <option key={m.id} value={m.id} disabled={!m.integrated || m.id === other}>{m.name}{!m.integrated ? ' – noch nicht integriert' : m.id === other ? ' – schon auf der anderen Seite' : ` – ${STATUS_LABEL[m.effective]}${m.installed ? '' : ' (wird beim Start geladen)'}`}</option>)
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gap: 16, paddingTop: 12, paddingBottom: 40 }}>
+    <div className="sm-wrap" style={{ display: 'grid', gap: 16, paddingTop: 12, paddingBottom: 40 }}>
       <div><h1 style={{ display: 'flex', gap: 10, alignItems: 'center' }}><FlaskConical size={26} /> Testlab</h1></div>
       <div className="sm-glass" style={{ padding: 16, display: 'grid', gap: 14 }}>
         <label style={{ display: 'grid', gap: 6, maxWidth: 420 }}><small>Platz</small>

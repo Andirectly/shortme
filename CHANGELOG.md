@@ -12,10 +12,12 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
 - Neue Auswahl-Engine (Beta): schaut sich Bild und Ton wirklich an (Qwen3-VL und Voxtral, lokal), sucht über das ganze Video, plant Schnitte und vergleicht die Vorschläge. Umschalter im Erstellen-Dialog und in der Clip-Liste neben „Neu berechnen“; die bisherige Engine bleibt unverändert und ihre Ergebnisse bleiben erhalten. Die zwei neuen Modelle (ca. 6,5 GB) werden im Modell-Manager geladen.
 - Klar sichtbar, welche Engine läuft und angezeigt wird (farbiges Kennzeichen in Clip-Liste und Fortschrittsanzeige, „Neue Engine“ an den Clips) und ob die Modelle der neuen Engine installiert sind.
+- Neuer Hintergrund „Schwarz“ (Einstellungen → Allgemein → Darstellung) neben dem transparenten Glas-Look.
 - Editor: automatische Kürzungen der neuen Engine lassen sich zurücknehmen und wieder anwenden (mit Rückgängig).
 
 ### Changed
 
+- Alle Seiten nutzen die Fensterbreite (Spalten passen sich an, bei kleinem Fenster einspaltig). Einstellungen sind in vier Bereiche gegliedert (Allgemein, Modelle & Updates, Konten & Dienste, System).
 - Clips werden je Lauf getrennt gespeichert; Bewertungen und Lernen merken sich Engine und Lauf.
 
 ## [0.31.0] - 2026-11-13

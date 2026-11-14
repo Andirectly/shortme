@@ -33,7 +33,7 @@ export function LearnScreen(): React.JSX.Element {
   const decide = (r: Rule, d: 'accept' | 'reject'): void => void api()!.rule(r, d).then(load)
 
   return (
-    <div style={{ display: 'grid', gap: 14, paddingTop: 12, maxWidth: 1000, alignContent: 'start' }}>
+    <div className="sm-wrap" style={{ display: 'grid', gap: 14, paddingTop: 12, alignContent: 'start' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <h1 style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1 }}><GraduationCap size={26} /> Lernen</h1>
         <span aria-label={s.settings.collect ? 'Sammelt' : 'Aus'} style={{ width: 10, height: 10, borderRadius: 5, background: s.settings.collect ? 'var(--ok)' : 'rgba(255,255,255,0.25)' }} />

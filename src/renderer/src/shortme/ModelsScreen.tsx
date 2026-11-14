@@ -62,18 +62,19 @@ export function ModelsScreen(): React.JSX.Element {
     if (r) setMsg(`${r.imported.length} importiert${r.skipped.length ? `, ${r.skipped.length} übersprungen (Prüfsumme falsch)` : ''}`)
   }
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', display: 'grid', gap: 16, paddingTop: 12 }}>
+    <div className="sm-wrap" style={{ display: 'grid', gap: 16, paddingTop: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 12 }}>
         <div>
           <h1>Modelle</h1>
           <small>{hw ? `${hw.gpuName ?? 'Keine NVIDIA-GPU'}${hw.gpuName ? ` · ${(hw.vramTotalMb / 1024).toFixed(0)} GB VRAM` : ''}` : ''}{missing.length === 0 ? ' · alles bereit' : ` · ${missing.length} fehlen (${fmtBytes(missing.reduce((n, c) => n + c.files.reduce((m, f) => m + f.size, 0), 0))})`}</small>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button variant="ghost" onClick={() => void doImport()}><FolderInput size={15} /> Von USB</Button>
+          <Button variant="secondary" onClick={() => void doImport()}><FolderInput size={15} /> Von USB</Button>
           {missing.length > 0 && <Button variant="primary" disabled={installingAll} onClick={() => void installAll()}><Download size={15} /> {installingAll ? 'Lädt …' : 'Alles laden'}</Button>}
         </div>
       </div>
       <AnimatePresence>{msg && <motion.small initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ color: 'var(--text-1)' }}>{msg}</motion.small>}</AnimatePresence>
+      <div className="sm-cols">
       <div className="sm-card" style={{ padding: 0, overflow: 'hidden' }}>
         {main.map((spec, i) => <div key={spec.id} style={i === 0 ? { marginTop: -1 } : undefined}><Row spec={spec} st={status[spec.id]} recommended /></div>)}
       </div>
@@ -83,6 +84,7 @@ export function ModelsScreen(): React.JSX.Element {
           {more && <div className="sm-card" style={{ padding: 0, overflow: 'hidden' }}>{other.map((spec) => <Row key={spec.id} spec={spec} st={status[spec.id]} recommended={false} />)}</div>}
         </div>
       )}
+      </div>
     </div>
   )
 }

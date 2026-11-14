@@ -27,6 +27,7 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
   const screen = useStore((s) => s.screen)
   const go = useStore((s) => s.go)
   const testlab = useStore((s) => s.testlab)
+  const theme = useStore((s) => s.theme)
   const { base } = useSprings()
   const active = parentNav(screen)
   const liveOn = useTwitch((s) => s.live.running)
@@ -34,7 +35,7 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
   // Der Puffer läuft im Hintergrund weiter; der Status wird alle 3 s abgefragt (Badge am Live-Tab)
   useEffect(() => { void refreshLive(); const t = setInterval(() => void refreshLive(), 3000); return () => clearInterval(t) }, [refreshLive])
   return (
-    <div className="sm-root">
+    <div className="sm-root" data-theme={theme}>
       <div className="sm-ambient" style={{ backgroundImage: `url(${IMG.ambient})` }} />
       <div className="sm-titlebar">
         <span className="sm-logo"><Logo size={16} /></span>

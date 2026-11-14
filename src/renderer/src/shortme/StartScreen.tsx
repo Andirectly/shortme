@@ -50,11 +50,12 @@ export function StartScreen(): React.JSX.Element {
   const liveBuffer = (): void => { if (tw.info?.channel) setChannelDraft(tw.info.channel); go('live') }
   const { base } = useSprings()
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gap: 28, paddingTop: 12 }}>
+    <div className="sm-wrap" style={{ display: 'grid', gap: 28, paddingTop: 12 }}>
       <div>
         <h1>Aus langen Videos kurze Clips</h1>
         <p style={{ color: 'var(--text-2)', margin: '8px 0 0' }}>Alles lokal auf deinem Rechner – keine Cloud.</p>
       </div>
+      <div className="sm-cols" style={{ alignItems: 'stretch' }}>
       <motion.div
         className="sm-glass"
         role="button"
@@ -75,6 +76,7 @@ export function StartScreen(): React.JSX.Element {
           {importing && <small>{importMessage}</small>}{importError && <small style={{ color: 'var(--warn)' }}>{importError}</small>}
         </div>
       </motion.div>
+      <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <Link2 size={16} style={{ position: 'absolute', left: 16, top: 12, color: 'var(--text-3)' }} />
@@ -94,6 +96,8 @@ export function StartScreen(): React.JSX.Element {
           {importError && <span style={{ color: 'var(--warn)', fontSize: 14 }}>{importError}</span>}
         </div>
       )}
+      </div>
+      </div>
       <section>
         <h3 style={{ marginBottom: 12 }}>Zuletzt geöffnet</h3>
         <ProjectGrid limit={6} />

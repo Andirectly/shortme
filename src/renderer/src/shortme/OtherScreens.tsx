@@ -43,7 +43,7 @@ function TwitchSettings(): React.JSX.Element {
   if (!api) return <></>
   const saveToken = async (value: string): Promise<void> => { await api.setToken(value); setToken(''); setMsg(value ? 'Token gespeichert' : 'Token entfernt'); void refresh() }
   return (
-    <div className="sm-glass" style={{ padding: '4px 22px 16px' }}>
+    <div>
       <Row label="Twitch-Chat als Ranking-Signal nutzen" toggle={<Switch on={!!status?.chatSignal} onChange={(b) => void api.setSettings({ chatSignal: b }).then(refresh)} label="Twitch-Chat als Ranking-Signal nutzen" />} />
       <ChannelLayouts />
       <Row label="Live-Puffer (Minuten)"><Segmented options={['5', '15', '30', '60']} value={String(minutes)} onChange={(v) => { setMinutes(Number(v)); void api.setSettings({ bufferMinutes: Number(v) }) }} /></Row>
@@ -216,7 +216,26 @@ function UpdateSettings(): React.JSX.Element {
   )
 }
 
+/** Karte mit Überschrift – Einstellungen sind in Bereiche gegliedert, jeder Bereich besteht aus wenigen Karten. */
+function Card({ title, children }: { title?: string; children: React.ReactNode }): React.JSX.Element {
+  return (
+    <section className="sm-glass" style={{ padding: '14px 22px 12px', display: 'grid', gap: 2, alignContent: 'start' }}>
+      {title && <h2 style={{ fontSize: 17, marginBottom: 4 }}>{title}</h2>}
+      {children}
+    </section>
+  )
+}
+
+const SECTIONS = [
+  { id: 'general', label: 'Allgemein' },
+  { id: 'models', label: 'Modelle & Updates' },
+  { id: 'accounts', label: 'Konten & Dienste' },
+  { id: 'system', label: 'System' }
+] as const
+type SectionId = (typeof SECTIONS)[number]['id']
+
 export function SettingsScreen(): React.JSX.Element {
+  const [section, setSection] = useState<SectionId>('general')
   const [profile, setProfile] = useState('TikTok')
   const [quality, setQuality] = useState('Hoch')
   const [encoder, setEncoder] = useState('Auto')
@@ -224,37 +243,71 @@ export function SettingsScreen(): React.JSX.Element {
   const [names, setNames] = useState(true)
   const testlab = useStore((s) => s.testlab)
   const setTestlab = useStore((s) => s.setTestlab)
+  const theme = useStore((s) => s.theme)
+  const setTheme = useStore((s) => s.setTheme)
   const check = useEngines((s) => s.check)
   const checking = useEngines((s) => s.checking)
   const refreshCheck = useEngines((s) => s.refreshCheck)
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gap: 8, paddingTop: 12 }}>
+    <div className="sm-wrap" style={{ display: 'grid', gap: 18, paddingTop: 12 }}>
       <h1>Einstellungen</h1>
-      <div className="sm-glass" style={{ padding: '4px 22px 16px' }}>
-        <Row label="Export-Profil"><Segmented options={['TikTok', 'Reels', 'Shorts', 'Eigenes']} value={profile} onChange={setProfile} /></Row>
-        <Row label="Qualität"><Segmented options={['Normal', 'Hoch', 'Maximal']} value={quality} onChange={setQuality} /></Row>
-        <Row label="Encoder"><Segmented options={['Auto', 'NVENC', 'CPU']} value={encoder} onChange={setEncoder} /></Row>
-        <Row label="Untertitel"><Segmented options={['Eingebrannt', 'SRT', 'Beides']} value={subs} onChange={setSubs} /></Row>
-        <Row label="Testlab (Menü und gewählte Testlab-Modelle)"><Switch on={testlab} onChange={setTestlab} label="Testlab anzeigen" /></Row>
-        <Row label="Dateinamen nach KI-Titel"><Switch on={names} onChange={setNames} label="Dateinamen nach KI-Titel" /></Row>
-        <ExportFolder />
-      </div>
-      <div className="sm-glass" style={{ padding: '4px 22px 16px' }}>
-        <ModelSettings />
-        <UpdateSettings />
-        <PatchNotesList />
-        <YouTubeLogin />
-        <CatalogSettings />
-      </div>
-      <h3 style={{ marginTop: 8 }}>Twitch</h3>
-      <TwitchSettings />
-      <div className="sm-glass" style={{ padding: '14px 22px', display: 'grid', gap: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}><h3>Systemcheck</h3><div style={{ display: 'flex', gap: 8 }}><Pill onClick={() => void refreshCheck()}><RefreshCw size={13} className={checking ? 'sm-spin' : ''} /> Neu prüfen</Pill><Pill onClick={() => void window.cutawan?.shortme?.openLogs()}>Logs öffnen</Pill></div></div>
-        {check.map((c) => (
-          <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '24px 210px 1fr', alignItems: 'center', gap: 8, fontSize: 14 }}>
-            {c.ok ? <CheckCircle2 size={17} color="var(--ok)" /> : <XCircle size={17} color="var(--warn)" />}<span>{c.name}</span><small>{c.detail}</small>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'minmax(150px, 200px) minmax(0, 1fr)', alignItems: 'start' }}>
+        <nav aria-label="Einstellungsbereiche" style={{ display: 'grid', gap: 4, position: 'sticky', top: 0 }}>
+          {SECTIONS.map((s) => (
+            <button key={s.id} className="sm-pill" aria-pressed={section === s.id} onClick={() => setSection(s.id)} style={{ justifyContent: 'flex-start', height: 38, fontSize: 14 }}>{s.label}</button>
+          ))}
+        </nav>
+        <div className="sm-cols">
+          {section === 'general' && (
+            <>
+              <Card title="Darstellung">
+                <Row label="Hintergrund"><Segmented options={['Glas', 'Schwarz']} value={theme === 'black' ? 'Schwarz' : 'Glas'} onChange={(v) => setTheme(v === 'Schwarz' ? 'black' : 'glass')} /></Row>
+                <small style={{ paddingBottom: 6 }}>Glas: transparenter Hintergrund mit Unschärfe. Schwarz: tiefes Schwarz mit weißen Akzenten.</small>
+              </Card>
+              <Card title="Export">
+                <Row label="Export-Profil"><Segmented options={['TikTok', 'Reels', 'Shorts', 'Eigenes']} value={profile} onChange={setProfile} /></Row>
+                <Row label="Qualität"><Segmented options={['Normal', 'Hoch', 'Maximal']} value={quality} onChange={setQuality} /></Row>
+                <Row label="Encoder"><Segmented options={['Auto', 'NVENC', 'CPU']} value={encoder} onChange={setEncoder} /></Row>
+                <Row label="Untertitel"><Segmented options={['Eingebrannt', 'SRT', 'Beides']} value={subs} onChange={setSubs} /></Row>
+                <Row label="Dateinamen nach KI-Titel"><Switch on={names} onChange={setNames} label="Dateinamen nach KI-Titel" /></Row>
+                <ExportFolder />
+              </Card>
+            </>
+          )}
+          {section === 'models' && (
+            <>
+              <Card title="Modelle und Updates">
+                <ModelSettings />
+                <UpdateSettings />
+              </Card>
+              <Card title="Neu in dieser Version"><PatchNotesList /></Card>
+            </>
+          )}
+          {section === 'accounts' && (
+            <>
+              <Card title="Twitch"><TwitchSettings /></Card>
+              <Card title="YouTube und Bewertungen">
+                <YouTubeLogin />
+                <CatalogSettings />
+              </Card>
+            </>
+          )}
+          {section === 'system' && (
+            <>
+              <Card title="Systemcheck">
+                <div style={{ display: 'flex', gap: 8, paddingBottom: 8 }}><Pill onClick={() => void refreshCheck()}><RefreshCw size={13} className={checking ? 'sm-spin' : ''} /> Neu prüfen</Pill><Pill onClick={() => void window.cutawan?.shortme?.openLogs()}>Logs öffnen</Pill></div>
+                {check.map((c) => (
+                  <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(120px, 210px) 1fr', alignItems: 'center', gap: 8, fontSize: 14, padding: '4px 0' }}>
+                    {c.ok ? <CheckCircle2 size={17} color="var(--ok)" /> : <XCircle size={17} color="var(--warn)" />}<span>{c.name}</span><small>{c.detail}</small>
+                  </div>
+                ))}
+              </Card>
+              <Card title="Entwicklung">
+                <Row label="Testlab (Menü und gewählte Testlab-Modelle)"><Switch on={testlab} onChange={setTestlab} label="Testlab anzeigen" /></Row>
+              </Card>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

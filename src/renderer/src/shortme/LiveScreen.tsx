@@ -32,9 +32,10 @@ export function LiveScreen(): React.JSX.Element {
   const fill = live.bufferMinutes ? Math.min(1, live.bufferSec / (live.bufferMinutes * 60)) : 0
 
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gap: 16, paddingTop: 12 }}>
+    <div className="sm-wrap" style={{ display: 'grid', gap: 16, paddingTop: 12 }}>
       <h1 style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Radio size={26} /> Live</h1>
 
+      <div className="sm-cols">
       <div className="sm-glass" style={{ padding: 18, display: 'grid', gap: 14 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input className="sm-input" style={{ flex: 1 }} aria-label="Twitch-Kanal" placeholder="Kanalname, z. B. papaplatte" disabled={live.running} value={live.running ? live.channel ?? '' : draft} onChange={(e) => setDraft(e.target.value)} />
@@ -81,6 +82,7 @@ export function LiveScreen(): React.JSX.Element {
             </div>
           )}
       </section>
+      </div>
     </div>
   )
 }

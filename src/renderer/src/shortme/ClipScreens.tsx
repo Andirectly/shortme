@@ -188,7 +188,7 @@ export function ClipsScreen(): React.JSX.Element {
 
 export function ProjectsScreen(): React.JSX.Element {
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gap: 18, paddingTop: 12 }}>
+    <div className="sm-wrap" style={{ display: 'grid', gap: 18, paddingTop: 12 }}>
       <h1>Projekte</h1>
       <ProjectGrid />
     </div>
@@ -235,7 +235,7 @@ function RealProcessing(): React.JSX.Element {
   const title = job.state === 'done' ? 'Clips gefunden' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : 'Transkribiert …'
   const later = ['Rendern']
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 24, paddingTop: 12 }}>
+    <div className="sm-wrap" style={{ display: 'grid', gap: 24, paddingTop: 12 }}>
       <div><h1>{title}</h1>{engineSel && <div style={{ margin: '6px 0' }}><EngineBadge engine={engineSel} prefix="Engine: " /></div>}<small>{job.title} · {job.message}</small>{busy && total < 1 && <small style={{ display: 'block', marginTop: 4 }}>Noch {fmtEta(eta)}{total < 0.05 ? ' (Schätzung)' : ''}</small>}</div>
       <div className="sm-glass" style={{ padding: 22, display: 'grid', gap: 18 }}>
         {ROWS.map((label, i) => {
