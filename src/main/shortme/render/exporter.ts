@@ -40,6 +40,8 @@ export interface ExportOptions {
   renderer?: 'tscaps' | 'remotion'
   /** false: Untertitelposition wurde vom Nutzer gesetzt – nicht an die Facecam-Naht legen. */
   seamCaption?: boolean
+  /** false: Titelposition wurde vom Nutzer gesetzt – nicht an die Facecam-Naht legen. */
+  seamTitle?: boolean
   /** Herausgeschnittene Wörter (Quellzeit), aus den Editor-Operationen. */
   extraCuts?: Interval[]
   /** KI-Hervorhebung (betonte Wörter) an/aus. */
@@ -97,8 +99,12 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
   await mkdir(opts.outDir, { recursive: true })
   const style: StylePreset = opts.style ?? BUILTIN_PRESETS[0]
   // Facecam + Gameplay: Untertitel standardmäßig an der Naht zwischen beiden (außer der Nutzer hat die Position selbst gesetzt)
-  const seam = opts.seamCaption === false ? null : streamSeamY(clip.shots ?? [], { width: meta.width, height: meta.height })
+  const seamY = streamSeamY(clip.shots ?? [], { width: meta.width, height: meta.height })
+  const titleAtSeam = seamY !== null && opts.seamTitle !== false
+  // Ist der Titel an der Naht, rutschen die Untertitel knapp darunter (sonst überdecken sich beide in den ersten Sekunden)
+  const seam = opts.seamCaption === false || seamY === null ? null : opts.hook && titleAtSeam ? Math.min(0.92, seamY + 0.1) : seamY
   const baseCap = seam !== null ? { ...style.caption, y: seam } : style.caption
+  const titleStyle = titleAtSeam ? { ...style.title, y: seamY } : style.title
   const capStyle = opts.caption?.highlight === false ? { ...baseCap, highlight: baseCap.color } : baseCap
 
   // libass: gebündelte + eigene Schriften in einem Ordner (ohne Electron, z. B. in Skripten: nur gebündelte)
@@ -116,7 +122,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
     const hook = opts.hook ? { text: opts.hookText ?? clip.hookText, seconds: opts.hookSeconds ?? style.title.seconds } : null
     // Titel (TikTok-Stil): Overlay-Bildfolge aus demselben Layout wie die Editor-Vorschau (nur in der App, braucht Electron)
     const useRemotion = opts.renderer === 'remotion' && !!process.versions.electron && remotionAvailable() && opts.captions !== false
-    const title = hook && !useRemotion && process.versions.electron ? await renderTitleOverlay(hook.text, style.title, hook.seconds, join(work, 'title'), opts.signal).catch((e) => { console.error('Titel-Overlay fehlgeschlagen:', e); return null }) : null
+    const title = hook && !useRemotion && process.versions.electron ? await renderTitleOverlay(hook.text, titleStyle, hook.seconds, join(work, 'title'), opts.signal).catch((e) => { console.error('Titel-Overlay fehlgeschlagen:', e); return null }) : null
     const enc = await resolveEncoder(opts.encoder ?? 'auto')
     const quality = opts.quality ?? 'standard'
     const src = { width: meta.width, height: meta.height }
@@ -155,7 +161,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
         const mid = join(work, 'mid.mp4')
         await render(mid, null, 'high')
         report(0.4, 'Untertitel (Remotion) …')
-        const overlay = await renderRemotionOverlay({ preset: { ...style, caption: capStyle }, words: capWords, highlight: opts.caption?.highlight !== false, titleText: hook?.text ?? '', titleSeconds: hook?.seconds ?? 3, durationSec: plan.duration, workDir: join(work, 'remotion'), signal: opts.signal, onProgress: (f, m) => report(0.4 + f * 0.5, m) })
+        const overlay = await renderRemotionOverlay({ preset: { ...style, caption: capStyle, title: titleStyle }, words: capWords, highlight: opts.caption?.highlight !== false, titleText: hook?.text ?? '', titleSeconds: hook?.seconds ?? 3, durationSec: plan.duration, workDir: join(work, 'remotion'), signal: opts.signal, onProgress: (f, m) => report(0.4 + f * 0.5, m) })
         report(0.92, 'Zusammenfügen …')
         await compositeOverlay(mid, overlay, tmp, [...encoderArgs(enc.kind, quality), '-r', '30'], enc.bin, opts.signal)
         used = 'remotion'

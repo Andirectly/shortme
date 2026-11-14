@@ -115,8 +115,13 @@ export function EditorScreen(): React.JSX.Element {
   useEffect(() => { if (hasApi) void window.cutawan.shortme.testlab.models().then((v) => setRemotionOn(v.active.renderer === 'remotion_renderer')).catch(() => undefined) }, [hasApi])
   const [plan, setPlan] = useState<PreviewPlan | null>(null)
   const presetBase = useMemo(() => effective(allPresets, st.caption.presetId, st.caption.style, live), [allPresets, st.caption.presetId, st.caption.style, live])
-  const seam = useMemo(() => (source && plan && st.caption.style.caption?.y === undefined && live?.caption?.y === undefined ? streamSeamY(plan.pieces.map((p) => ({ start: p.src0, end: p.src1, layout: p.shot.layout, stream: p.shot.stream })), { width: source.width, height: source.height }) : null), [source, plan, st.caption.style.caption?.y, live])
-  const preset = useMemo(() => (seam === null ? presetBase : { ...presetBase, caption: { ...presetBase.caption, y: seam } }), [presetBase, seam])
+  // Facecam + Gameplay: Titel und Untertitel liegen an der Naht zwischen Facecam und Gameplay (außer der Nutzer hat die Position selbst gesetzt).
+  // Ist der Titel an, rutschen die Untertitel knapp darunter, damit sich beide nicht überdecken.
+  const seamY = useMemo(() => (source && plan ? streamSeamY(plan.pieces.map((p) => ({ start: p.src0, end: p.src1, layout: p.shot.layout, stream: p.shot.stream })), { width: source.width, height: source.height }) : null), [source, plan])
+  const capFree = st.caption.style.caption?.y === undefined && live?.caption?.y === undefined
+  const titleFree = st.caption.style.title?.y === undefined && live?.title?.y === undefined
+  const seam = seamY !== null && capFree ? (st.hook.enabled && titleFree ? Math.min(0.92, seamY + 0.1) : seamY) : null
+  const preset = useMemo(() => { let p = presetBase; if (seam !== null) p = { ...p, caption: { ...p.caption, y: seam } }; if (seamY !== null && titleFree) p = { ...p, title: { ...p.title, y: seamY } }; return p }, [presetBase, seam, seamY, titleFree])
   const [fonts, setFonts] = useState<string[]>([])
   const [fontCss, setFontCss] = useState('')
   useEffect(() => { if (hasApi) void window.cutawan.listFonts().then((l) => setFonts(l.map((f) => f.family))).catch(() => undefined) }, [hasApi])

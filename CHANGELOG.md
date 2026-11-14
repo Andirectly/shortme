@@ -15,6 +15,10 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 - Neuer Hintergrund „Schwarz“ (Einstellungen → Allgemein → Darstellung) neben dem transparenten Glas-Look.
 - Editor: automatische Kürzungen der neuen Engine lassen sich zurücknehmen und wieder anwenden (mit Rückgängig).
 
+### Changed
+
+- Facecam + Gameplay: Die Überschrift am Anfang erscheint jetzt in der Mitte an der Naht zwischen Facecam und Gameplay (nicht mehr oben im Bild). Die Untertitel rutschen dann knapp darunter. Selbst gesetzte Positionen bleiben unverändert.
+
 ### Fixed
 
 - Restzeit-Anzeige springt nicht mehr (10 → 45 Minuten): die neue Engine hat eine eigene Zeitschätzung und meldet ihren Fortschritt gleichmäßig je Stufe.
