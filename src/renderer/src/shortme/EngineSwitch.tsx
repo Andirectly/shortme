@@ -22,7 +22,7 @@ export function EngineSwitch({ onSelect, value, disabled }: { onSelect: (e: Sele
 /** Gut sichtbares Kennzeichen, welche Engine gemeint ist (neue Engine hervorgehoben). */
 export function EngineBadge({ engine, prefix }: { engine: SelectionEngineId; prefix?: string }): React.JSX.Element {
   const v2 = engine === 'multimodal-v2'
-  return <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: v2 ? 'var(--accent)' : 'rgba(255,255,255,0.12)', color: v2 ? '#fff' : 'var(--text-1)' }}>{prefix}{ENGINE_LABEL[engine]}</span>
+  return <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: v2 ? '#3b6df0' : 'rgba(255,255,255,0.16)', color: '#fff' }}>{prefix}{ENGINE_LABEL[engine]}</span>
 }
 
 /** Schalter in der Clipliste (nahe „Neu berechnen“) mit Statuszeile: Anzeige, laufender Lauf, fehlende Modelle, Fehler. */

@@ -185,6 +185,8 @@ export const useProject = create<ProjectState>((set, get) => ({
     // Verspätete Antwort eines anderen Projekts/Laufs darf die aktuelle Ansicht nicht überschreiben
     const cur = get().clipsFile
     if (clipsFile && (!cur || cur.hash === hash)) set({ clipsFile })
+    // Transkript nachladen, falls es fehlt (Clips erscheinen schon während der Analyse); sonst zeigte der Editor Beispieltext
+    if (clipsFile && !get().transcript) { const transcript = await a.transcript(hash); if (get().clipsFile?.hash === hash) set({ transcript }) }
   },
   loadResults: async (hash, force = false) => {
     const a = api()

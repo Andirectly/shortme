@@ -86,7 +86,7 @@ export function EditorScreen(): React.JSX.Element {
   // ---------- Wörter, Zustand ----------
   const rawWords = useMemo(() => (real && transcript
     ? transcript.words.slice(real.firstWord, real.lastWord + 1).map((w, i) => ({ w: w.w, t: Math.max(0, w.start - real.start), e: Math.max(0, w.end - real.start), g: real.firstWord + i, hi: real.tags.some((x) => x.word === real.firstWord + i) }))
-    : TRANSCRIPT.map((w, i) => ({ ...w, g: i, t: (i * clip.duration) / TRANSCRIPT.length, e: ((i + 0.8) * clip.duration) / TRANSCRIPT.length }))), [clip.duration, real, transcript])
+    : real ? [] : TRANSCRIPT.map((w, i) => ({ ...w, g: i, t: (i * clip.duration) / TRANSCRIPT.length, e: ((i + 0.8) * clip.duration) / TRANSCRIPT.length }))), [clip.duration, real, transcript])
   const words = useMemo(() => rawWords.map((w) => ({ ...w, w: st.wordEdits[w.g] ?? w.w, edited: st.wordEdits[w.g] !== undefined })), [rawWords, st.wordEdits])
   const [t, setT] = useState(0)
   const [playing, setPlaying] = useState(false)
