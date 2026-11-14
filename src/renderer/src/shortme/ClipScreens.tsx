@@ -210,7 +210,8 @@ function trackRun(id: string, total: number, done: boolean, refSec: number): voi
 /** Echte Verarbeitung (M3/M4): Balken zeitgewichtet nach der Schätzung (shared/estimate.ts), dazu die Restzeit. */
 function RealProcessing(): React.JSX.Element {
   const job = useProject((s) => s.job)!
-  const engineSel = useProject((s) => s.engine.state?.selected)
+  const engineSel = useProject((s) => (s.engine.hash === s.job?.hash ? s.engine.state?.selected : undefined))
+  const loadEngine = useProject((s) => s.loadEngine)
   const pause = useProject((s) => s.pause)
   const resume = useProject((s) => s.resume)
   const stop = useProject((s) => s.stop)
@@ -219,6 +220,8 @@ function RealProcessing(): React.JSX.Element {
   const projects = useProject((s) => s.projects)
   const count = useStore((s) => s.opts.count)
   const go = useStore((s) => s.go)
+  // Engine-Kennzeichen immer frisch für DIESEN Job holen (der Hauptprozess legt die Wahl vor dem Jobstart fest)
+  useEffect(() => { void loadEngine(job.hash) }, [job.id, job.hash, loadEngine])
   const dur = imported?.meta.hash === job.hash ? imported.meta.durationSec : projects.find((p) => p.hash === job.hash)?.durationSec ?? 3600
   const wanted = count && count !== 'Auto' ? Number(count) : undefined
   const est = estimateStages(dur, wanted)

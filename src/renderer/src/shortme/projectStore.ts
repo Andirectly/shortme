@@ -82,6 +82,7 @@ export interface ProjectCard { hash: string; title: string; durationSec: number;
 
 let unsub: Array<() => void> = []
 let lastRefresh = 0
+let latestEngineReq = ''
 
 export const useProject = create<ProjectState>((set, get) => ({
   imported: null,
@@ -144,10 +145,11 @@ export const useProject = create<ProjectState>((set, get) => ({
   loadEngine: async (hash) => {
     const a = api()
     if (!a) return
+    latestEngineReq = hash
     const [r, missing] = await Promise.all([a.engineState(hash), a.engineMissing('multimodal-v2')])
-    // verspätete Antwort für ein anderes Projekt überschreibt die aktuelle Ansicht nicht
+    // verspätete Antwort für ein anderes Projekt überschreibt die aktuelle Ansicht nicht (maßgeblich ist die zuletzt angeforderte)
+    if (latestEngineReq !== hash) return
     const cur = get().engine
-    if (cur.hash && cur.hash !== hash && get().clipsFile?.hash !== hash) return
     set({ engine: { ...cur, hash, state: r.state, missing, modelsChecked: true } })
   },
   selectEngine: async (engine, cur) => {
