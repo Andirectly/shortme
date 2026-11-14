@@ -199,6 +199,7 @@ function CreateSheet(): React.JSX.Element {
                       <Button variant="secondary" onClick={() => { openSheet(false); go('models') }}>Modell-Manager öffnen</Button>
                     </div>
                   )}
+                  {startEngine === 'multimodal-v2' && startMissing.length === 0 && <small style={{ color: 'var(--ok)' }}>Neue Engine gewählt · Modelle (Bild, Ton, Text) installiert</small>}
                 </div>
               </Row>
               <Row label="Format"><Segmented options={['9:16', '1:1', '16:9']} value={opts.format} onChange={(format) => setOpts({ format })} /></Row>

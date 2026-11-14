@@ -9,7 +9,7 @@ import { useClipList } from './clipData'
 import { ProjectGrid } from './ProjectGrid'
 import { Button, Pill, Score } from './ui'
 import { useSprings } from './motion'
-import { EngineBar } from './EngineSwitch'
+import { EngineBadge, EngineBar } from './EngineSwitch'
 import { estimateStages, fmtEta, fractionOf, remainingSec, spans, totalSec } from '@shared/estimate'
 import { getSpeed, saveSpeed } from './speed'
 
@@ -104,7 +104,7 @@ function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: b
       <div style={{ padding: '10px 12px 12px', display: 'grid', gap: 4 }}>
         <h3 style={{ fontSize: 14, lineHeight: 1.25 }}>{c.title}</h3>
         <div style={{ position: 'absolute', right: 10, bottom: 10, display: 'flex', gap: 4, alignItems: 'flex-start' }}><RatingBar clipId={c.id} chips="popover" /><button aria-label="Clip löschen" title="Clip löschen" onClick={(e) => { e.stopPropagation(); void deleteClip(c.id) }} style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--edge)', background: 'rgba(0,0,0,0.35)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><Trash2 size={14} /></button></div>
-        <small>{c.duration} s {c.faceRatio < 0.6 && <span title={`Gesichtsquote ${Math.round(c.faceRatio * 100)} %`} style={{ color: 'var(--warn)', marginLeft: 6 }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> wenig Gesicht</span>}</small>
+        <small>{c.duration} s{c.notes ? ' · Neue Engine' : ''} {c.faceRatio < 0.6 && <span title={`Gesichtsquote ${Math.round(c.faceRatio * 100)} %`} style={{ color: 'var(--warn)', marginLeft: 6 }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> wenig Gesicht</span>}</small>
       </div>
       <AnimatePresence>
         {pop && (
@@ -210,6 +210,7 @@ function trackRun(id: string, total: number, done: boolean, refSec: number): voi
 /** Echte Verarbeitung (M3/M4): Balken zeitgewichtet nach der Schätzung (shared/estimate.ts), dazu die Restzeit. */
 function RealProcessing(): React.JSX.Element {
   const job = useProject((s) => s.job)!
+  const engineSel = useProject((s) => s.engine.state?.selected)
   const pause = useProject((s) => s.pause)
   const resume = useProject((s) => s.resume)
   const stop = useProject((s) => s.stop)
@@ -235,7 +236,7 @@ function RealProcessing(): React.JSX.Element {
   const later = ['Rendern']
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 24, paddingTop: 12 }}>
-      <div><h1>{title}</h1><small>{job.title} · {job.message}</small>{busy && total < 1 && <small style={{ display: 'block', marginTop: 4 }}>Noch {fmtEta(eta)}{total < 0.05 ? ' (Schätzung)' : ''}</small>}</div>
+      <div><h1>{title}</h1>{engineSel && <div style={{ margin: '6px 0' }}><EngineBadge engine={engineSel} prefix="Engine: " /></div>}<small>{job.title} · {job.message}</small>{busy && total < 1 && <small style={{ display: 'block', marginTop: 4 }}>Noch {fmtEta(eta)}{total < 0.05 ? ' (Schätzung)' : ''}</small>}</div>
       <div className="sm-glass" style={{ padding: 22, display: 'grid', gap: 18 }}>
         {ROWS.map((label, i) => {
           const [a, b] = sp.row[i]

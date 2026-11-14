@@ -21,7 +21,7 @@ interface ProjectState {
   hasApi: boolean
   loadResults: (hash: string, force?: boolean) => Promise<void>
   /** Engine-Wahl und Läufe des Projekts (Schalter in Clipliste und Erstellen-Dialog); getrennt von Job und angezeigter Clipliste. */
-  engine: { hash: string | null; state: AnalysisState | null; pending: boolean; msg: string; missing: Array<{ id: string; name: string; sizeBytes: number }> }
+  engine: { hash: string | null; state: AnalysisState | null; pending: boolean; msg: string; missing: Array<{ id: string; name: string; sizeBytes: number }>; /** Modellprüfung der neuen Engine wurde ausgeführt (missing ist dann verlässlich). */ modelsChecked: boolean }
   /** Engine für neue Projekte (Erstellen-Dialog); wird als Standard gespeichert, zunächst die bisherige Engine. */
   startEngine: SelectionEngineId
   startMissing: Array<{ id: string; name: string; sizeBytes: number }>
@@ -129,7 +129,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     set({ currentTitle: p?.title ?? null })
     return !!get().clipsFile
   },
-  engine: { hash: null, state: null, pending: false, msg: '', missing: [] },
+  engine: { hash: null, state: null, pending: false, msg: '', missing: [], modelsChecked: false },
   startEngine: 'legacy',
   startMissing: [],
   setStartEngine: async (e) => {
@@ -144,11 +144,11 @@ export const useProject = create<ProjectState>((set, get) => ({
   loadEngine: async (hash) => {
     const a = api()
     if (!a) return
-    const r = await a.engineState(hash)
+    const [r, missing] = await Promise.all([a.engineState(hash), a.engineMissing('multimodal-v2')])
     // verspätete Antwort für ein anderes Projekt überschreibt die aktuelle Ansicht nicht
     const cur = get().engine
     if (cur.hash && cur.hash !== hash && get().clipsFile?.hash !== hash) return
-    set({ engine: { ...cur, hash, state: r.state } })
+    set({ engine: { ...cur, hash, state: r.state, missing, modelsChecked: true } })
   },
   selectEngine: async (engine, cur) => {
     const a = api()
@@ -158,7 +158,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     try {
       const r = await a.engineSelect({ hash, engine, query: cur.query, contentType: get().contentType, frame: frameFromLabel(get().frame), wanted: cur.wanted })
       const msg = r.kind === 'busy' ? 'Es läuft gerade eine Analyse. Der Wechsel ist erst nach „Stoppen & behalten“ oder nach dem Ende möglich.' : ''
-      set({ engine: { hash, state: r.state, pending: false, msg, missing: r.kind === 'needs-models' ? r.missing : [] } })
+      set((s) => ({ engine: { hash, state: r.state, pending: false, msg, missing: r.kind === 'needs-models' ? r.missing : [], modelsChecked: s.engine.modelsChecked } }))
       if (r.kind === 'shown') await get().loadResults(hash, true)
       if (r.kind === 'started') { const live = (await a.jobs()).find((j) => j.id === r.jobId); if (live) set({ job: live }) }
     } catch (e) {
@@ -207,7 +207,7 @@ export const useProject = create<ProjectState>((set, get) => ({
       a.onJob((j) => {
         if (j.title.startsWith('Export')) { set({ exportJob: j }); return }
         set((s) => (s.job && s.job.id !== j.id && s.job.state === 'running' ? s : { job: j }))
-        if (['done', 'error', 'stopped'].includes(j.state)) void get().loadEngine(j.hash)
+        if (['done', 'error', 'stopped'].includes(j.state) || get().engine.hash !== j.hash || (j.state === 'queued' && get().job?.id !== j.id)) void get().loadEngine(j.hash)
         if (j.state === 'done') void get().loadResults(j.hash)
         // Clips erscheinen, sobald sie fertig sind: Übersicht öffnet sich beim ersten fertigen Clip
         else if (j.stage === 'layout' && j.state === 'running') {
