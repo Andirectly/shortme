@@ -115,7 +115,8 @@ export async function buildPersons(meta: ProjectMeta, clips: Array<Pick<ShortmeC
   const concurrent = maxConcurrentPeople(layouts.map((l) => l.input))
   // Gleichzeitig sichtbare Tracks desselben Clips sind nie dieselbe Person
   const cannotLink = (i: number, j: number): boolean => items[i].clip === items[j].clip && items[i].from < items[j].to && items[j].from < items[i].to
-  const all = clusterEmbeddings(items, { cannotLink, targetK: Math.max(1, concurrent) })
+  // Gleichzeitig sichtbare Personen begrenzen die Zahl (targetK). Wird immer nur EINE Person gezeigt (Podcast mit Kamerawechsel zwischen den Sprechern), sagt das nichts über die Zahl der Personen: nicht auf eine zusammenziehen
+  const all = clusterEmbeddings(items, { cannotLink, ...(concurrent >= 2 ? { targetK: concurrent } : {}) })
   const total = items.reduce((n, i) => n + i.sec, 0)
   // Winzige Cluster (< 10 % der Gesichtszeit) sind Rauschen (Fehlerkennung, Randgesichter)
   const groups = all.filter((g) => { const sec = g.reduce((n, i) => n + items[i].sec, 0); return sec >= MIN_PERSON_SEC && sec >= total * 0.1 })

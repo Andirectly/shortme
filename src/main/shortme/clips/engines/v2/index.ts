@@ -191,14 +191,16 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
       report('snap', 0.45 + 0.4 * (i / finalists.length), `Schnitte planen (${i + 1}/${finalists.length}) …`)
       const ev = finalists[i].event
       const perf = ev.evidenceIds.map((id) => evidence.get(id)?.performance).find((p) => !!p) ?? null
-      const base = baselineKeep(ev, perf, ctx, lim)
-      const bad = checkVariant(base, dur, lim)
+      // Gespräch (kein Stream): Aussagen und Geschichten brauchen Kontext → längere Mindestlänge als reine Pointen
+      const evLim = req.contentType !== 'stream' && ev.kind !== 'performance' && ev.kind !== 'gameplay' ? { ...lim, minSec: Math.max(lim.minSec, ev.kind === 'witz' || ev.kind === 'reaktion' ? 22 : 28) } : lim
+      const base = baselineKeep(ev, perf, ctx, evLim)
+      const bad = checkVariant(base, dur, evLim)
       const list: Variant[] = []
       if (bad) { dropped.push({ eventId: ev.id, reason: `Grundvariante ungültig: ${bad}` }); continue }
       list.push({ eventId: ev.id, variantId: `${ev.id}-b`, keep: base, reason: 'zusammenhängender Ausschnitt', verification: 'needs-review', kind: 'baseline', notes: [] })
       try {
         const hints = ev.evidenceIds.map((id) => evidence.get(id)).filter((e): e is Evidence => !!e && e.state === 'observed' && e.modality !== 'text').map((e) => `${e.modality}: ${e.observation}`).join('\n')
-        const pv = await planVariants(url, ev, base, ctx, lim, hints, signal)
+        const pv = await planVariants(url, ev, base, ctx, evLim, hints, signal)
         pv.keeps.forEach((k, n) => list.push({ eventId: ev.id, variantId: `${ev.id}-c${n + 1}`, keep: k.keep, reason: k.reason, verification: 'needs-review', kind: 'cut', notes: [] }))
         if (pv.rejected.length) diag.rejectedVariants = [...((diag.rejectedVariants as string[] | undefined) ?? []), ...pv.rejected.map((r) => `${ev.id}: ${r}`)]
       } catch (e) { if (signal?.aborted) throw e; problems.push(`Schnittvarianten für ${ev.id} nicht erzeugt`) }

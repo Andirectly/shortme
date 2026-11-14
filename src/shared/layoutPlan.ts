@@ -121,9 +121,11 @@ const SAME_PERSON = 0.15
 export const splitHalfFrac = (sourceAspect: number): number => 1.125 / sourceAspect
 const SPLIT_MAX_ZOOM = 1.8
 
-export function pingPongWindows(active: Array<number | null>, dt: number, opt: PlanOptions = PLAN_DEFAULTS, tracks: PlanTrack[] = []): Array<[number, number]> {
+export function pingPongWindows(active: Array<number | null>, dt: number, opt: PlanOptions = PLAN_DEFAULTS, tracks: PlanTrack[] = [], cuts: number[] = []): Array<[number, number]> {
   const sw: number[] = []
-  for (let i = 1; i < active.length; i++) if (active[i] !== null && active[i - 1] !== null && active[i] !== active[i - 1] && !samePerson(tracks, active[i]!, active[i - 1]!, i)) sw.push(i)
+  // Ein Wechsel direkt an einem Kamerawechsel ist kein Hin und Her im selben Bild, sondern ein Schnitt von Person zu Person
+  const nearCut = (i: number): boolean => cuts.some((c) => Math.abs(c - i) <= 1)
+  for (let i = 1; i < active.length; i++) if (active[i] !== null && active[i - 1] !== null && active[i] !== active[i - 1] && !nearCut(i) && !samePerson(tracks, active[i]!, active[i - 1]!, i)) sw.push(i)
   const win = Math.round(opt.pingPongWindowSec / dt)
   const out: Array<[number, number]> = []
   for (let i = 0; i + opt.pingPongSwitches - 1 < sw.length; i++) {
@@ -147,7 +149,39 @@ export function mainTrack(inp: PlanInput): number | null {
   return best?.id ?? null
 }
 
-export function planShots(inp: PlanInput, opt0: PlanOptions = PLAN_DEFAULTS): ShortmeShot[] {
+/**
+ * Tracks an die Kamerawechsel anlegen: Das Raster (0,2 s) trifft den Schnitt nie genau, ein Track ragt so ein bis zwei Ticks in die neue Szene (Ausschnitt der alten Person
+ * in der neuen Szene = „Leerfläche“ am Schnitt) oder beginnt erst danach (die ersten Bilder haben keinen Ausschnitt). Hier: Tracks am Schnitt trennen, übergroße
+ * Reste (≤ 2 Ticks) verwerfen, späte Anfänge (≤ 2 Ticks nach dem Schnitt) bis zum Schnitt zurückziehen.
+ */
+export function alignTracksToCuts(inp: PlanInput): PlanInput {
+  const cuts = [...new Set(inp.cuts)].filter((c) => c > 0 && c < inp.ticks).sort((a, b) => a - b)
+  if (!cuts.length) return inp
+  let nextId = Math.max(-1, ...inp.tracks.map((t) => t.id)) + 1
+  const out: PlanTrack[] = []
+  for (const t of inp.tracks) {
+    const end = t.start + t.centres.length - 1
+    const edges = [t.start, ...cuts.filter((c) => c > t.start && c <= end), end + 1]
+    const split = edges.length > 2
+    for (let k = 0; k < edges.length - 1; k++) {
+      const a = edges[k], b = edges[k + 1] - 1
+      if (split && b - a + 1 <= 2) continue // Rest/Anfang der alten Szene
+      const sl = (arr: number[]): number[] => arr.slice(a - t.start, b - t.start + 1)
+      out.push({ ...t, id: k === 0 ? t.id : nextId++, start: a, centres: sl(t.centres), areas: sl(t.areas), scores: sl(t.scores) })
+    }
+  }
+  // späte Anfänge bis zum Schnitt zurückziehen
+  for (const t of out) {
+    const c = [...cuts].reverse().find((x) => x < t.start && t.start - x <= 2)
+    if (c === undefined) continue
+    const n = t.start - c
+    t.centres = [...Array(n).fill(t.centres[0]), ...t.centres]; t.areas = [...Array(n).fill(t.areas[0]), ...t.areas]; t.scores = [...Array(n).fill(t.scores[0]), ...t.scores]; t.start = c
+  }
+  return { ...inp, tracks: out }
+}
+
+export function planShots(inp0: PlanInput, opt0: PlanOptions = PLAN_DEFAULTS): ShortmeShot[] {
+  const inp = alignTracksToCuts(inp0)
   const w = cropWidth(inp.sourceAspect, inp.targetAspect)
   const follow = opt0.follow ?? 'speaker'
   // Vlog/Solo: immer die Hauptperson, keine Sprecherwechsel, kein Split; Solo zusätzlich ein einziger fester Ausschnitt
@@ -155,7 +189,7 @@ export function planShots(inp: PlanInput, opt0: PlanOptions = PLAN_DEFAULTS): Sh
   const main = follow === 'speaker' ? null : mainTrack(inp)
   const active: Array<number | null> = follow === 'speaker' ? activeSpeakers(inp, opt)
     : Array.from({ length: inp.ticks }, (_, i) => { const t = inp.tracks.find((x) => x.id === main); return t && at(t, i) ? t.id : null })
-  const pp = follow !== 'speaker' || opt.allowSplit === false ? [] : pingPongWindows(active, inp.dt, opt, inp.tracks)
+  const pp = follow !== 'speaker' || opt.allowSplit === false ? [] : pingPongWindows(active, inp.dt, opt, inp.tracks, inp.cuts)
   const inPP = (i: number): boolean => pp.some(([a, b]) => i >= a && i <= b)
   const noSpeakerTicks = Math.round(opt.noSpeakerSec / inp.dt)
 
