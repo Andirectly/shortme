@@ -18,6 +18,9 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
 ### Fixed
 
+- Facecam verschieben: gilt jetzt standardmäßig nur für die aktuelle Szene; bei „Ganzer Clip“ bleiben Szenen mit eigener Facecam (andere Person/Position) unberührt. Neuer Knopf „Facecams pro Szene erkennen“ im Editor erkennt die Facecam jeder Szene eines schon berechneten Clips neu.
+- Facecam-Ausschnitt: Kopffreiheit bleibt, überstehender Rand wird vor allem unten abgeschnitten statt über dem Kopf.
+- Bewertungsfenster (Daumen) mit den Gründen schließt nicht mehr, bevor man es anklicken kann.
 - Restzeit-Anzeige springt nicht mehr (10 → 45 Minuten): die neue Engine hat eine eigene Zeitschätzung und meldet ihren Fortschritt gleichmäßig je Stufe.
 - Streams mit wechselnder Facecam: Wechselt der Stream auf die Ansicht eines anderen Streamers, wird dessen Facecam erkannt und genauso eingebunden (Facecam + Gameplay) statt als Smart-Ausschnitt ohne Facecam (gilt für neu berechnete Clips).
 - Layout-Wechsel (z. B. Vollbild ↔ Smart) sitzen jetzt exakt auf dem Videoschnitt statt ein Bild später: Schnittzeiten werden an den echten Bildern nachgemessen, und die Wechsel rasten darauf ein (gilt für neu berechnete Clips).
