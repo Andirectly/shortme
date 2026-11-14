@@ -138,9 +138,9 @@ textarea.sm-input { height: auto; padding: 10px 16px; border-radius: 18px; resiz
 .sm-build { position: fixed; left: 14px; bottom: 8px; z-index: 45; font-size: 11px; color: var(--text-3); opacity: 0.8; pointer-events: none; user-select: text; }
 
 /* Seitenbreite: Inhalt nutzt das Fenster (bis 1760 px), danach zentriert; Spalten passen sich der Breite an */
-.sm-wrap { width: 100%; max-width: 1760px; margin: 0 auto; }
+.sm-wrap { width: 100%; max-width: 2200px; margin: 0 auto; }
 .sm-cols { display: grid; gap: 16px; align-items: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }
-.sm-page { padding: 8px clamp(16px, 2.2vw, 40px) 36px 8px; }
+.sm-page { left: 0; padding: 8px 84px 36px 84px; }
 
 /* Theme „Schwarz“: tiefes Schwarz, helle Kanten und weiße Akzente (statt transparentem Glas) */
 .sm-root[data-theme='black'] { --shell-bg: #000; --glass-panel: #0c0c0c; --glass-card: #080808; --glass-blur: none; --edge: rgba(255,255,255,0.16); --edge-highlight: rgba(255,255,255,0.22); --text-2: rgba(255,255,255,0.68); }
