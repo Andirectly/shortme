@@ -11,7 +11,9 @@ const clamp = (n: number, a: number, b: number): number => Math.min(b, Math.max(
  * Untertitel in der Vorschau – dasselbe CSS und dieselben Zeit-Variablen wie in tscaps (eingefrorene Animationen, auf die
  * Abspielposition `t` gespult). Container muss `container-type: size` haben (9:16-Fläche).
  */
-export function CaptionLayer({ preset, groups, t, highlight = true, fontCss = '', scope = 'sm-cap' }: { preset: StylePreset; groups: PWord[][]; t: number; highlight?: boolean; fontCss?: string; scope?: string }): React.JSX.Element | null {
+export function CaptionLayer({ preset, groups, t, highlight = true, fontCss = '', scope = 'sm-cap', onMove, onCommit }: { preset: StylePreset; groups: PWord[][]; t: number; highlight?: boolean; fontCss?: string; scope?: string; /** Ziehen verschiebt die Untertitel vertikal (`onMove` live, `onCommit` beim Loslassen). */ onMove?: (y: number) => void; onCommit?: (y: number) => void }): React.JSX.Element | null {
+  const wrap = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ active: boolean; y: number }>({ active: false, y: preset.caption.y })
   const s = preset.caption
   const css = useMemo(() => `${fontCss}\n${scopeCss(`${FROZEN_CSS}\n${captionCss(s, { highlight, css: preset.css })}`, `.${scope}`)}`, [s, highlight, preset.css, fontCss, scope])
   const cues = useMemo(() => cueTimes(groups), [groups])
@@ -24,7 +26,11 @@ export function CaptionLayer({ preset, groups, t, highlight = true, fontCss = ''
     <>
       <style>{css}</style>
       {alive && g && cue && (
-        <div className={scope} style={{ position: 'absolute', left: 0, right: 0, top: `${s.y * 100}%`, transform: 'translateY(-50%)', padding: '0 4%' }}>
+        <div ref={wrap} className={scope} title={onMove ? 'Ziehen: Untertitel verschieben' : undefined}
+          onPointerDown={(e) => { if (!onMove) return; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); drag.current = { active: true, y: s.y } }}
+          onPointerMove={(e) => { if (!drag.current.active) return; const r = wrap.current?.parentElement?.getBoundingClientRect(); if (!r) return; drag.current.y = clamp((e.clientY - r.top) / r.height, 0.06, 0.95); onMove?.(drag.current.y) }}
+          onPointerUp={() => { if (drag.current.active) { drag.current.active = false; onCommit?.(drag.current.y) } }}
+          style={{ position: 'absolute', left: 0, right: 0, top: `${s.y * 100}%`, transform: 'translateY(-50%)', padding: '0 4%', cursor: onMove ? 'grab' : 'default', touchAction: 'none' }}>
           <div className="segment" style={segmentVars(cue, t) as React.CSSProperties}>
             <div className="line">
               {g.map((w) => {
@@ -71,7 +77,7 @@ export function TitleLayer({ preset, text, t, seconds, onMove, onCommit, onReady
     const parent = wrap.current?.parentElement
     if (!parent) return ts.y
     const r = parent.getBoundingClientRect()
-    return clamp((clientY - r.top) / r.height, 0.04, 0.5)
+    return clamp((clientY - r.top) / r.height, 0.04, 0.95)
   }
   return (
     <>
