@@ -1,6 +1,8 @@
 // Szenen eines Clips in „Facecam + Gameplay“ (Facecam im Bild) und Smart-Ausschnitt (keine Facecam, z. B. Vollbild-Kamera bei „Just Chatting“) aufteilen.
 import type { ShortmeShot } from '../../../shared/shortme'
-import type { StreamLayout } from '../../../shared/streamLayout'
+import { sameCam, type StreamLayout } from '../../../shared/streamLayout'
+
+export { sameCam }
 
 export interface Scene { start: number; end: number }
 
@@ -41,12 +43,4 @@ export function mergeStreamScenes(clipStart: number, clipEnd: number, planned: S
   }
   if (merged.length) { merged[0].start = 0; merged[merged.length - 1].end = clipEnd - clipStart }
   return merged
-}
-
-/** Zwei Facecam-Rahmen praktisch gleich? (Überdeckung ≥ 0,6) – verhindert, dass dieselbe Kamera in jeder Szene als „neue“ gilt. */
-export function sameCam(a?: { x: number; y: number; w: number; h: number }, b?: { x: number; y: number; w: number; h: number }): boolean {
-  if (!a || !b) return a === b
-  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
-  if (w <= 0 || h <= 0) return false
-  return (w * h) / (a.w * a.h + b.w * b.h - w * h) >= 0.6
 }

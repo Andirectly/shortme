@@ -171,7 +171,7 @@ export function EditorScreen(): React.JSX.Element {
   const [streamLive, setStreamLive] = useState<Partial<StreamLayout> | null>(null)
   const streamLiveRef = useRef<Partial<StreamLayout> | null>(null)
   streamLiveRef.current = streamLive
-  const [scope, setScope] = useState('Ganzer Clip')
+  const [scope, setScope] = useState('Diese Szene')
   const [kindNext, setKindNext] = useState<ContentType | null>(null)
   const shotKey = useRef('')
   /** Zeit des Bildes, das der Player wirklich gerade zeigt (nicht currentTime, das dem Bild vorauseilt) – sonst bekommt das letzte Bild einer Szene schon den Ausschnitt der nächsten. */
@@ -317,6 +317,19 @@ export function EditorScreen(): React.JSX.Element {
   const [channelSaved, setChannelSaved] = useState(false)
   const recompute = async (k: ContentType): Promise<void> => { if (!hash) return; await persist(logRef.current); await window.cutawan.shortme.reanalyze(hash, k); go('processing') }
   const saveChannel = async (l: StreamLayout): Promise<void> => { if (channel) { await window.cutawan.shortme.channelLayoutSave(channel, l); setChannelSaved(true) } }
+  const [camBusy, setCamBusy] = useState(false)
+  const [camMsg, setCamMsg] = useState('')
+  /** Facecams in allen Szenen dieses Clips neu erkennen (andere Person/Kamera an anderer Stelle) und die Vorschau neu laden. */
+  const redetect = async (): Promise<void> => {
+    if (!hash || camBusy) return
+    setCamBusy(true); setCamMsg('')
+    try {
+      const r = await window.cutawan.shortme.redetectCams(hash, clipId)
+      await useProject.getState().refreshClips(hash)
+      setCamMsg(r.changed ? `${r.scenes} Szenen geprüft, ${r.others} weitere Facecam${r.others === 1 ? '' : 's'} gefunden` : 'Keine Facecam gefunden')
+    } catch (e) { setCamMsg(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e)) }
+    setCamBusy(false)
+  }
   const findCam = async (): Promise<void> => { if (!hash) return; const l = await window.cutawan.shortme.findStream(hash); if (l) { commit({ t: 'stream', patch: l }); commit({ t: 'layoutClip', layout: 'stream' }) } }
   const defaultGameFor = (l: StreamLayout): StreamLayout['game'] => ({ ...l.game, x: Math.max(0, Math.min(1 - l.game.w, 0.5 - l.game.w / 2)), y: Math.max(0, Math.min(1 - l.game.h, 0.5 - l.game.h / 2)) })
   const rects = shotNow && source && !streamShot ? sourceRects({ width: source.width, height: source.height }, shotNow.shot, shotNow.zoom) : []
@@ -429,6 +442,8 @@ export function EditorScreen(): React.JSX.Element {
                   <Row label="Gilt für"><Segmented options={['Ganzer Clip', 'Diese Szene']} value={scope} onChange={setScope} /></Row>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 4 }}>
                     <Pill onClick={() => commitStream({ game: defaultGameFor(streamShot) })}>Gameplay zentrieren</Pill>
+                    <Pill onClick={() => void redetect()}>{camBusy ? 'Erkenne …' : 'Facecams pro Szene erkennen'}</Pill>
+                    {camMsg && <small role="status">{camMsg}</small>}
                     {channel && <Pill onClick={() => void saveChannel(streamShot)}>{channelSaved ? 'Kanal-Layout gespeichert' : 'Als Kanal-Layout speichern'}</Pill>}
                   </div>
                 </>

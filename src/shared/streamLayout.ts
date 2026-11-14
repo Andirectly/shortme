@@ -57,13 +57,15 @@ export function fitGame(src: { width: number; height: number }, game: NRect, des
 }
 
 /** Quellausschnitt (Pixel, gerade Werte) für einen Rahmen, der ein Ziel mit Seitenverhältnis `destAspect` ausfüllt (Mitte bleibt, überstehende Seite wird abgeschnitten). */
-export function coverCrop(src: { width: number; height: number }, r: NRect, destAspect: number): PxRect {
+/** `vAnchor`: Anteil des abzuschneidenden Überstands, der OBEN weggeht (0,5 = mittig; kleiner = Kopffreiheit bleibt, bei Facecams 0,2). */
+export function coverCrop(src: { width: number; height: number }, r: NRect, destAspect: number, vAnchor = 0.5): PxRect {
   let w = r.w * src.width
   let h = r.h * src.height
   if (w / h > destAspect) w = h * destAspect
   else h = w / destAspect
   const cx = (r.x + r.w / 2) * src.width
-  const cy = (r.y + r.h / 2) * src.height
+  const fullH = r.h * src.height
+  const cy = (r.y + r.h / 2) * src.height - (fullH - h) * (0.5 - vAnchor) // abgeschnitten wird vor allem unten, nicht über dem Kopf
   const W = Math.min(src.width, even(w))
   const H = Math.min(src.height, even(h))
   return { w: W, h: H, x: even(clamp(cx - W / 2, 0, src.width - W)), y: even(clamp(cy - H / 2, 0, src.height - H)) }
@@ -77,7 +79,7 @@ export function planStream(src: { width: number; height: number }, s: StreamLayo
   const d = streamDest(s.preset, s.gap, camAspect)
   const game = fitGame(src, s.game, d.game.w / d.game.h)
   return {
-    cam: { crop: coverCrop(src, s.cam, d.cam.w / d.cam.h), dest: d.cam },
+    cam: { crop: coverCrop(src, s.cam, d.cam.w / d.cam.h, 0.2), dest: d.cam },
     game: { crop: coverCrop(src, game, d.game.w / d.game.h), dest: d.game },
     seam: d.seam, pip: s.preset === 'pip'
   }
@@ -136,3 +138,11 @@ export function streamSeamY(shots: Array<{ start: number; end: number; layout: s
 
 /** Vollständiges Layout (aus „Facecam suchen“ oder Kanal-Layout) statt nur einer Änderung? */
 export const isFullStream = (p: Partial<StreamLayout>): p is StreamLayout => !!p.cam && !!p.game && !!p.preset && p.gap !== undefined
+
+/** Zwei Facecam-Rahmen praktisch gleich? (Überdeckung ≥ 0,6) – verhindert, dass dieselbe Kamera in jeder Szene als „neue“ gilt. */
+export function sameCam(a?: { x: number; y: number; w: number; h: number }, b?: { x: number; y: number; w: number; h: number }): boolean {
+  if (!a || !b) return a === b
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
+  if (w <= 0 || h <= 0) return false
+  return (w * h) / (a.w * a.h + b.w * b.h - w * h) >= 0.6
+}

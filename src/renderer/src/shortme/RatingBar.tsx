@@ -37,6 +37,10 @@ export function RatingBar({ clipId, chips = 'below' }: { clipId: string; chips?:
   const rating = useProject((s) => s.feedback[clipId])
   const setFeedback = useProject((s) => s.setFeedback)
   const [open, setOpen] = useState(false)
+  // Das Fenster schließt erst kurz nach dem Verlassen: zwischen Knöpfen und Fenster liegt eine Lücke, über die der Mauszeiger wandern muss
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelClose = (): void => { if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null } }
+  useEffect(() => () => cancelClose(), [])
   const set = (level: Level): void => {
     if (rating?.level === level) { setOpen(false); void setFeedback(clipId, null); return }
     setOpen(true)
@@ -50,7 +54,7 @@ export function RatingBar({ clipId, chips = 'below' }: { clipId: string; chips?:
   }
   const showChips = !!rating && (chips === 'below' || open)
   return (
-    <div style={{ position: 'relative', display: 'grid', gap: 6 }} onMouseLeave={() => setOpen(false)}>
+    <div style={{ position: 'relative', display: 'grid', gap: 6 }} onMouseEnter={cancelClose} onMouseLeave={() => { cancelClose(); closeTimer.current = setTimeout(() => setOpen(false), 450) }}>
       <div role="group" aria-label="Bewertung" style={{ display: 'flex', gap: 4 }}>
         {LEVELS.map((l, i) => (
           <button key={l} aria-label={LEVEL_LABEL[l]} aria-pressed={rating?.level === l} title={`${LEVEL_LABEL[l]} (${i + 1})`} onClick={(e) => { e.stopPropagation(); set(l) }}

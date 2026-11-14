@@ -234,6 +234,7 @@ const api = {
     channelLayoutDelete: (channel: string): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutDelete', channel),
     channelLayoutSave: (channel: string, layout: StreamLayout): Promise<Array<StreamLayout & { channel: string; updatedAt: string }>> => ipcRenderer.invoke('shortme:channelLayoutSave', channel, layout),
     findStream: (hash: string): Promise<StreamLayout | null> => ipcRenderer.invoke('shortme:findStream', hash),
+    redetectCams: (hash: string, clipId: string): Promise<{ changed: boolean; scenes: number; others: number }> => ipcRenderer.invoke('shortme:redetectCams', hash, clipId),
     catalog: {
       status: (): Promise<CatalogStatus> => ipcRenderer.invoke('catalog:status'),
       connect: (repo: string, token: string): Promise<CatalogStatus> => ipcRenderer.invoke('catalog:connect', repo, token),

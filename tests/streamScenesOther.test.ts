@@ -35,3 +35,28 @@ describe('Weitere Facecam in einer Szene (anderer Streamer)', () => {
     expect(sameCam(base.cam, other.cam)).toBe(false)
   })
 })
+
+import { applyStreamOps } from '../src/shared/edits'
+import { coverCrop } from '../src/shared/streamLayout'
+describe('Änderungen am ganzen Clip und Facecam-Ausschnitt', () => {
+  const shot = (start: number, end: number, stream: typeof base): { start: number; end: number; layout: 'stream'; cx: number; zoom: number; stream: typeof base } => ({ start, end, layout: 'stream', cx: 0.5, zoom: 1, stream })
+  it('Facecam verschieben „Ganzer Clip“ trifft nur Szenen mit der Kanal-Facecam, andere Szenen behalten ihre eigene', () => {
+    const moved = { x: 0.5, y: 0.1, w: 0.25, h: 0.44 }
+    const r = applyStreamOps([shot(0, 10, base), shot(10, 20, other), shot(20, 30, base)], [{ t: 'stream', patch: { cam: moved } }], base)
+    expect(r[0].stream?.cam).toEqual(moved); expect(r[2].stream?.cam).toEqual(moved)
+    expect(r[1].stream?.cam).toEqual(other.cam)
+  })
+  it('Änderung „Diese Szene“ (mit at) trifft genau diese Szene; Layout-Änderungen ohne Position gelten für alle', () => {
+    const moved = { x: 0.5, y: 0.1, w: 0.25, h: 0.44 }
+    const r = applyStreamOps([shot(0, 10, base), shot(10, 20, other)], [{ t: 'stream', patch: { cam: moved }, at: 12 }, { t: 'stream', patch: { gap: 30 } }], base)
+    expect(r[0].stream?.cam).toEqual(base.cam); expect(r[1].stream?.cam).toEqual(moved)
+    expect(r[0].stream?.gap).toBe(30); expect(r[1].stream?.gap).toBe(30)
+  })
+  it('Kopffreiheit: zu hohe Facecam wird unten gekürzt, nicht oben', () => {
+    const src = { width: 1920, height: 1080 }
+    const cam = { x: 0.7, y: 0.1, w: 0.25, h: 0.5 } // 480×540, Ziel breiter → Höhe wird gekürzt
+    const mid = coverCrop(src, cam, 1.69, 0.5), top = coverCrop(src, cam, 1.69, 0.2)
+    expect(top.y).toBeLessThan(mid.y)
+    expect(top.y).toBeGreaterThanOrEqual(Math.round(cam.y * src.height) - 2) // beginnt nahe der Oberkante der Facecam
+  })
+})

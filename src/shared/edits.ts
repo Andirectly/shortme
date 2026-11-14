@@ -4,7 +4,7 @@
 import type { ShortmeClip, ShortmeShot } from './shortme'
 import { deepMerge, type PresetPatch } from './preset'
 import { planShots, type PlanInput, type PlanTrack } from './layoutPlan'
-import { isFullStream, type StreamLayout } from './streamLayout'
+import { isFullStream, sameCam, type StreamLayout } from './streamLayout'
 
 /** Änderung am Untertitel-/Titelstil: anderes Preset und/oder Änderungen am Preset (tief zusammengeführt). */
 export interface CaptionPatch {
@@ -147,7 +147,13 @@ export function applyStreamOps(shots: ShortmeShot[], ops: Array<Extract<Op, { t:
   return shots.map((s) => {
     if (s.layout !== 'stream') return s
     let cur: StreamLayout | undefined = s.stream ?? base
-    for (const op of ops) if (op.at === undefined || (op.at >= s.start - 1e-6 && op.at < s.end - 1e-6)) cur = cur ? { ...cur, ...op.patch } : isFullStream(op.patch) ? op.patch : undefined
+    for (const op of ops) {
+      if (op.at !== undefined && !(op.at >= s.start - 1e-6 && op.at < s.end - 1e-6)) continue
+      // Änderung am ganzen Clip: Position von Facecam/Gameplay gilt nur für Szenen mit der Kanal-Facecam, nicht für Szenen mit eigener (anderer) Facecam
+      let patch = op.patch
+      if (op.at === undefined && base && cur && !sameCam(cur.cam, base.cam)) { const { cam: _c, game: _g, ...rest } = patch; patch = rest }
+      cur = cur ? { ...cur, ...patch } : isFullStream(patch) ? patch : undefined
+    }
     if (!cur) return { ...s, layout: 'fixed' as const } // ohne Facecam-Layout kein Stream-Bild
     return { ...s, stream: cur }
   })

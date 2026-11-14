@@ -34,7 +34,7 @@ import type { Level } from '../../shared/learn'
 import type { PersonsPatch, ShortmePersons } from '@shared/shortme'
 import { makeThumbs, thumbPath } from './clips/thumbs'
 import { existsSync } from 'node:fs'
-import { ensureLayoutInput, ensureSignals, loadLayoutInput } from './clips/analysis'
+import { ensureLayoutInput, ensureShots, ensureSignals, loadLayoutInput } from './clips/analysis'
 import { exportClip } from './render/exporter'
 import { addExport } from '../upload/store'
 import { deleteClip } from './corrections'
@@ -49,6 +49,8 @@ import type { ContentType, FrameChoice } from '../../shared/videoKind'
 import { channelLayouts, deleteChannelLayout, loadProfile, rememberChoice, saveChannelLayout, sourceKey } from './profiles'
 import { suggestKind } from './layout/suggest'
 import { findFacecam } from './layout/facecam'
+import { classifyScenes } from './layout/streamScenes'
+import { mergeStreamScenes, scenesOf } from './layout/streamShots'
 import { defaultStream, sanitizeStream, type StreamLayout } from '../../shared/streamLayout'
 
 export const jobs = new JobQueue()
@@ -93,6 +95,25 @@ export function registerShortmeIpc(): void {
     if (!meta) throw new Error('Projekt nicht gefunden')
     const f = await findFacecam(meta.sourcePath, 0, meta.durationSec)
     return f ? defaultStream({ width: meta.width, height: meta.height }, f.cam) : null
+  })
+  /** Facecams eines Clips pro Szene neu erkennen (bei Szenen, in denen eine andere Person/Kamera an anderer Stelle sitzt); schreibt die Shots in den Lauf des Clips. */
+  ipcMain.handle('shortme:redetectCams', async (_e, hash: string, clipId: string) => {
+    const meta = await loadMeta(hash)
+    const found = await findClip(hash, clipId)
+    if (!meta || !found) throw new Error('Clip nicht gefunden')
+    const clip = found.clip
+    const dims = { width: meta.width, height: meta.height }
+    let base: StreamLayout | null = clip.stream ?? null
+    if (!base) { const f = await findFacecam(meta.sourcePath, clip.start, clip.end, 10).catch(() => null); if (f) base = defaultStream(dims, f.cam) }
+    if (!base) return { changed: false, scenes: 0, others: 0 }
+    const cuts = await ensureShots(meta)
+    const known: StreamLayout[] = []
+    const scenes = await classifyScenes(meta.sourcePath, scenesOf(clip.start, clip.end, cuts), base, dims, known)
+    const planned = (clip.shots ?? []).filter((s) => s.layout !== 'stream')
+    const shots = mergeStreamScenes(clip.start, clip.end, planned, scenes, base)
+    const file = await loadClips(hash, found.runId)
+    if (file) await saveClips(hash, { ...file, clips: file.clips.map((c) => (c.id === clipId ? { ...c, shots, stream: base ?? undefined } : c)) })
+    return { changed: true, scenes: scenes.length, others: known.length }
   })
   /** Verarbeitung: Transkription (0–55 %), dann Analyse + Clip-Auswahl (55–100 %). */
   ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice; engine?: SelectionEngineId }) => {
