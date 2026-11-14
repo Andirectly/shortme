@@ -18,6 +18,7 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
 ### Fixed
 
+- Editor-Vorschau: Beim Abspielen wird der Ausschnitt jetzt zusammen mit jedem Videobild gezeichnet, sodass das erste Bild einer neuen Szene nie mehr kurz den Ausschnitt der vorigen Person bekommt.
 - Podcast mit Kamerawechsel zwischen den Sprechern: Personen werden jetzt getrennt erkannt (vorher wurden beide zu einer Person zusammengezogen). Der Bildausschnitt wechselt genau auf dem Schnitt zur jeweiligen Person; vorher war am Schnitt kurz der Ausschnitt der anderen Person zu sehen (Leerfläche), und bei schnellem Hin und Her landete der Ausschnitt zwischen den Personen.
 - Neue Engine bei Gesprächen: Aussagen und Geschichten bekommen mehr Kontext (mindestens 28 s, Pointen 22 s).
 - Facecam verschieben: gilt jetzt standardmäßig nur für die aktuelle Szene; bei „Ganzer Clip“ bleiben Szenen mit eigener Facecam (andere Person/Position) unberührt. Neuer Knopf „Facecams pro Szene erkennen“ im Editor erkennt die Facecam jeder Szene eines schon berechneten Clips neu.

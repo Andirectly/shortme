@@ -213,7 +213,8 @@ export function EditorScreen(): React.JSX.Element {
     let raf = 0
     let last = 0
     let vfc = 0
-    const onFrame = (_now: number, meta: { mediaTime: number }): void => { frameTimeRef.current = meta.mediaTime; vfc = v.requestVideoFrameCallback(onFrame) }
+    // Beim Abspielen wird NUR hier gezeichnet: das Bild und seine Zeit (mediaTime) gehören sicher zusammen. Zeichnete die rAF-Schleife vor diesem Rückruf, bekäme das erste Bild einer neuen Szene noch den Ausschnitt der alten.
+    const onFrame = (_now: number, meta: { mediaTime: number }): void => { frameTimeRef.current = meta.mediaTime; draw(); vfc = v.requestVideoFrameCallback(onFrame) }
     vfc = v.requestVideoFrameCallback(onFrame)
     const tick = (now: number): void => {
       const abs = v.currentTime
@@ -226,7 +227,7 @@ export function EditorScreen(): React.JSX.Element {
       }
       tRef.current = abs - origStart
       if (now - last > 66 || v.paused) { last = now; setT(tRef.current) }
-      draw()
+      if (v.paused) draw() // im Stand (Springen, Ziehen, Stiländerung) zeichnet die Schleife; beim Abspielen der Bild-Rückruf
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
