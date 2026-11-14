@@ -15,6 +15,11 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 - Neuer Hintergrund „Schwarz“ (Einstellungen → Allgemein → Darstellung) neben dem transparenten Glas-Look.
 - Editor: automatische Kürzungen der neuen Engine lassen sich zurücknehmen und wieder anwenden (mit Rückgängig).
 
+### Fixed
+
+- Layout-Wechsel (z. B. Vollbild ↔ Smart) sitzen jetzt exakt auf dem Videoschnitt statt ein Bild später: Schnittzeiten werden an den echten Bildern nachgemessen, und die Wechsel rasten darauf ein (gilt für neu berechnete Clips).
+- Der Wechsel zwischen Bisheriger und Neuer Engine zeigt vorhandene Ergebnisse sofort an, statt neu zu rechnen. Geänderte Optionen wirken erst bei „Neu berechnen“.
+
 ### Changed
 
 - Alle Seiten nutzen die Fensterbreite (Spalten passen sich an, bei kleinem Fenster einspaltig). Einstellungen sind in vier Bereiche gegliedert (Allgemein, Modelle & Updates, Konten & Dienste, System).

@@ -5,8 +5,7 @@ import { join } from 'node:path'
 import { dataRoot } from '../../../engines/paths'
 import { writeFileAtomic } from '../../atomic'
 import { loadMeta, type ProjectMeta } from '../../project'
-import { loadTranscript } from '../../transcription'
-import { ENGINE_IDS, LEGACY_RUN_ID, V2_ENGINE_VERSION, fingerprintOf, findReusableRun, type AnalysisState, type EngineSwitchResult, type SelectionEngineId } from '../../../../shared/engine'
+import { ENGINE_IDS, LEGACY_RUN_ID, V2_ENGINE_VERSION, fingerprintOf, type AnalysisState, type EngineSwitchResult, type SelectionEngineId } from '../../../../shared/engine'
 import { clipsPathFor, loadState, setSelected, showRun, stopStaleRuns } from './state'
 import { existsSync } from 'node:fs'
 import { loadProfile } from '../../profiles'
@@ -94,12 +93,11 @@ export async function switchEngine(req: SwitchRequest, deps: SwitchDeps): Promis
     if (engine === 'legacy') {
       if (existsSync(clipsPathFor(hash, LEGACY_RUN_ID))) return { kind: 'shown', state: await showRun(hash, LEGACY_RUN_ID) }
     } else {
-      const t = await loadTranscript(hash)
-      if (t) {
-        const fp = analysisFingerprint({ hash, engine, transcriptVersion: t.version, wordCount: t.words.length, asrModel: t.model, query: req.query, contentType: req.contentType, frame: req.frame, wanted: req.wanted, revisions: deps.revisions(engine) })
-        const run = findReusableRun(state, engine, fp)
-        if (run && existsSync(clipsPathFor(hash, run.runId))) return { kind: 'shown', state: await showRun(hash, run.runId) }
-      }
+      // Engine-Wechsel zeigt das zuletzt fertige Ergebnis dieser Engine an (zuerst das zuletzt angezeigte), ohne neue Berechnung.
+      // Geänderte Optionen (Suchwunsch, Typ, Anzahl) wirken erst bei „Neu berechnen“, nicht beim bloßen Wechseln.
+      const done = state.runs.filter((r) => r.engineId === engine && (r.status === 'done' || r.status === 'incomplete') && existsSync(clipsPathFor(hash, r.runId)))
+      const run = done.find((r) => r.runId === state.view[engine]) ?? [...done].sort((x, y) => y.createdAt.localeCompare(x.createdAt))[0]
+      if (run) return { kind: 'shown', state: await showRun(hash, run.runId) }
     }
     const missing = await deps.missingModels(engine)
     if (missing.length) return { kind: 'needs-models', state, missing }

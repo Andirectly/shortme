@@ -12,3 +12,19 @@ export function mergeShortShots<T extends Pick<ShortmeShot, 'start' | 'end'>>(sh
   }
   return out
 }
+
+/** Layout-Wechsel exakt auf den Videoschnitt legen: Die Planung rechnet in 0,2-s-Schritten, der echte Schnitt liegt bis zu 0,1 s daneben (sichtbar als ein Bild mit falschem Ausschnitt). */
+export function snapShotsToCuts<T extends Pick<ShortmeShot, 'start' | 'end'>>(shots: T[], clipStart: number, cuts: number[], tol = 0.35): T[] {
+  const out = shots.map((s) => ({ ...s }))
+  for (let i = 1; i < out.length; i++) {
+    const abs = clipStart + out[i].start
+    let best: number | null = null
+    for (const c of cuts) if (Math.abs(c - abs) <= tol && (best === null || Math.abs(c - abs) < Math.abs(best - abs))) best = c
+    if (best === null) continue
+    const t = best - clipStart
+    // nie eine Einstellung auf null stauchen
+    if (t <= out[i - 1].start + 0.1 || t >= out[i].end - 0.1) continue
+    out[i - 1].end = t; out[i].start = t
+  }
+  return out
+}

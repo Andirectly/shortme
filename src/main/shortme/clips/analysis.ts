@@ -7,7 +7,8 @@ import { markStage, projectFile, type ProjectMeta } from '../project'
 import { writeFileAtomic } from '../atomic'
 import { loadTranscript } from '../transcription'
 import { signalsFromWav, type Signals } from './signals'
-import { detectShots } from './scenes'
+import { detectShots, refineCuts } from './scenes'
+import { snapShotsToCuts } from '../../../shared/shots'
 import { collecting, notifyLearnChange } from '../../learn/store'
 import { applyAcceptedRules } from '../../learn/rules'
 import { fetchTrend } from '../../learn/trend'
@@ -133,7 +134,8 @@ export async function ensureSignals(meta: ProjectMeta): Promise<Signals> {
 
 export async function ensureShots(meta: ProjectMeta, signal?: AbortSignal, onProgress?: (f: number) => void): Promise<number[]> {
   if (!(await assets.isInstalled('transnetv2'))) return []
-  return cached(meta.hash, 'shots.json', () => detectShots(meta.sourcePath, meta.durationSec, signal, onProgress))
+  // shots.json = grobe Zeiten (25 Bilder/s); shots-exact.json = auf die echten Bilder gelegt (ältere Projekte werden hier einmalig nachgezogen)
+  return cached(meta.hash, 'shots-exact.json', async () => refineCuts(meta.sourcePath, await cached(meta.hash, 'shots.json', () => detectShots(meta.sourcePath, meta.durationSec, signal, onProgress)), signal))
 }
 
 /** Stufe „Analysieren + Clips finden“: Signale → Kamerawechsel → LLM-Auswahl (oder TextTiling) → clips.json. */
@@ -246,7 +248,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
       const l = await layoutForClip(meta, clips[i], cuts, opts.signal, undefined, plan)
       layouts[i] = l
       await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(l.input))
-      let shots = guardEmptyShots(l.shots, l.input) // Sicherheitsnetz: keine Person im Ausschnitt → Ganzes Bild
+      let shots = snapShotsToCuts(guardEmptyShots(l.shots, l.input), clips[i].start, cuts) // Sicherheitsnetz: keine Person im Ausschnitt → Ganzes Bild; Wechsel exakt auf den Videoschnitt
       let penalty = l.penalty
       let stream: StreamLayout | undefined
       if (frame === 'fit') shots = [{ start: 0, end: clips[i].end - clips[i].start, layout: 'fit', cx: 0.5, zoom: 1 }]

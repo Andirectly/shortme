@@ -100,7 +100,7 @@ describe('Umschalter-Entscheidung im Main-Prozess', () => {
     const busy = await switchEngine({ hash: HASH, engine: 'multimodal-v2' }, deps({ hasActiveJob: () => true }))
     expect(busy.kind).toBe('busy')
   })
-  it('passendes V2-Ergebnis wird angezeigt, ohne neuen Lauf; geänderte Optionen starten neu', async () => {
+  it('vorhandenes V2-Ergebnis wird beim Wechsel angezeigt, auch bei geänderten Optionen; ohne Ergebnis startet ein Lauf', async () => {
     const { switchEngine, analysisFingerprint } = await import('../src/main/shortme/clips/engines/control')
     const { registerRun, clipsPathFor } = await import('../src/main/shortme/clips/engines/state')
     const { loadTranscript } = await import('../src/main/shortme/transcription')
@@ -117,7 +117,7 @@ describe('Umschalter-Entscheidung im Main-Prozess', () => {
     const d = deps()
     const same = await switchEngine({ hash: HASH, engine: 'multimodal-v2' }, d)
     expect(same.kind).toBe('shown'); expect(d.started).toBe(0)
-    const other = await switchEngine({ hash: HASH, engine: 'multimodal-v2', query: 'Rap' }, d)
-    expect(other.kind).toBe('started'); expect(d.started).toBe(1)
+    const other = await switchEngine({ hash: HASH, engine: 'multimodal-v2', query: 'Rap', wanted: 3 }, d)
+    expect(other.kind).toBe('shown'); expect(d.started).toBe(0)
   })
 })
