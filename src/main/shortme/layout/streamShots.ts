@@ -22,11 +22,11 @@ export function scenesOf(start: number, end: number, cuts: number[], minSec = 1.
  * Shots des Clips (Zeiten relativ zum Clipbeginn) mit Stream-Szenen versehen: Szenen mit Facecam → ein Shot `stream`; die übrigen
  * behalten den Smart-Plan (`planned`), hart geschnitten an den Szenengrenzen.
  */
-export function mergeStreamScenes(clipStart: number, clipEnd: number, planned: ShortmeShot[], scenes: Array<Scene & { cam: boolean }>, base: StreamLayout): ShortmeShot[] {
+export function mergeStreamScenes(clipStart: number, clipEnd: number, planned: ShortmeShot[], scenes: Array<Scene & { cam: boolean; /** Eigene Facecam dieser Szene (z. B. Blick eines anderen Streamers); sonst die Kanal-Facecam. */ stream?: StreamLayout }>, base: StreamLayout): ShortmeShot[] {
   const out: ShortmeShot[] = []
   for (const sc of scenes) {
     const a = sc.start - clipStart, b = sc.end - clipStart
-    if (sc.cam) { out.push({ start: a, end: b, layout: 'stream', cx: 0.5, zoom: 1, stream: base }); continue }
+    if (sc.cam) { out.push({ start: a, end: b, layout: 'stream', cx: 0.5, zoom: 1, stream: sc.stream ?? base }); continue }
     for (const p of planned) {
       const s = Math.max(a, p.start), e = Math.min(b, p.end)
       if (e - s > 1e-3) out.push({ ...p, start: s, end: e })
@@ -36,9 +36,17 @@ export function mergeStreamScenes(clipStart: number, clipEnd: number, planned: S
   const merged: ShortmeShot[] = []
   for (const s of out) {
     const p = merged[merged.length - 1]
-    if (p && p.layout === 'stream' && s.layout === 'stream') p.end = s.end
+    if (p && p.layout === 'stream' && s.layout === 'stream' && sameCam(p.stream?.cam, s.stream?.cam)) p.end = s.end
     else merged.push({ ...s })
   }
   if (merged.length) { merged[0].start = 0; merged[merged.length - 1].end = clipEnd - clipStart }
   return merged
+}
+
+/** Zwei Facecam-Rahmen praktisch gleich? (Überdeckung ≥ 0,6) – verhindert, dass dieselbe Kamera in jeder Szene als „neue“ gilt. */
+export function sameCam(a?: { x: number; y: number; w: number; h: number }, b?: { x: number; y: number; w: number; h: number }): boolean {
+  if (!a || !b) return a === b
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
+  if (w <= 0 || h <= 0) return false
+  return (w * h) / (a.w * a.h + b.w * b.h - w * h) >= 0.6
 }

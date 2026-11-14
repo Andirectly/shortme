@@ -240,7 +240,7 @@ function CreateSheet(): React.JSX.Element {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 24px', borderTop: '1px solid var(--edge)' }}>
-              {imported && <small style={{ marginRight: 'auto', alignSelf: 'center' }} title="Grobe Schätzung; sie passt sich nach dem ersten kompletten Lauf an diesen Rechner an.">Dauer etwa {fmtEta(totalSec(estimateStages(imported.meta.durationSec, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined, getSpeed())))}</small>}
+              {imported && <small style={{ marginRight: 'auto', alignSelf: 'center' }} title="Grobe Schätzung; sie passt sich nach dem ersten kompletten Lauf an diesen Rechner an.">Dauer etwa {fmtEta(totalSec(estimateStages(imported.meta.durationSec, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined, getSpeed(), startEngine)))}</small>}
               <Button variant="secondary" onClick={() => openSheet(false)}>Abbrechen</Button>
               <Button variant="primary" disabled={(!!imported && !imported.preflight.ok) || (startEngine === 'multimodal-v2' && startMissing.length > 0)} onClick={() => void start()}><Sparkles size={16} /> Clips finden</Button>
             </div>

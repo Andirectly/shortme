@@ -20,7 +20,8 @@ import { loadHeat } from './heat'
 import { loadChatSignal } from '../../twitch/chat'
 import { loadProfile, channelLayout } from '../profiles'
 import { applySecondPass, secondPassKind } from './secondPass'
-import { findFacecam, camHasFace } from '../layout/facecam'
+import { findFacecam } from '../layout/facecam'
+import { classifyScenes } from '../layout/streamScenes'
 import { mergeStreamScenes, scenesOf } from '../layout/streamShots'
 import { defaultStream, type StreamLayout } from '../../../shared/streamLayout'
 import type { ContentType, FrameChoice } from '../../../shared/videoKind'
@@ -222,6 +223,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   const plan: Partial<PlanOptions> = { allowSplit: profile.tracking.split && frame !== 'fixed', follow: frame === 'fixed' ? 'fixed' : profile.tracking.follow }
   // Facecam + Gameplay: Layout des Kanals (gespeichert) oder Facecam im Video finden; ohne Facecam bleibt es beim Gameplay-Ausschnitt
   let streamBase: StreamLayout | null = null
+  const otherCams: StreamLayout[] = [] // weitere Facecams (andere Streamer-Ansichten), über alle Clips des Laufs geteilt
   if (frame === 'stream') {
     report('layout', 0, 'Facecam suchen …')
     const dims = { width: meta.width, height: meta.height }
@@ -256,7 +258,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
         penalty = 0 // Gesichtsquote sagt bei Streams nichts: das Gameplay ist der Inhalt
         if (streamBase) {
           const base = streamBase
-          const scenes = await Promise.all(scenesOf(clips[i].start, clips[i].end, cuts).map(async (sc) => ({ ...sc, cam: await camHasFace(meta.sourcePath, (sc.start + sc.end) / 2, base.cam, opts.signal).catch(() => false) })))
+          const scenes = await classifyScenes(meta.sourcePath, scenesOf(clips[i].start, clips[i].end, cuts), base, { width: meta.width, height: meta.height }, otherCams, opts.signal)
           shots = mergeStreamScenes(clips[i].start, clips[i].end, shots, scenes, base)
           stream = base
         } else shots = [{ start: 0, end: clips[i].end - clips[i].start, layout: 'fixed', cx: 0.5, zoom: 1 }]

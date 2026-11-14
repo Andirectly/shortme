@@ -18,7 +18,7 @@ const ALIAS: Record<string, Stage> = { llm: 'topics', texttiling: 'topics', thum
  * Sekunden je Stufe, gemessen auf einer RTX 5090 mit Parakeet + Qwen3-14B (1 h 47: Transkription 5 min, Kamerawechsel 10 min,
  * KI-Teil mit 10 Kandidaten 3 min). Andere Rechner weichen ab: `scale` (gemessen aus früheren Läufen) rechnet das um.
  */
-export function estimateStages(durationSec: number, wanted?: number, scale = 1): Record<Stage, number> {
+export function estimateStages(durationSec: number, wanted?: number, scale = 1, engine: 'legacy' | 'multimodal-v2' = 'legacy'): Record<Stage, number> {
   const dur = Math.max(60, durationSec)
   const n = wanted ?? defaultWanted(dur)
   const words = (dur / 60) * 140
@@ -38,6 +38,17 @@ export function estimateStages(durationSec: number, wanted?: number, scale = 1):
     snap: 0.5 * n,
     proofread: 3 * n,
     layout: 10 + 3 * n
+  }
+  if (engine === 'multimodal-v2') {
+    // Neue Engine (gemessen auf RTX 5090, 293-s-Stream mit 11 Ereignissen: Text 15 s, Bild 4+43 s, Ton 14 s, Bewerten/Planen 55–70 s, Prüfen+Vergleich 85–130 s, Titel 18 s).
+    // Die Zeit hängt an der Zahl der Ereignisse (Detailprüfung höchstens 50), nicht an der Videolänge allein; je Modellwechsel kommen ca. 8 s Ladezeit dazu.
+    const ev = Math.min(50, Math.max(8, Math.round(dur / 26)))
+    s.topics = 0
+    s.candidates = (dur / 150) * 6 + 8
+    s.rate = 0.012 * dur + 5.5 * ev + 20
+    s.snap = 7 * ev + 25
+    s.compare = 3.5 * ev + Math.min(36, 1.6 * ev) * 4.4 + 8
+    s.proofread = 3.5 * n + 5
   }
   for (const k of STAGES) s[k] *= scale
   return s

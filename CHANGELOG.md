@@ -17,6 +17,8 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
 ### Fixed
 
+- Restzeit-Anzeige springt nicht mehr (10 → 45 Minuten): die neue Engine hat eine eigene Zeitschätzung und meldet ihren Fortschritt gleichmäßig je Stufe.
+- Streams mit wechselnder Facecam: Wechselt der Stream auf die Ansicht eines anderen Streamers, wird dessen Facecam erkannt und genauso eingebunden (Facecam + Gameplay) statt als Smart-Ausschnitt ohne Facecam (gilt für neu berechnete Clips).
 - Layout-Wechsel (z. B. Vollbild ↔ Smart) sitzen jetzt exakt auf dem Videoschnitt statt ein Bild später: Schnittzeiten werden an den echten Bildern nachgemessen, und die Wechsel rasten darauf ein (gilt für neu berechnete Clips).
 - Der Wechsel zwischen Bisheriger und Neuer Engine zeigt vorhandene Ergebnisse sofort an, statt neu zu rechnen. Geänderte Optionen wirken erst bei „Neu berechnen“.
 

@@ -49,3 +49,18 @@ describe('Dauer-Schätzung', () => {
     expect(fmtEta(120 * 60)).toBe('2 Std')
   })
 })
+
+describe('Dauer-Schätzung neue Engine', () => {
+  it('Messpunkt: 293-s-Stream, 5 Clips → KI-Teil im gemessenen Bereich (254–337 s Gesamtlauf inkl. Layout)', () => {
+    const e = estimateStages(293, 5, 1, 'multimodal-v2')
+    const ki = e.candidates + e.rate + e.snap + e.compare + e.proofread
+    expect(ki).toBeGreaterThan(200); expect(ki).toBeLessThan(420)
+    expect(e.topics).toBe(0)
+  })
+  it('wächst mit der Ereigniszahl, aber begrenzt (Detailprüfung höchstens 50)', () => {
+    const t = (d: number): number => totalSec(estimateStages(d, 10, 1, 'multimodal-v2'))
+    expect(t(3 * 3600)).toBeGreaterThan(t(1200))
+    const ki = (d: number): number => { const e = estimateStages(d, 10, 1, 'multimodal-v2'); return e.snap + e.compare }
+    expect(ki(10 * 3600)).toBeCloseTo(ki(6 * 3600), -2) // ab 50 Ereignissen gedeckelt (Bewerten, Planen, Vergleichen)
+  })
+})

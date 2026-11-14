@@ -113,7 +113,7 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
   report('rate', 0, 'Bild prüfen …')
   try {
     await stage('bild', () => withVision(async (url) => {
-      const sw = await stage('bild-rundgang', () => sweep(project.sourcePath, url, dur, { maxFrames: SWEEP_MAX_FRAMES, signal, modelRev: V2_MODELS.vision, onProgress: (f) => report('rate', f * 0.35, 'Bild-Rundgang …') }))
+      const sw = await stage('bild-rundgang', () => sweep(project.sourcePath, url, dur, { maxFrames: SWEEP_MAX_FRAMES, signal, modelRev: V2_MODELS.vision, onProgress: (f) => report('rate', f * 0.15, 'Bild-Rundgang …') }))
       raw.push(...sw.proposals); addEv(sw.evidence)
       for (let i = 0; i < sw.sampled; i++) sweepCov.push([(i + 0.5) * sw.step - sw.step / 2, (i + 0.5) * sw.step + sw.step / 2])
       diag.sweep = { sampled: sw.sampled, failed: sw.failed, stepSec: Math.round(sw.step), calls: sw.calls, proposals: sw.proposals.length }
@@ -127,7 +127,7 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
       diag.events = { raw: raw.length, clustered: events.length, picked: picked.length, timeBinsCovered: `${pick.binsCovered}/${pick.bins}`, skipped: pick.skipped.length }
       let i = 0
       for (const ev of picked.filter(needsVision)) {
-        report('rate', 0.35 + 0.65 * (i++ / Math.max(1, picked.filter(needsVision).length)), `Bild prüfen (${i}/${picked.filter(needsVision).length}) …`)
+        report('rate', 0.15 + 0.5 * (i++ / Math.max(1, picked.filter(needsVision).length)), `Bild prüfen (${i}/${picked.filter(needsVision).length}) …`)
         const o = await observeVision(url, project.sourcePath, ev, `vo-${ev.id}`, V2_MODELS.vision, signal)
         addEv([o]); ev.evidenceIds.push(o.id); visionRan.add(ev.id)
       }
@@ -144,14 +144,14 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
   }
 
   // ---------------------------------------------------------------------------------------------------------------------------------- 4. Tonprüfung
-  report('rate', 0.7, 'Ton prüfen …')
+  report('rate', 0.65, 'Ton prüfen …')
   const audioTargets = picked.filter(needsAudio)
   let audioOk = 0, audioFailed = 0
   if (audioTargets.length) {
     try {
       await stage('ton', () => withAudio(async (url) => {
         for (let i = 0; i < audioTargets.length; i++) {
-          report('rate', 0.7 + 0.3 * (i / audioTargets.length), `Ton prüfen (${i + 1}/${audioTargets.length}) …`)
+          report('rate', 0.65 + 0.35 * (i / audioTargets.length), `Ton prüfen (${i + 1}/${audioTargets.length}) …`)
           const ev = audioTargets[i]
           const o = await observeAudio(url, wav, ev, `ao-${ev.id}`, V2_MODELS.audio, signal)
           addEv([o]); ev.evidenceIds.push(o.id)
@@ -176,7 +176,7 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
   const fusedById = new Map<string, Judged>()
   await stage('bewerten+planen', () => withLlm(async (url) => {
     for (let i = 0; i < picked.length; i++) {
-      report('rate', 0.0, `Ereignisse bewerten (${i + 1}/${picked.length}) …`)
+      report('snap', 0.45 * (i / picked.length), `Ereignisse bewerten (${i + 1}/${picked.length}) …`)
       const fused = { ...(await fuseEvent(url, picked[i], evidence, sentences, signal)), strength: picked[i].strength } as Ev
       const j = await rateEvent(url, fused, evidence, sentences, req.contentType, signal)
       judged.push(j); fusedById.set(fused.id, j)
@@ -188,7 +188,7 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
     const finalists = [...ranked.filter((j) => j.rating.quality !== 'ungeprueft').slice(0, V2_LIMITS.finalists - unchecked.length), ...unchecked]
     for (const j of judged) if (!finalists.includes(j)) dropped.push({ eventId: j.event.id, reason: j.rating.quality === 'schwach' ? 'Qualität schwach' : 'nicht unter den Finalisten (Budget)' })
     for (let i = 0; i < finalists.length; i++) {
-      report('snap', i / finalists.length, `Schnitte planen (${i + 1}/${finalists.length}) …`)
+      report('snap', 0.45 + 0.4 * (i / finalists.length), `Schnitte planen (${i + 1}/${finalists.length}) …`)
       const ev = finalists[i].event
       const perf = ev.evidenceIds.map((id) => evidence.get(id)?.performance).find((p) => !!p) ?? null
       const base = baselineKeep(ev, perf, ctx, lim)
@@ -215,7 +215,7 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
       try {
         await stage('nahtpruefung', () => withAudio(async (url) => {
           for (let i = 0; i < cutVariants.length; i++) {
-            report('snap', 0.5 + 0.5 * (i / cutVariants.length), `Schnittnähte hören (${i + 1}/${cutVariants.length}) …`)
+            report('snap', 0.85 + 0.15 * (i / cutVariants.length), `Schnittnähte hören (${i + 1}/${cutVariants.length}) …`)
             const v = cutVariants[i]
             let ok = true
             for (let k = 1; k < v.keep.length && ok; k++) {
@@ -237,7 +237,7 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
     // Prüfung am tatsächlich erhaltenen Material
     const all = [...variants.values()].flat()
     for (let i = 0; i < all.length; i++) {
-      report('compare', 0, `Schnitte prüfen (${i + 1}/${all.length}) …`)
+      report('compare', 0.3 * (i / Math.max(1, all.length)), `Schnitte prüfen (${i + 1}/${all.length}) …`)
       const v = all[i]
       const j = fusedById.get(v.eventId)!
       try {
@@ -257,8 +257,8 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
     cands.sort((a, b) => TIER[b.j.rating.quality] - TIER[a.j.rating.quality])
     const cap = cands.slice(0, V2_LIMITS.finalists)
     const cmpCands: CompareCand[] = cap.map(({ v, j }) => ({ id: v.variantId, kind: j.event.kind, durationSec: outputDuration(v.keep), text: keptText(v.keep, sentences).slice(0, 1400) || '(keine Sprache)', evidence: evidenceLines(j.event.evidenceIds.filter((id) => { const e = evidence.get(id); return e && evidenceInKeep(e, v.keep) }), evidence).slice(0, 700) }))
-    report('compare', 0.1, 'Vorschläge vergleichen …')
-    const cmp = await compareAll(url, cmpCands, { matches: V2_LIMITS.matches, k: wanted, signal, onProgress: (f) => report('compare', 0.1 + 0.9 * f, 'Vorschläge vergleichen …') })
+    report('compare', 0.3, 'Vorschläge vergleichen …')
+    const cmp = await compareAll(url, cmpCands, { matches: V2_LIMITS.matches, k: wanted, signal, onProgress: (f) => report('compare', 0.3 + 0.7 * f, 'Vorschläge vergleichen …') })
     compareInfo = { candidates: cmpCands.length, judgements: cmp.judgements.length, modelCalls: cmp.calls, failedCalls: cmp.failedCalls, connected: cmp.connected, ranked: cmp.strength !== null }
     judgementsLog = cmp.judgements.map((x) => ({ a: cmpCands[x.a].id, b: cmpCands[x.b].id, ab: x.ab, ba: x.ba, outcome: x.outcome, reason: x.reason }))
     if (!cmp.strength && cmpCands.length > 1) problems.push('Vergleich unvollständig: keine gemeinsame Rangordnung, Reihenfolge nach Ereignisqualität')
