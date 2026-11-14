@@ -113,6 +113,8 @@ export function installEngineLifecycle(): void {
     e.preventDefault()
     done = true
     const t = Date.now()
+    // Notausgang: hängt das Aufräumen (Kindprozess, offener Auftrag), bleibt sonst ein unsichtbarer Prozess zurück, der den nächsten Start blockiert
+    setTimeout(() => app.exit(0), 6000)
     void killAllSidecars().finally(() => { if (process.env.SHORTME_SELFTEST) console.log(`SELFTEST sidecars killed in ${Date.now() - t}ms`); app.quit() })
   })
   process.once('exit', () => { void killAllSidecars() })
