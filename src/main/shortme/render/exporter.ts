@@ -17,6 +17,7 @@ import { buildAss, type CapWord } from './ass'
 import { renderTitleOverlay } from './titleOverlay'
 import { streamSeamY } from '../../../shared/streamLayout'
 import { compositeOverlay, remotionAvailable, renderRemotionOverlay } from '../../remotion/render'
+import { mergeShortShots } from '../../../shared/shots'
 import { buildPieces, keepsFromCuts, planPauseCuts, TimeMap, type Interval } from './timeline'
 import { safeFileName, uniquePath, type QualityTier } from './profiles'
 
@@ -59,7 +60,7 @@ export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signa
   const cuts = mergeIntervals([...(removePauses ? planPauseCuts(range, words, signals.silences, t.speech) : []), ...extraCuts.filter((c) => c[1] > range[0] && c[0] < range[1])])
   const map = new TimeMap(keepsFromCuts(range, cuts))
   const fallback: ShortmeShot = { start: 0, end: clip.end - clip.start, layout: 'fixed', cx: 0.5, zoom: 1 }
-  const pieces = buildPieces(map, clip.shots?.length ? clip.shots : [fallback], clip.start)
+  const pieces = buildPieces(map, clip.shots?.length ? mergeShortShots(clip.shots) : [fallback], clip.start)
   const tagByWord = new Map(clip.tags.map((g) => [g.word, g.kind]))
   const capWords: CapWord[] = map.words(words.map((w, i) => ({ w: wordEdits[clip.firstWord + i] ?? w.w, start: w.start, end: w.end, tag: tagByWord.get(clip.firstWord + i) })))
   return { map, pieces, cuts, words: capWords, duration: map.duration }

@@ -62,24 +62,24 @@ export function CaptionControls({ value, onLive, onCommit, fonts, onImportFonts,
         </div>
       </Row>
       <Row label="Großbuchstaben" toggle={<Switch on={c.upper} onChange={(b) => set({ upper: b })} label="Großbuchstaben" />} />
-      <Row label="Kontur" toggle={<Switch on={c.outline.enabled} onChange={(b) => set({ outline: { enabled: b } })} label="Kontur" />}>
-        {c.outline.enabled && <Lv label="Breite" value={c.outline.widthPct} min={2} max={14} onLive={(v) => live({ outline: { widthPct: v } })} onCommit={(v) => set({ outline: { widthPct: v } })} />}
+      <Row off={!c.outline.enabled} label="Kontur" toggle={<Switch on={c.outline.enabled} onChange={(b) => set({ outline: { enabled: b } })} label="Kontur" />}>
+        <Lv label="Breite" value={c.outline.widthPct} min={2} max={14} onLive={(v) => live({ outline: { widthPct: v } })} onCommit={(v) => set({ outline: { widthPct: v } })} />
       </Row>
-      <Row label="Schatten" toggle={<Switch on={c.shadow.enabled} onChange={(b) => set({ shadow: { enabled: b } })} label="Schatten" />}>
-        {c.shadow.enabled && <>
+      <Row off={!c.shadow.enabled} label="Schatten" toggle={<Switch on={c.shadow.enabled} onChange={(b) => set({ shadow: { enabled: b } })} label="Schatten" />}>
+        <>
           <Lv label="Weichzeichnung" value={c.shadow.blurPct} min={2} max={30} onLive={(v) => live({ shadow: { blurPct: v } })} onCommit={(v) => set({ shadow: { blurPct: v } })} />
           <Lv label="Deckkraft" value={c.shadow.opacity * 100} min={10} max={100} onLive={(v) => live({ shadow: { opacity: v / 100 } })} onCommit={(v) => set({ shadow: { opacity: v / 100 } })} />
-        </>}
+        </>
       </Row>
-      <Row label="Glow" toggle={<Switch on={c.glow.enabled} onChange={(b) => set({ glow: { enabled: b } })} label="Glow" />}>
-        {c.glow.enabled && <>
+      <Row off={!c.glow.enabled} label="Glow" toggle={<Switch on={c.glow.enabled} onChange={(b) => set({ glow: { enabled: b } })} label="Glow" />}>
+        <>
           <Lv label="Stärke" value={c.glow.strength} min={0} max={100} onLive={(v) => live({ glow: { strength: v } })} onCommit={(v) => set({ glow: { strength: v } })} />
           <Segmented options={['Weiß', 'Gelb', 'Folgt Hervorhebung']} value={c.glow.color === 'white' ? 'Weiß' : c.glow.color === 'yellow' ? 'Gelb' : 'Folgt Hervorhebung'} onChange={(n) => set({ glow: { color: (n === 'Weiß' ? 'white' : n === 'Gelb' ? 'yellow' : 'highlight') as GlowColor } })} />
           <Row label="Stärker auf aktivem Wort" toggle={<Switch on={c.glow.activeBoost} onChange={(b) => set({ glow: { activeBoost: b } })} label="Stärker auf aktivem Wort" />} />
-        </>}
+        </>
       </Row>
-      <Row label="Box" toggle={<Switch on={c.box.enabled} onChange={(b) => set({ box: { enabled: b } })} label="Box" />}>
-        {c.box.enabled && <Lv label="Deckkraft" value={c.box.opacity * 100} min={10} max={100} onLive={(v) => live({ box: { opacity: v / 100 } })} onCommit={(v) => set({ box: { opacity: v / 100 } })} />}
+      <Row off={!c.box.enabled} label="Box" toggle={<Switch on={c.box.enabled} onChange={(b) => set({ box: { enabled: b } })} label="Box" />}>
+        <Lv label="Deckkraft" value={c.box.opacity * 100} min={10} max={100} onLive={(v) => live({ box: { opacity: v / 100 } })} onCommit={(v) => set({ box: { opacity: v / 100 } })} />
       </Row>
     </div>
   )

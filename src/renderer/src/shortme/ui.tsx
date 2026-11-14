@@ -42,11 +42,12 @@ export function Switch({ on, onChange, label }: { on: boolean; onChange: (b: boo
 export const Score = ({ v }: { v: number }): React.JSX.Element => <span className="sm-score">{v}</span>
 
 /** Zeile mit Titel; toggle steht rechts in der Titelzeile (z. B. Schalter). hint wird bewusst nicht angezeigt (keine Erklärtexte). */
-export function Row({ label, children, toggle }: { label: string; children?: ReactNode; hint?: string; toggle?: ReactNode }): React.JSX.Element {
+/** off: Unterregler bleiben sichtbar (kein Springen der Oberfläche), sind aber abgeblendet und gesperrt. */
+export function Row({ label, children, toggle, off }: { label: string; children?: ReactNode; hint?: string; toggle?: ReactNode; off?: boolean }): React.JSX.Element {
   return (
     <div style={{ display: 'grid', gap: 8, padding: '9px 0', borderTop: '1px solid var(--edge)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 26 }}><h3 style={{ flex: 1 }}>{label}</h3>{toggle}</div>
-      {children}
+      {off ? <div aria-disabled="true" style={{ display: "grid", gap: 8, opacity: 0.35, pointerEvents: "none" }}>{children}</div> : children}
     </div>
   )
 }

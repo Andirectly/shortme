@@ -169,10 +169,13 @@ export function EditorScreen(): React.JSX.Element {
   const [scope, setScope] = useState('Ganzer Clip')
   const [kindNext, setKindNext] = useState<ContentType | null>(null)
   const shotKey = useRef('')
+  /** Zeit des Bildes, das der Player wirklich gerade zeigt (nicht currentTime, das dem Bild vorauseilt) – sonst bekommt das letzte Bild einer Szene schon den Ausschnitt der nächsten. */
+  const frameTimeRef = useRef<number | null>(null)
 
   const currentShot = useCallback((abs: number): ShotView => {
     const p = planRef.current
-    const piece = p?.pieces.find((x) => abs >= x.src0 && abs < x.src1) ?? p?.pieces[p.pieces.length - 1]
+    // Liegt die Zeit in einer entfernten Lücke, gilt der Ausschnitt des Stücks davor (nie des letzten Stücks des Clips)
+    const piece = p?.pieces.find((x) => abs >= x.src0 && abs < x.src1) ?? [...(p?.pieces ?? [])].reverse().find((x) => x.src1 <= abs) ?? p?.pieces[0]
     if (piece) return { shot: piece.shot, zoom: piece.zoom }
     return { shot: { layout: 'fixed', cx: 0.5 }, zoom: 1 }
   }, [])
@@ -183,7 +186,7 @@ export function EditorScreen(): React.JSX.Element {
     if (!v || !c || !v.videoWidth) return
     const ctx = c.getContext('2d')
     if (!ctx) return
-    const cur0 = currentShot(v.currentTime)
+    const cur0 = currentShot(frameTimeRef.current ?? v.currentTime)
     const live = streamLiveRef.current
     const cur: ShotView = live && cur0.shot.layout === 'stream' && cur0.shot.stream ? { ...cur0, shot: { ...cur0.shot, stream: { ...cur0.shot.stream, ...live } } } : cur0
     drawLayout(ctx, v, { width: v.videoWidth, height: v.videoHeight }, cur.shot, cur.zoom, CANVAS_W, CANVAS_H)
@@ -204,6 +207,9 @@ export function EditorScreen(): React.JSX.Element {
     if (!v || !srcUrl) return
     let raf = 0
     let last = 0
+    let vfc = 0
+    const onFrame = (_now: number, meta: { mediaTime: number }): void => { frameTimeRef.current = meta.mediaTime; vfc = v.requestVideoFrameCallback(onFrame) }
+    vfc = v.requestVideoFrameCallback(onFrame)
     const tick = (now: number): void => {
       const abs = v.currentTime
       if (!v.paused) {
@@ -219,7 +225,7 @@ export function EditorScreen(): React.JSX.Element {
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    return () => { cancelAnimationFrame(raf); v.cancelVideoFrameCallback(vfc) }
   }, [srcUrl, origStart, draw])
 
   useEffect(() => {
