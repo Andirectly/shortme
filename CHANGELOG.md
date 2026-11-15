@@ -6,6 +6,13 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.33.0] - 2026-11-15
+
+### Added
+
+- Engine 3 (Adaptive AI, Beta): sucht per Bild-Embedding (Qwen3-VL-Embedding-2B, lokal) über das ganze Video, mit Profilen Schnell/Ausgewogen/Gründlich. Dritter Schalter im Erstellen-Dialog und in der Clip-Liste. Braucht die Python-Laufzeit (Knopf „Python-Laufzeit installieren") und das Modell (ca. 4,3 GB, Modell-Manager).
+- Engines vergleichen: Ergebnisse mehrerer Läufe desselben Videos Ereignis für Ereignis zuordnen, blind bewerten (A/B/C), Zuordnung per Hand trennen/zusammenführen.
+
 ## [0.32.0] - 2026-11-14
 
 ### Added
