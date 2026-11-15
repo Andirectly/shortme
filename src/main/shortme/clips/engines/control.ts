@@ -13,9 +13,9 @@ import type { ContentType } from '../../../../shared/videoKind'
 
 const defaultFile = (): string => join(dataRoot(), 'engine-default.json')
 
-/** Standard-Engine für neue Projekte (zunächst Legacy, bis der Nutzer etwas anderes wählt). */
+/** Standard-Engine für neue Projekte (zunächst Engine 3, bis der Nutzer etwas anderes wählt). */
 export async function loadDefaultEngine(): Promise<SelectionEngineId> {
-  try { const e = (JSON.parse(await readFile(defaultFile(), 'utf8')) as { engine?: unknown }).engine; return ENGINE_IDS.includes(e as SelectionEngineId) ? (e as SelectionEngineId) : 'legacy' } catch { return 'legacy' }
+  try { const e = (JSON.parse(await readFile(defaultFile(), 'utf8')) as { engine?: unknown }).engine; return ENGINE_IDS.includes(e as SelectionEngineId) ? (e as SelectionEngineId) : 'adaptive-v3' } catch { return 'adaptive-v3' }
 }
 export async function saveDefaultEngine(engine: SelectionEngineId): Promise<SelectionEngineId> {
   if (!ENGINE_IDS.includes(engine)) throw new Error('Unbekannte Engine')

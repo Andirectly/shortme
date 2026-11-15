@@ -134,7 +134,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     return !!get().clipsFile
   },
   engine: { hash: null, state: null, pending: false, msg: '', missing: [], modelsChecked: false },
-  startEngine: 'legacy',
+  startEngine: 'adaptive-v3',
   startProfile: (() => { try { const v = localStorage.getItem('sm.v3profile'); return isV3Profile(v) ? v : 'balanced' } catch { return 'balanced' } })(),
   setStartProfile: (p) => { try { localStorage.setItem('sm.v3profile', p) } catch { /* nur Komfort */ } set({ startProfile: p }) },
   startMissing: [],

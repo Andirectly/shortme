@@ -36,9 +36,11 @@ export function RuntimeInstall({ onDone }: { onDone: () => void }): React.JSX.El
   const [err, setErr] = useState('')
   const api = typeof window !== 'undefined' ? window.cutawan?.shortme : undefined
   useEffect(() => api?.onV3RuntimeProgress((l) => setLine(l)), [api])
+  const run = (): void => { setBusy(true); setErr(''); void api!.v3RuntimeInstall().then(onDone).catch((e: unknown) => setErr(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e))).finally(() => setBusy(false)) }
+  useEffect(() => { if (api) run() }, []) // eslint-disable-line react-hooks/exhaustive-deps -- startet die Installation einmal selbst
   return (
     <div style={{ display: 'grid', gap: 4, justifyItems: 'start' }}>
-      <Button variant="primary" disabled={busy || !api} onClick={() => { setBusy(true); setErr(''); void api!.v3RuntimeInstall().then(onDone).catch((e: unknown) => setErr(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e))).finally(() => setBusy(false)) }}>{busy ? 'Installiert …' : 'Python-Laufzeit installieren'}</Button>
+      <Button variant="primary" disabled={busy || !api} onClick={run}>{busy ? 'Installiert …' : 'Erneut versuchen'}</Button>
       {busy && line && <small style={{ maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{line}</small>}
       {err && <small role="alert" style={{ color: 'var(--warn)' }}>{err}</small>}
     </div>
