@@ -254,12 +254,17 @@ export function registerShortmeIpc(): void {
     const meta = await loadMeta(hash)
     if (!meta) return false
     const win = BrowserWindow.fromWebContents(e.sender)
-    const box = { type: 'warning' as const, buttons: ['Löschen', 'Abbrechen'], defaultId: 1, cancelId: 1, title: 'Projekt löschen', message: `„${meta.title}“ löschen?`, detail: 'Clips, Bearbeitungen und Analyse werden entfernt. Deine Originaldatei bleibt erhalten; ein per Link geladenes Video wird ebenfalls gelöscht.' }
-    const r = win ? await dialog.showMessageBox(win, box) : await dialog.showMessageBox(box)
-    if (r.response !== 0) return false
-    await discardProject(hash)
     const dl = resolve(dataRoot(), 'downloads')
-    if (resolve(meta.sourcePath).toLowerCase().startsWith(dl.toLowerCase())) await rm(meta.sourcePath, { force: true }).catch(() => undefined)
+    const inDl = resolve(meta.sourcePath).toLowerCase().startsWith(dl.toLowerCase())
+    // Eigene Originaldatei nur auf ausdrücklichen Wunsch (eigener Knopf) und dauerhaft entfernen.
+    const buttons = inDl ? ['Löschen', 'Abbrechen'] : ['Projekt löschen', 'Projekt + Originaldatei löschen', 'Abbrechen']
+    const cancel = buttons.length - 1
+    const box = { type: 'warning' as const, buttons, defaultId: cancel, cancelId: cancel, title: 'Projekt löschen', message: `„${meta.title}“ löschen?`, detail: inDl ? 'Clips, Bearbeitungen und Analyse werden entfernt; das per Link geladene Video wird ebenfalls gelöscht.' : `Clips, Bearbeitungen und Analyse werden entfernt. „Projekt + Originaldatei löschen“ entfernt zusätzlich die Videodatei dauerhaft von der Festplatte (nicht im Papierkorb):
+${meta.sourcePath}` }
+    const r = win ? await dialog.showMessageBox(win, box) : await dialog.showMessageBox(box)
+    if (r.response === cancel) return false
+    await discardProject(hash)
+    if (inDl || r.response === 1) await rm(meta.sourcePath, { force: true }).catch(() => undefined)
     return true
   })
   ipcMain.handle('shortme:projects', async () => {
