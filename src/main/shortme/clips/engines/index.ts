@@ -3,12 +3,13 @@
 import type { ShortmeClip } from '@shared/shortme'
 import { assets, withLlm } from '../../../engines'
 import { selectClips, type CandTrace, type SelectInput, type SelectOptions } from '../select'
-import type { ModalityStatus, RunInfo, SelectionEngineId } from '../../../../shared/engine'
+import type { ModalityStatus, RunInfo, SelectionEngineId, V3Profile } from '../../../../shared/engine'
 import { v2Revisions } from './v2/revisions'
+import { v3Revisions } from './v3/revisions'
 
 export interface SelectionOutcome {
   clips: ShortmeClip[]
-  mode: 'llm' | 'texttiling' | 'v2'
+  mode: 'llm' | 'texttiling' | 'v2' | 'v3'
   /** Nur Legacy: Kandidaten-Spur für das Lernen. */
   trace?: CandTrace[]
   /** Nur V2: Angaben zum Lauf (Modalitäten, Abdeckung, Modelle). */
@@ -21,6 +22,8 @@ export interface SelectionRequest {
   input: SelectInput
   options: Omit<SelectOptions, 'baseUrl'>
   noLlm?: boolean
+  /** Nur Engine 3: Analyseprofil (Schnell/Ausgewogen/Gründlich), beim Jobstart eingefroren. */
+  profile?: V3Profile
   /** Inhaltstyp des Videos (steuert u. a. die Bewertungsart der neuen Engine). */
   contentType?: string | null
   signal?: AbortSignal
@@ -45,14 +48,18 @@ async function selectLegacy(req: SelectionRequest): Promise<SelectionOutcome> {
 }
 
 /** Modell-/Prompt-/Algorithmusversionen der Engine für den Eingabefingerabdruck (Legacy: keine, sein Ergebnis hängt nicht an solchen Revisionen). */
-export function engineRevisions(engine: SelectionEngineId): string[] {
-  return engine === 'multimodal-v2' ? v2Revisions() : []
+export function engineRevisions(engine: SelectionEngineId, profile: V3Profile = 'balanced'): string[] {
+  return engine === 'multimodal-v2' ? v2Revisions() : engine === 'adaptive-v3' ? v3Revisions(profile) : []
 }
 
 export async function runSelection(req: SelectionRequest): Promise<SelectionOutcome> {
   if (req.engine === 'multimodal-v2') {
     const { selectV2 } = await import('./v2')
     return selectV2(req)
+  }
+  if (req.engine === 'adaptive-v3') {
+    const { selectV3 } = await import('./v3')
+    return selectV3(req)
   }
   return selectLegacy(req)
 }

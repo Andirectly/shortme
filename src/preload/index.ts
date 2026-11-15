@@ -32,7 +32,8 @@ import type { PlatformId, UploadOverview } from '@shared/upload'
 import type { WbOverview, WbProject, WbStatus, WorkItem } from '@shared/workbench'
 import type { LearnSettings } from '@shared/learn'
 import type { CatalogStatus } from '@shared/catalog'
-import type { AnalysisState, EngineSwitchResult, SelectionEngineId } from '@shared/engine'
+import type { BlindReview, EngineComparison, EventMatchOverride } from '@shared/compare'
+import type { AnalysisState, EngineSwitchResult, SelectionEngineId, V3Profile } from '@shared/engine'
 import type { LearnStats } from '@shared/learnStats'
 import type { Rule } from '@shared/learnStats'
 import type { LabResult, LabRunRequest, LabSource, ModelsView } from '@shared/models'
@@ -178,13 +179,22 @@ const api = {
   shortme: {
     importFile: (path: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importFile', path),
     importUrl: (url: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importUrl', url),
-    transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice; engine?: SelectionEngineId }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
+    transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice; engine?: SelectionEngineId; profile?: V3Profile }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
     engineState: (hash: string): Promise<{ state: AnalysisState; busy: boolean }> => ipcRenderer.invoke('shortme:engineState', hash),
-    engineSelect: (req: { hash: string; engine: SelectionEngineId; query?: string; contentType?: string | null; frame?: string | null; wanted?: number | null }): Promise<EngineSwitchResult> => ipcRenderer.invoke('shortme:engineSelect', req),
+    engineSelect: (req: { hash: string; engine: SelectionEngineId; query?: string; contentType?: string | null; frame?: string | null; wanted?: number | null; profile?: string | null }): Promise<EngineSwitchResult> => ipcRenderer.invoke('shortme:engineSelect', req),
     engineDefault: (): Promise<SelectionEngineId> => ipcRenderer.invoke('shortme:engineDefault'),
     engineMissing: (engine: SelectionEngineId): Promise<Array<{ id: string; name: string; sizeBytes: number }>> => ipcRenderer.invoke('shortme:engineMissing', engine),
     engineSetDefault: (engine: SelectionEngineId): Promise<SelectionEngineId> => ipcRenderer.invoke('shortme:engineSetDefault', engine),
-    recompute: (hash: string, o: { query?: string; contentType?: ContentType; frame?: FrameChoice; wanted?: number; engine?: SelectionEngineId }): Promise<{ jobId: string | null; missing?: Array<{ id: string; name: string; sizeBytes: number }> }> => ipcRenderer.invoke('shortme:recompute', hash, o),
+    compareCreate: (hash: string, runIds: string[]): Promise<EngineComparison> => ipcRenderer.invoke('shortme:compareCreate', hash, runIds),
+    compareList: (hash: string): Promise<Array<{ comparisonId: string; createdAt: string; runIds: string[] }>> => ipcRenderer.invoke('shortme:compareList', hash),
+    compareGet: (hash: string, id: string): Promise<{ c: EngineComparison; clips: Record<string, { title: string; start: number; end: number; score: number; autoCuts: Array<{ start: number; end: number }> }> } | null> => ipcRenderer.invoke('shortme:compareGet', hash, id),
+    compareOverride: (hash: string, id: string, o: Omit<EventMatchOverride, 'createdAt'>): Promise<EngineComparison> => ipcRenderer.invoke('shortme:compareOverride', hash, id, o),
+    compareBlind: (hash: string, id: string, matchId: string): Promise<string[]> => ipcRenderer.invoke('shortme:compareBlind', hash, id, matchId),
+    compareReview: (hash: string, id: string, r: { matchId: string; choice: BlindReview['choice']; reasonTags: string[] }): Promise<EngineComparison> => ipcRenderer.invoke('shortme:compareReview', hash, id, r),
+    v3RuntimeStatus: (): Promise<{ state: 'missing' | 'outdated' | 'ready'; detail: string }> => ipcRenderer.invoke('shortme:v3RuntimeStatus'),
+    v3RuntimeInstall: (): Promise<{ state: 'missing' | 'outdated' | 'ready'; detail: string }> => ipcRenderer.invoke('shortme:v3RuntimeInstall'),
+    onV3RuntimeProgress: (cb: (line: string) => void): (() => void) => { const h = (_e: unknown, l: string): void => cb(l); ipcRenderer.on('shortme:v3-runtime-progress', h); return () => ipcRenderer.removeListener('shortme:v3-runtime-progress', h) },
+    recompute: (hash: string, o: { query?: string; contentType?: ContentType; frame?: FrameChoice; wanted?: number; engine?: SelectionEngineId; profile?: V3Profile }): Promise<{ jobId: string | null; missing?: Array<{ id: string; name: string; sizeBytes: number }> }> => ipcRenderer.invoke('shortme:recompute', hash, o),
     jobs: (): Promise<ShortmeJob[]> => ipcRenderer.invoke('shortme:jobs'),
     pause: (id: string): Promise<void> => ipcRenderer.invoke('shortme:pause', id),
     resume: (id: string): Promise<void> => ipcRenderer.invoke('shortme:resume', id),

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { CLIPS } from './data'
 import { allClips } from './clipData'
 
-export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'live' | 'upload' | 'workbench' | 'learn' | 'settings' | 'processing' | 'clips' | 'editor'
+export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'live' | 'upload' | 'workbench' | 'learn' | 'settings' | 'processing' | 'clips' | 'editor' | 'compare'
 export type NavId = 'start' | 'projects' | 'studio' | 'live' | 'upload' | 'workbench' | 'learn' | 'models' | 'testlab' | 'settings'
 
 interface Op { label: string; undo: () => void; redo: () => void }

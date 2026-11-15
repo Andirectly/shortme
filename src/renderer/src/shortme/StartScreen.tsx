@@ -15,7 +15,8 @@ import { ProjectGrid } from './ProjectGrid'
 import { useSprings } from './motion'
 import { estimateStages, fmtEta, totalSec } from '@shared/estimate'
 import { getSpeed } from './speed'
-import { EngineSwitch } from './EngineSwitch'
+import { EngineSwitch, ProfilePicker, RuntimeInstall } from './EngineSwitch'
+import { ENGINE_BLURB, ENGINE_LABEL } from '@shared/engine'
 
 export function StartScreen(): React.JSX.Element {
   const openSheet = useStore((s) => s.openSheet)
@@ -119,6 +120,8 @@ function CreateSheet(): React.JSX.Element {
   const startTranscribe = useProject((s) => s.startTranscribe)
   const startEngine = useProject((s) => s.startEngine)
   const startMissing = useProject((s) => s.startMissing)
+  const startProfile = useProject((s) => s.startProfile)
+  const setStartProfile = useProject((s) => s.setStartProfile)
   const setStartEngine = useProject((s) => s.setStartEngine)
   const contentType = useProject((s) => s.contentType)
   const setContentType = useProject((s) => s.setContentType)
@@ -197,13 +200,16 @@ function CreateSheet(): React.JSX.Element {
               <Row label="Auswahl-Engine">
                 <div style={{ display: 'grid', gap: 8 }}>
                   <EngineSwitch value={startEngine} onSelect={(e) => void setStartEngine(e)} />
-                  {startEngine === 'multimodal-v2' && startMissing.length > 0 && (
+                  <small>{ENGINE_BLURB[startEngine]}</small>
+                  {startEngine === 'adaptive-v3' && <ProfilePicker value={startProfile} onChange={setStartProfile} />}
+                  {startEngine !== 'legacy' && startMissing.length > 0 && (
                     <div role="alert" style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
-                      <small style={{ color: 'var(--warn)' }}>Für die neue Engine fehlt: {startMissing.map((m) => m.name).join(', ')}.</small>
-                      <Button variant="secondary" onClick={() => { openSheet(false); go('models') }}>Modell-Manager öffnen</Button>
+                      <small style={{ color: 'var(--warn)' }}>Für {ENGINE_LABEL[startEngine]} fehlt: {startMissing.map((m) => m.name).join(', ')}.</small>
+                      {startMissing.some((m) => m.id === 'python-runtime-v3') && <RuntimeInstall onDone={() => void setStartEngine(startEngine)} />}
+                      {startMissing.some((m) => m.id !== 'python-runtime-v3') && <Button variant="secondary" onClick={() => { openSheet(false); go('models') }}>Modell-Manager öffnen</Button>}
                     </div>
                   )}
-                  {startEngine === 'multimodal-v2' && startMissing.length === 0 && <small style={{ color: 'var(--ok)' }}>Neue Engine gewählt · Modelle (Bild, Ton, Text) installiert</small>}
+                  {startEngine !== 'legacy' && startMissing.length === 0 && <small style={{ color: 'var(--ok)' }}>{ENGINE_LABEL[startEngine]} gewählt · Voraussetzungen installiert</small>}
                 </div>
               </Row>
               <Row label="Format"><Segmented options={['9:16', '1:1', '16:9']} value={opts.format} onChange={(format) => setOpts({ format })} /></Row>
@@ -240,9 +246,9 @@ function CreateSheet(): React.JSX.Element {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 24px', borderTop: '1px solid var(--edge)' }}>
-              {imported && <small style={{ marginRight: 'auto', alignSelf: 'center' }} title="Grobe Schätzung; sie passt sich nach dem ersten kompletten Lauf an diesen Rechner an.">Dauer etwa {fmtEta(totalSec(estimateStages(imported.meta.durationSec, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined, getSpeed(), startEngine)))}</small>}
+              {imported && <small style={{ marginRight: 'auto', alignSelf: 'center' }} title="Grobe Schätzung; sie passt sich nach dem ersten kompletten Lauf an diesen Rechner an.">Dauer etwa {fmtEta(totalSec(estimateStages(imported.meta.durationSec, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined, getSpeed(), startEngine, startProfile)))}</small>}
               <Button variant="secondary" onClick={() => openSheet(false)}>Abbrechen</Button>
-              <Button variant="primary" disabled={(!!imported && !imported.preflight.ok) || (startEngine === 'multimodal-v2' && startMissing.length > 0)} onClick={() => void start()}><Sparkles size={16} /> Clips finden</Button>
+              <Button variant="primary" disabled={(!!imported && !imported.preflight.ok) || (startEngine !== 'legacy' && startMissing.length > 0)} onClick={() => void start()}><Sparkles size={16} /> Clips finden</Button>
             </div>
           </motion.div>
         </>

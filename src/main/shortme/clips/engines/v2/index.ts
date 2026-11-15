@@ -36,19 +36,39 @@ const SWEEP_MAX_FRAMES = 240
 /** Zeitraum, der in `ranges` liegt (Vereinigung, in Sekunden). */
 const covered = (ranges: Array<[number, number]>): number => { let t = 0, end = -1; for (const [a, b] of [...ranges].sort((x, y) => x[0] - y[0])) { const s = Math.max(a, end); if (b > s) { t += b - s; end = b } } return t }
 
-export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome> {
+/** Engine 3: eigene Kandidatensuche (Embedding-Index) statt Bild-Rundgang, Rangfusion der Quellen, profilabhängige Budgets; danach derselbe redaktionelle Teil wie Engine 2. */
+export interface V3Discovery { proposals: RawProposal[]; evidence: Evidence[]; modality: ModalityStatus; coverage: number; diag: Record<string, unknown>; models: Record<string, string>; problems: string[] }
+export interface V3Hooks {
+  profile: string
+  detailMax: number
+  finalists: number
+  discover: (ctx: { project: SelectionRequest['project']; signal?: AbortSignal; report: (f: number, msg: string) => void; query?: string }) => Promise<V3Discovery>
+  /** Rangfusion über alle Quellen (je Quelle normalisiert, dann zusammengeführt). */
+  fuse: (raw: RawProposal[]) => RawProposal[]
+  revisions: () => string[]
+  missing: () => Promise<Array<{ id: string; name: string; sizeBytes: number }>>
+}
+export interface PipelineMode { engine: 'multimodal-v2' | 'adaptive-v3'; v3?: V3Hooks }
+
+export const selectV2 = (req: SelectionRequest): Promise<SelectionOutcome> => runPipeline(req, { engine: 'multimodal-v2' })
+
+export async function runPipeline(req: SelectionRequest, mode: PipelineMode): Promise<SelectionOutcome> {
   const { input, project, signal } = req
+  const v3 = mode.v3
+  const detailMax = v3?.detailMax ?? V2_LIMITS.detailMax
+  const finalistsMax = v3?.finalists ?? V2_LIMITS.finalists
+  const engineName = v3 ? 'Engine 3' : 'Engine 2'
   const dur = project.durationSec
   const hash = project.hash
   const T0 = Date.now()
-  const missing = await v2MissingModels()
-  if (missing.length) throw new Error(`Für die neue Engine fehlen Modelle: ${missing.map((m) => m.name).join(', ')}. Im Modell-Manager installieren.`)
+  const missing = v3 ? await v3.missing() : await v2MissingModels()
+  if (missing.length) throw new Error(`Für ${engineName} fehlen Modelle: ${missing.map((m) => m.name).join(', ')}. Im Modell-Manager installieren.`)
   const minSec = req.options.minSec ?? V2_LIMITS.minClipSec, maxSec = req.options.maxSec ?? V2_LIMITS.maxClipSec
   const wanted = req.options.wanted ?? defaultWanted(dur)
   const query = req.options.query
   const wav = projectFile(hash, 'audio.wav')
   const report = (stage: string, f: number, msg: string): void => req.report(stage, Math.max(0, Math.min(1, f)), msg)
-  const diag: Record<string, unknown> = { engine: 'multimodal-v2', revisions: v2Revisions(), durationSec: dur, wanted, minSec, maxSec, limits: V2_LIMITS, vramPeak: 'nicht gemessen', stageSec: {} as Record<string, number> }
+  const diag: Record<string, unknown> = { engine: mode.engine, ...(v3 ? { profile: v3.profile } : {}), revisions: v3 ? v3.revisions() : v2Revisions(), durationSec: dur, wanted, minSec, maxSec, limits: V2_LIMITS, vramPeak: 'nicht gemessen', stageSec: {} as Record<string, number> }
   const stageSec = diag.stageSec as Record<string, number>
   const stage = async <T>(name: string, fn: () => Promise<T>): Promise<T> => { const t = Date.now(); try { return await fn() } finally { stageSec[name] = Math.round((Date.now() - t) / 100) / 10 } }
   const modalities: Partial<Record<Mod, ModalityStatus>> = {}
@@ -110,19 +130,34 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
   const visionRan = new Set<string>()
   const needsVision = (e: Ev): boolean => stream || e.kind === 'gameplay' || e.foundBy.includes('visual')
   const needsAudio = (e: Ev): boolean => project.hasAudio && (stream || e.foundBy.includes('audio') || ['performance', 'witz', 'reaktion', 'konflikt'].includes(e.kind))
+  let v3Cov = 0
+  if (v3) {
+    report('candidates', 0.4, 'Video semantisch durchsuchen (Embedding-Index) …')
+    try {
+      const d = await stage('embedding-suche', () => v3.discover({ project, signal, query, report: (f, m) => report('candidates', 0.4 + 0.6 * f, m) }))
+      raw.push(...d.proposals); addEv(d.evidence); modalities.visual = d.modality; v3Cov = d.coverage; problems.push(...d.problems)
+      diag.v3 = d.diag; diag.v3Models = d.models
+    } catch (e) {
+      if (signal?.aborted) throw e
+      modalities.visual = 'failed'; problems.push(`Embedding-Suche fehlgeschlagen: ${e instanceof Error ? e.message.slice(0, 200) : e}`)
+    }
+  }
+  const fusedRaw = (): RawProposal[] => (v3 ? v3.fuse(raw) : raw)
   report('rate', 0, 'Bild prüfen …')
   try {
     await stage('bild', () => withVision(async (url) => {
-      const sw = await stage('bild-rundgang', () => sweep(project.sourcePath, url, dur, { maxFrames: SWEEP_MAX_FRAMES, signal, modelRev: V2_MODELS.vision, onProgress: (f) => report('rate', f * 0.15, 'Bild-Rundgang …') }))
+      const sw = v3 ? { proposals: [] as RawProposal[], evidence: [] as Evidence[], sampled: 0, failed: 0, step: 0, calls: 0 } : await stage('bild-rundgang', () => sweep(project.sourcePath, url, dur, { maxFrames: SWEEP_MAX_FRAMES, signal, modelRev: V2_MODELS.vision, onProgress: (f) => report('rate', f * 0.15, 'Bild-Rundgang …') }))
       raw.push(...sw.proposals); addEv(sw.evidence)
       for (let i = 0; i < sw.sampled; i++) sweepCov.push([(i + 0.5) * sw.step - sw.step / 2, (i + 0.5) * sw.step + sw.step / 2])
-      diag.sweep = { sampled: sw.sampled, failed: sw.failed, stepSec: Math.round(sw.step), calls: sw.calls, proposals: sw.proposals.length }
-      modalities.visual = sw.failed === 0 ? 'checked' : sw.failed >= sw.sampled ? 'failed' : 'checked'
-      if (sw.failed) problems.push(`Bild-Rundgang: ${sw.failed}/${sw.sampled} Bilder nicht geprüft`)
+      if (!v3) {
+        diag.sweep = { sampled: sw.sampled, failed: sw.failed, stepSec: Math.round(sw.step), calls: sw.calls, proposals: sw.proposals.length }
+        modalities.visual = sw.failed === 0 ? 'checked' : sw.failed >= sw.sampled ? 'failed' : 'checked'
+        if (sw.failed) problems.push(`Bild-Rundgang: ${sw.failed}/${sw.sampled} Bilder nicht geprüft`)
+      }
       // Ereignisse bilden und für die Detailprüfung auswählen (reine Logik)
-      events = clusterProposals(raw, dur) as Ev[]
+      events = clusterProposals(fusedRaw(), dur) as Ev[]
       events.forEach((e) => { e.requiredModalities = [] })
-      const pick = pickDetailSet(events, dur, V2_LIMITS.detailMax, V2_LIMITS.reservePerSource)
+      const pick = pickDetailSet(events, dur, detailMax, V2_LIMITS.reservePerSource)
       picked = pick.picked
       diag.events = { raw: raw.length, clustered: events.length, picked: picked.length, timeBinsCovered: `${pick.binsCovered}/${pick.bins}`, skipped: pick.skipped.length }
       let i = 0
@@ -135,12 +170,12 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
   } catch (e) {
     if (signal?.aborted) throw e
     modalities.visual = 'failed'; problems.push(`Bildmodell nicht nutzbar: ${e instanceof Error ? e.message.slice(0, 140) : e}`)
-    if (!events.length) { events = clusterProposals(raw, dur) as Ev[]; events.forEach((x) => { x.requiredModalities = [] }); picked = pickDetailSet(events, dur, V2_LIMITS.detailMax, V2_LIMITS.reservePerSource).picked }
+    if (!events.length) { events = clusterProposals(fusedRaw(), dur) as Ev[]; events.forEach((x) => { x.requiredModalities = [] }); picked = pickDetailSet(events, dur, detailMax, V2_LIMITS.reservePerSource).picked }
   }
   if (!picked.length) {
     diag.note = 'keine Ereignisse gefunden'
     await persist(hash, req.runId, { diag, evidence, events: [], variants: [], judgements: [] })
-    return { clips: [], mode: 'v2', run: { status: problems.length ? 'incomplete' : 'done', modalities, coverage: { text: 1, audio: 0, visual: 0 }, models: { vision: V2_MODELS.vision, audio: V2_MODELS.audio } } }
+    return { clips: [], mode: v3 ? 'v3' : 'v2', run: { status: problems.length ? 'incomplete' : 'done', modalities, coverage: { text: 1, audio: 0, visual: 0 }, models: { vision: V2_MODELS.vision, audio: V2_MODELS.audio } } }
   }
 
   // ---------------------------------------------------------------------------------------------------------------------------------- 4. Tonprüfung
@@ -185,7 +220,7 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
     // Finalisten: gute Ereignisse zuerst, ungeprüfte nichtsprachliche nur als kleine Reserve (nie wegen „keiner Textnote“ verworfen)
     const ranked = judged.filter((j) => j.rating.quality !== 'schwach').sort((a, b) => TIER[b.rating.quality] - TIER[a.rating.quality] || Math.max(...Object.values((b.event as Ev).strength).map((v) => v ?? 0), 0) - Math.max(...Object.values((a.event as Ev).strength).map((v) => v ?? 0), 0))
     const unchecked = ranked.filter((j) => j.rating.quality === 'ungeprueft').slice(0, 4)
-    const finalists = [...ranked.filter((j) => j.rating.quality !== 'ungeprueft').slice(0, V2_LIMITS.finalists - unchecked.length), ...unchecked]
+    const finalists = [...ranked.filter((j) => j.rating.quality !== 'ungeprueft').slice(0, finalistsMax - unchecked.length), ...unchecked]
     for (const j of judged) if (!finalists.includes(j)) dropped.push({ eventId: j.event.id, reason: j.rating.quality === 'schwach' ? 'Qualität schwach' : 'nicht unter den Finalisten (Budget)' })
     for (let i = 0; i < finalists.length; i++) {
       report('snap', 0.45 + 0.4 * (i / finalists.length), `Schnitte planen (${i + 1}/${finalists.length}) …`)
@@ -257,7 +292,7 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
       for (const v of [base, cut]) if (v) cands.push({ v, j })
     }
     cands.sort((a, b) => TIER[b.j.rating.quality] - TIER[a.j.rating.quality])
-    const cap = cands.slice(0, V2_LIMITS.finalists)
+    const cap = cands.slice(0, finalistsMax)
     const cmpCands: CompareCand[] = cap.map(({ v, j }) => ({ id: v.variantId, kind: j.event.kind, durationSec: outputDuration(v.keep), text: keptText(v.keep, sentences).slice(0, 1400) || '(keine Sprache)', evidence: evidenceLines(j.event.evidenceIds.filter((id) => { const e = evidence.get(id); return e && evidenceInKeep(e, v.keep) }), evidence).slice(0, 700) }))
     report('compare', 0.3, 'Vorschläge vergleichen …')
     const cmp = await compareAll(url, cmpCands, { matches: V2_LIMITS.matches, k: wanted, signal, onProgress: (f) => report('compare', 0.3 + 0.7 * f, 'Vorschläge vergleichen …') })
@@ -278,22 +313,22 @@ export async function selectV2(req: SelectionRequest): Promise<SelectionOutcome>
     // Titel, Hook und Schlüsselwörter erst für die endgültigen Vorschläge
     for (let i = 0; i < chosen.length; i++) {
       report('proofread', i / chosen.length, `Titel und Untertitel (${i + 1}/${chosen.length}) …`)
-      clips.push(await buildClip(url, chosen[i], req, sentences, evidence, signal))
+      clips.push(await buildClip(url, chosen[i], req, sentences, evidence, mode.engine, signal))
     }
   }))
 
   // ---------------------------------------------------------------------------------------------------------------------------------- Abschluss
   const textCov = failedRanges.length ? Math.max(0, 1 - covered(failedRanges) / dur) : sentences.length ? 1 : 0
-  const visCov = modalities.visual === 'failed' ? 0 : Math.min(1, covered(sweepCov) / dur)
+  const visCov = modalities.visual === 'failed' ? 0 : v3 ? v3Cov : Math.min(1, covered(sweepCov) / dur)
   const audCov = modalities.audio === 'unavailable' ? 0 : seriesCached || modalities.audio !== 'failed' ? 1 : 0
   diag.coverage = { text: textCov, audio: audCov, visual: visCov }
-  diag.notExamined = { visualSweepStepSec: (diag.sweep as { stepSec?: number } | undefined)?.stepSec ?? null, detailBudgetEvents: V2_LIMITS.detailMax, eventsWithoutDetail: Math.max(0, events.length - picked.length), note: 'Ereignisse außerhalb der Detailprüfung wurden nicht weiter bewertet' }
+  diag.notExamined = { visualSweepStepSec: (diag.sweep as { stepSec?: number } | undefined)?.stepSec ?? null, detailBudgetEvents: detailMax, eventsWithoutDetail: Math.max(0, events.length - picked.length), note: 'Ereignisse außerhalb der Detailprüfung wurden nicht weiter bewertet' }
   diag.problems = problems; diag.compare = compareInfo; diag.dropped = dropped; diag.totalSec = Math.round((Date.now() - T0) / 1000)
   await persist(hash, req.runId, { diag, evidence, events: events.map((e) => ({ ...e })), variants: [...variants.values()].flat(), judgements: judgementsLog, ratings: judged.map((j) => ({ eventId: j.event.id, ...j.rating })) })
   const incomplete = problems.length > 0 || textCov < 0.95
   const run: NonNullable<SelectionOutcome['run']> = { status: incomplete ? 'incomplete' : 'done', modalities, coverage: { text: textCov, audio: audCov, visual: visCov }, models: { vision: V2_MODELS.vision, audio: V2_MODELS.audio, audioEvents: V2_MODELS.audioEvents } }
   if (incomplete) run.error = problems.slice(0, 3).join(' · ')
-  return { clips, mode: 'v2', run }
+  return { clips, mode: v3 ? 'v3' : 'v2', run }
 }
 
 async function persist(hash: string, runId: string, d: { diag: Record<string, unknown>; evidence: Map<string, Evidence>; events: unknown[]; variants: unknown[]; judgements: unknown[]; ratings?: unknown[] }): Promise<void> {
@@ -306,7 +341,7 @@ async function persist(hash: string, runId: string, d: { diag: Record<string, un
 
 const FIN_SCHEMA = { type: 'object', additionalProperties: false, required: ['title', 'hook_text', 'tags'], properties: { title: { type: 'string' }, hook_text: { type: 'string' }, tags: { type: 'array', maxItems: 8, items: { type: 'object', additionalProperties: false, required: ['sentence', 'word', 'kind'], properties: { sentence: { type: 'integer' }, word: { type: 'string' }, kind: { type: 'string', enum: ['emphasis', 'entity', 'hook'] } } } } } }
 
-async function buildClip(url: string, c: { v: Variant; j: Judged; rank: number }, req: SelectionRequest, sentences: Sentence[], evidence: Map<string, Evidence>, signal?: AbortSignal): Promise<ShortmeClip> {
+async function buildClip(url: string, c: { v: Variant; j: Judged; rank: number }, req: SelectionRequest, sentences: Sentence[], evidence: Map<string, Evidence>, engine: 'multimodal-v2' | 'adaptive-v3', signal?: AbortSignal): Promise<ShortmeClip> {
   const { v, j } = c
   const words = req.input.words
   const keep = v.keep
@@ -352,7 +387,7 @@ async function buildClip(url: string, c: { v: Variant; j: Judged; rank: number }
   return {
     id: v2ClipId(req.runId, c.rank + 1), start, end, firstWord, lastWord, score: BASE_SCORE[j.rating.quality] - c.rank * 0.01,
     criteria: { hook: 0, payoff: 0, quotable: 0, standalone: 0, density: 0 }, title, hookText: hook, reason: j.rating.reasons || ev.summary, tags,
-    source: 'v2', engine: 'multimodal-v2', runId: req.runId, snap: ['v2'], extended: 0, ...(wordless ? { wordless: true } : {}), ...(cuts.length ? { autoCuts: cuts } : {}), ...(corrections ? { corrections } : {}),
+    source: engine === 'adaptive-v3' ? 'v3' : 'v2', engine, runId: req.runId, snap: [engine === 'adaptive-v3' ? 'v3' : 'v2'], extended: 0, ...(wordless ? { wordless: true } : {}), ...(cuts.length ? { autoCuts: cuts } : {}), ...(corrections ? { corrections } : {}),
     v2: { eventId: ev.id, variantId: v.variantId, kind: ev.kind, summary: ev.summary, verification: v.verification, evidenceIds: keptEv.map((e) => e.id), modalities, eventNote: `Ereignisqualität: ${QUALITY_LABEL[j.rating.quality]}`, uncertainty }
   } satisfies ShortmeClip
 }

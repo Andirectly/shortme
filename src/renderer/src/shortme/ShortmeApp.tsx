@@ -10,6 +10,7 @@ import { SettingsScreen } from './OtherScreens'
 import { StudioScreen } from './StudioScreen'
 import { TestlabScreen } from './TestlabScreen'
 import { LiveScreen } from './LiveScreen'
+import { CompareScreen } from './CompareScreen'
 import { UploadScreen } from './UploadScreen'
 import { WorkbenchScreen } from './WorkbenchScreen'
 import { LearnScreen } from './LearnScreen'
@@ -36,6 +37,7 @@ export default function ShortmeApp(): React.JSX.Element {
       {screen === 'upload' && <UploadScreen />}
       {screen === 'workbench' && <WorkbenchScreen />}
       {screen === 'learn' && <LearnScreen />}
+      {screen === 'compare' && <CompareScreen />}
       {screen === 'settings' && <SettingsScreen />}
       <SetupWizard />
       <PatchNotesAfterUpdate />

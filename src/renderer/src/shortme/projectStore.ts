@@ -3,7 +3,7 @@ import type { Level, Ratings } from '@shared/learn'
 import { useStore } from './store'
 import { FRAME_LABELS, frameFromLabel, type ContentType } from '@shared/videoKind'
 import type { StyleDefaults } from '@shared/edits'
-import type { AnalysisState, SelectionEngineId } from '@shared/engine'
+import { isV3Profile, type AnalysisState, type SelectionEngineId, type V3Profile } from '@shared/engine'
 import type { PersonsPatch, ShortmeClips, ShortmePersons, ShortmeImport, ShortmeJob, ShortmeTranscript } from '@shared/shortme'
 
 const api = (): Window['cutawan']['shortme'] | null => (typeof window !== 'undefined' && window.cutawan?.shortme ? window.cutawan.shortme : null)
@@ -24,6 +24,9 @@ interface ProjectState {
   engine: { hash: string | null; state: AnalysisState | null; pending: boolean; msg: string; missing: Array<{ id: string; name: string; sizeBytes: number }>; /** Modellprüfung der neuen Engine wurde ausgeführt (missing ist dann verlässlich). */ modelsChecked: boolean }
   /** Engine für neue Projekte (Erstellen-Dialog); wird als Standard gespeichert, zunächst die bisherige Engine. */
   startEngine: SelectionEngineId
+  /** Analyseprofil der Engine 3 (Schnell/Ausgewogen/Gründlich); gilt für den nächsten Lauf. */
+  startProfile: V3Profile
+  setStartProfile: (p: V3Profile) => void
   startMissing: Array<{ id: string; name: string; sizeBytes: number }>
   setStartEngine: (e: SelectionEngineId) => Promise<void>
   loadEngine: (hash: string) => Promise<void>
@@ -132,6 +135,8 @@ export const useProject = create<ProjectState>((set, get) => ({
   },
   engine: { hash: null, state: null, pending: false, msg: '', missing: [], modelsChecked: false },
   startEngine: 'legacy',
+  startProfile: (() => { try { const v = localStorage.getItem('sm.v3profile'); return isV3Profile(v) ? v : 'balanced' } catch { return 'balanced' } })(),
+  setStartProfile: (p) => { try { localStorage.setItem('sm.v3profile', p) } catch { /* nur Komfort */ } set({ startProfile: p }) },
   startMissing: [],
   setStartEngine: async (e) => {
     const a = api()
@@ -158,7 +163,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (!a || !hash || get().engine.pending) return
     set((s) => ({ engine: { ...s.engine, hash, pending: true, msg: '', missing: [] } }))
     try {
-      const r = await a.engineSelect({ hash, engine, query: cur.query, contentType: get().contentType, frame: frameFromLabel(get().frame), wanted: cur.wanted })
+      const r = await a.engineSelect({ hash, engine, query: cur.query, contentType: get().contentType, frame: frameFromLabel(get().frame), wanted: cur.wanted, profile: get().startProfile })
       const msg = r.kind === 'busy' ? 'Es läuft gerade eine Analyse. Der Wechsel ist erst nach „Stoppen & behalten“ oder nach dem Ende möglich.' : ''
       set((s) => ({ engine: { hash, state: r.state, pending: false, msg, missing: r.kind === 'needs-models' ? r.missing : [], modelsChecked: s.engine.modelsChecked } }))
       if (r.kind === 'shown') await get().loadResults(hash, true)
@@ -173,7 +178,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (!a || !hash || get().engine.pending) return
     set((s) => ({ engine: { ...s.engine, hash, pending: true, msg: '', missing: [] } }))
     try {
-      const r = await a.recompute(hash, { query: cur.query, contentType: get().contentType, frame: frameFromLabel(get().frame), wanted: cur.wanted })
+      const r = await a.recompute(hash, { query: cur.query, contentType: get().contentType, frame: frameFromLabel(get().frame), wanted: cur.wanted, profile: get().startProfile })
       set((s) => ({ engine: { ...s.engine, pending: false, missing: r.missing ?? [] } }))
       if (r.jobId) { const live = (await a.jobs()).find((j) => j.id === r.jobId); if (live) set({ job: live }); await get().loadEngine(hash) }
     } catch (e) {
@@ -298,7 +303,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     const a = api()
     const imp = get().imported
     if (!a || !imp) return false
-    const job = await a.transcribe(imp.meta.hash, { diarize, query, wanted, contentType: get().contentType, frame: frameFromLabel(get().frame), engine: get().startEngine })
+    const job = await a.transcribe(imp.meta.hash, { diarize, query, wanted, contentType: get().contentType, frame: frameFromLabel(get().frame), engine: get().startEngine, profile: get().startProfile })
     set({ job, clipsFile: null, transcript: null })
     return true
   },

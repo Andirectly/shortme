@@ -30,7 +30,7 @@ import { overlapsSilence } from '../../twitch/silence'
 import { detectAudioEvents, loadEvents, saveEvents, yamnetAvailable, type AudioEvent } from './audioEvents'
 import { loadTopics, saveTopics, type TopicMap } from './topics'
 import type { PlanInput } from '../../../shared/layoutPlan'
-import { displayedRunId, LEGACY_RUN_ID, newRunId, V2_ENGINE_VERSION, type RunInfo, type SelectionEngineId } from '../../../shared/engine'
+import { displayedRunId, LEGACY_RUN_ID, newRunId, V2_ENGINE_VERSION, V3_ENGINE_VERSION, isV3Profile, type RunInfo, type SelectionEngineId, type V3Profile } from '../../../shared/engine'
 import { clipsPathFor, loadState, patchRun, registerRun, showRun } from './engines/state'
 import { analysisFingerprint } from './engines/control'
 import { engineRevisions, runSelection } from './engines'
@@ -38,6 +38,8 @@ import { engineRevisions, runSelection } from './engines'
 export interface AnalysisOptions {
   /** Auswahl-Engine dieses Laufs (beim Jobstart festgelegt; Standard: bisherige Engine). */
   engine?: SelectionEngineId
+  /** Nur Engine 3. */
+  profile?: V3Profile
   query?: string
   /** Inhaltstyp → Profil (Tracking, Ton-Markierungen, Ranking-Gewichte, Prompt-Variante). Standard: Podcast / Interview. */
   contentType?: ContentType
@@ -85,7 +87,7 @@ export interface ClipsFile {
   query: string
   createdAt: string
   /** `llm`/`texttiling`: bisherige Engine; `v2`: neue Engine (eigene Datenverträge, siehe `engine`/`runId`). */
-  mode: 'llm' | 'texttiling' | 'v2'
+  mode: 'llm' | 'texttiling' | 'v2' | 'v3'
   engine?: SelectionEngineId
   runId?: string
   clips: ShortmeClip[]
@@ -181,13 +183,14 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
 
   // Engine und Lauf stehen ab hier fest. Legacy schreibt wie bisher nach clips.json, die neue Engine in ihren eigenen Lauf-Ordner.
   const engine: SelectionEngineId = opts.engine ?? 'legacy'
-  const runId = engine === 'legacy' ? LEGACY_RUN_ID : newRunId()
+  const v3Profile: V3Profile = isV3Profile(opts.profile) ? opts.profile : 'balanced'
+  const runId = engine === 'legacy' ? LEGACY_RUN_ID : newRunId(Math.random, Date.now, engine === 'adaptive-v3' ? 'v3' : 'v2')
   const clipsPath = clipsPathFor(meta.hash, runId)
   if (engine !== 'legacy') {
     const run: RunInfo = {
-      runId, engineId: engine, engineVersion: V2_ENGINE_VERSION, schema: 1, createdAt: new Date().toISOString(), status: 'running',
-      fingerprint: analysisFingerprint({ hash: meta.hash, engine, transcriptVersion: t.version, wordCount: t.words.length, asrModel: t.model, query: opts.query, contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, revisions: engineRevisions(engine) }),
-      options: { query: opts.query ?? '', contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, minSec: 15, maxSec: 75 }, models: {}, modalities: {}
+      runId, engineId: engine, engineVersion: engine === 'adaptive-v3' ? V3_ENGINE_VERSION : V2_ENGINE_VERSION, schema: 1, createdAt: new Date().toISOString(), status: 'running',
+      fingerprint: analysisFingerprint({ hash: meta.hash, engine, transcriptVersion: t.version, wordCount: t.words.length, asrModel: t.model, query: opts.query, contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, revisions: engineRevisions(engine, v3Profile) }),
+      options: { query: opts.query ?? '', contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, minSec: 15, maxSec: 75, ...(engine === 'adaptive-v3' ? { profile: v3Profile } : {}) }, models: {}, modalities: {}
     }
     await registerRun(meta.hash, run)
   }
@@ -196,7 +199,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   let trace: CandTrace[]
   let runPatch: Awaited<ReturnType<typeof runSelection>>['run']
   try {
-    const out = await runSelection({ engine, runId, input, options: sel, noLlm: opts.noLlm, contentType: opts.contentType ?? null, signal: opts.signal, report, project: { hash: meta.hash, sourcePath: meta.sourcePath, durationSec: meta.durationSec, hasAudio: meta.hasAudio } })
+    const out = await runSelection({ engine, runId, input, options: sel, noLlm: opts.noLlm, profile: v3Profile, contentType: opts.contentType ?? null, signal: opts.signal, report, project: { hash: meta.hash, sourcePath: meta.sourcePath, durationSec: meta.durationSec, hasAudio: meta.hasAudio } })
     clips = out.clips; mode = out.mode; trace = out.trace ?? []; runPatch = out.run
   } catch (e) {
     if (engine !== 'legacy') await patchRun(meta.hash, runId, { status: opts.signal?.aborted ? 'stopped' : 'failed', error: e instanceof Error ? e.message : String(e), finishedAt: new Date().toISOString() })

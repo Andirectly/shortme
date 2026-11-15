@@ -232,8 +232,8 @@ function RealProcessing(): React.JSX.Element {
   const [now, setNow] = useState(0)
   useEffect(() => { const tick = (): void => setNow(Date.now()); tick(); const i = setInterval(tick, 5000); return () => clearInterval(i) }, [])
   const refSec = totalSec(est)
-  useEffect(() => trackRun(job.id, total, job.state === 'done', engineSel === 'multimodal-v2' ? 0 : refSec), [job.id, job.state, total, refSec])
-  const eta = remainingSec(est, total, run?.f0 ?? total, run ? (now - run.at) / 1000 : 0, engineSel === 'multimodal-v2' ? 1 : getSpeed())
+  useEffect(() => trackRun(job.id, total, job.state === 'done', engineSel && engineSel !== 'legacy' ? 0 : refSec), [job.id, job.state, total, refSec])
+  const eta = remainingSec(est, total, run?.f0 ?? total, run ? (now - run.at) / 1000 : 0, engineSel && engineSel !== 'legacy' ? 1 : getSpeed())
   const busy = job.state === 'running' || job.state === 'queued'
   const title = job.state === 'done' ? 'Clips gefunden' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : 'Transkribiert …'
   const later = ['Rendern']

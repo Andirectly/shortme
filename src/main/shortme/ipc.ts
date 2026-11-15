@@ -12,13 +12,12 @@ import { planExport } from './render/exporter'
 import { sanitizeLog } from '../../shared/edits'
 import { loadTranscript, runTranscription } from './transcription'
 import { findClip, loadClips, saveClips, layoutFile } from './clips/analysis'
-import { LEGACY_RUN_ID } from '../../shared/engine'
-import { registerEngineControlIpc, hasActiveJob, recomputeProject } from './engineIpc'
+import { ENGINE_LABEL, LEGACY_RUN_ID, isV3Profile } from '../../shared/engine'
+import { registerEngineControlIpc, hasActiveJob, missingModelsFor, recomputeProject } from './engineIpc'
 import { loadDefaultEngine } from './clips/engines/control'
 import { setSelected } from './clips/engines/state'
-import { v2MissingModels } from './clips/engines/v2/models'
 import { runAnalysis } from './clips/analysis'
-import type { SelectionEngineId } from '../../shared/engine'
+import type { SelectionEngineId, V3Profile } from '../../shared/engine'
 import { loadPersons, personsFile, replanWithPersons } from './clips/persons'
 import { writeFileAtomic } from './atomic'
 import { defaultExportRoot, exportRoot, setExportRoot } from './exportDir'
@@ -116,16 +115,13 @@ export function registerShortmeIpc(): void {
     return { changed: true, scenes: scenes.length, others: known.length }
   })
   /** Verarbeitung: Transkription (0–55 %), dann Analyse + Clip-Auswahl (55–100 %). */
-  ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice; engine?: SelectionEngineId }) => {
+  ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice; engine?: SelectionEngineId; profile?: V3Profile }) => {
     const meta = await loadMeta(hash)
     if (!meta) throw new Error('Projekt nicht gefunden')
     if (hasActiveJob(jobs, hash)) throw new Error('Für dieses Projekt läuft schon eine Analyse.')
     // Engine: Wahl im Erstellen-Dialog, sonst Standard für neue Projekte (zunächst die bisherige Engine); sie bleibt als Projektauswahl gespeichert
     const engine = opts?.engine ?? (await loadDefaultEngine())
-    if (engine === 'multimodal-v2') {
-      const missing = await v2MissingModels()
-      if (missing.length) throw new Error(`Für die neue Engine fehlen Modelle: ${missing.map((m) => m.name).join(', ')}. Bitte im Modell-Manager installieren.`)
-    }
+    { const missing = await missingModelsFor(engine); if (missing.length) throw new Error(`Für ${ENGINE_LABEL[engine]} fehlen Modelle: ${missing.map((m) => m.name).join(', ')}. Bitte im Modell-Manager installieren.`) }
     await setSelected(hash, engine)
     // Inhaltstyp am Projekt merken und als letzte Auswahl dieser Quelle (Twitch: des Kanals) speichern
     if (opts?.contentType) {
@@ -135,7 +131,7 @@ export function registerShortmeIpc(): void {
     }
     return jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
       await runTranscription(meta, { diarize: !!opts?.diarize, signal, onProgress: (p) => report(p.stage, p.fraction, p.message) })
-      await runAnalysis(meta, { engine, query: opts?.query, contentType: opts?.contentType, frame: opts?.frame, wanted: opts?.wanted, signal, onProgress: report })
+      await runAnalysis(meta, { engine, profile: isV3Profile(opts?.profile) ? opts.profile : undefined, query: opts?.query, contentType: opts?.contentType, frame: opts?.frame, wanted: opts?.wanted, signal, onProgress: report })
     }, () => discardProject(hash))
   })
   const personsView = async (hash: string): Promise<ShortmePersons | null> => {

@@ -99,7 +99,7 @@ export interface ShortmeClip {
   /** Schlüsselwörter für Untertitel (Wortindex im Transkript). */
   tags: Array<{ word: number; kind: ClipTagKind }>
   /** `llm`/`texttiling`: bisherige Engine, `v2`: neue Engine (Details in `v2`). */
-  source: 'llm' | 'texttiling' | 'v2'
+  source: 'llm' | 'texttiling' | 'v2' | 'v3'
   /** Engine und Lauf, zu denen der Clip gehört (fehlt bei alten Projekten = bisherige Engine). */
   engine?: SelectionEngineId
   runId?: string
@@ -149,7 +149,7 @@ export interface ShortmeClips {
   hash: string
   query: string
   createdAt: string
-  mode: 'llm' | 'texttiling' | 'v2'
+  mode: 'llm' | 'texttiling' | 'v2' | 'v3'
   /** Engine und Lauf der angezeigten Clipliste. */
   engine?: SelectionEngineId
   runId?: string

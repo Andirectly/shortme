@@ -48,6 +48,8 @@ export interface SwitchRequest {
   contentType?: string | null
   frame?: string | null
   wanted?: number | null
+  /** Nur Engine 3: Profil für einen neuen Lauf. */
+  profile?: string | null
 }
 
 export interface SwitchDeps {

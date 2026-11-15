@@ -67,6 +67,28 @@ export const CATALOG: AssetSpec[] = [
     vramMb: 3500
   },
   {
+    id: 'qwen3-vl-embedding-2b',
+    name: 'Qwen3-VL-Embedding 2B (Engine 3, PyTorch)',
+    kind: 'vision',
+    note: 'Engine 3: Bild-/Video-Embeddings für die semantische Suche über das ganze Video (läuft im Python-Worker, nicht in llama.cpp) · Apache-2.0 (Modellkarte) · ca. 4,3 GB, ca. 5 GB VRAM',
+    // Revision fest gebunden; Prüfsummen: LFS-Dateien laut Hugging-Face-API, kleine Dateien beim Anlegen des Eintrags selbst berechnet
+    files: [
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/config.json`, name: 'config.json', size: 1570, sha256: '9172f55b0b9cce70b7f67b10c58a408ccf3ec15c587e6efd4d5f41631237fded' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/preprocessor_config.json`, name: 'preprocessor_config.json', size: 783, sha256: 'd75c1f9f474add87cb0188d43c4fbf5c232d2af64f156fcefc5311089049100d' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/video_preprocessor_config.json`, name: 'video_preprocessor_config.json', size: 817, sha256: '59c5c9eb52182eb14c06ffb10ca9effd29adce5f238a95de23ca14a38dbd2cb1' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/tokenizer.json`, name: 'tokenizer.json', size: 11423705, sha256: 'def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/tokenizer_config.json`, name: 'tokenizer_config.json', size: 5404, sha256: '355f2b4e5bad7b01f11ef6cb68ebc176f61b95c3276092ea225b1bea0e01e95c' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/vocab.json`, name: 'vocab.json', size: 2776833, sha256: 'ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/merges.txt`, name: 'merges.txt', size: 1671853, sha256: '8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/added_tokens.json`, name: 'added_tokens.json', size: 707, sha256: 'c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/special_tokens_map.json`, name: 'special_tokens_map.json', size: 613, sha256: '76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/chat_template.jinja`, name: 'chat_template.jinja', size: 5519, sha256: 'a47e6afb389f86f45be7810f17d2686fd42b2bec7ba6e6958abf85845af258c5' },
+      { url: `${HF}/Qwen/Qwen3-VL-Embedding-2B/resolve/9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda/model.safetensors`, name: 'model.safetensors', size: 4255140312, sha256: 'c73fa9caeddeb3ff831d46c085a7a5708343248ca777e90f2d486964464509c1' }
+    ],
+    expect: ['model.safetensors', 'config.json', 'tokenizer.json'],
+    vramMb: 5000
+  },
+  {
     id: 'qwen3-vl-4b',
     name: 'Qwen3-VL 4B Instruct (Q4_K_M + Projektor F16)',
     kind: 'vision',

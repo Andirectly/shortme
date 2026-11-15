@@ -1,0 +1,5 @@
+qwen3_vl_embedding.py
+  Quelle: https://github.com/QwenLM/Qwen3-VL-Embedding  (src/models/qwen3_vl_embedding.py)
+  Commit: 393e2978d27852b0d0230d6994f37f9c15bed73c (2026-06-23)
+  Lizenz: Apache-2.0 (Repo-Lizenzdatei laut GitHub-Seite)
+  Unverändert übernommen (Datei wird vom Worker geladen, nicht verändert).

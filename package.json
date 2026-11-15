@@ -104,6 +104,10 @@
         "to": "profiles"
       },
       {
+        "from": "resources/python",
+        "to": "python"
+      },
+      {
         "from": "resources/fonts",
         "to": "fonts"
       },
