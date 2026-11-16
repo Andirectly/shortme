@@ -205,8 +205,8 @@ function CreateSheet(): React.JSX.Element {
                   {startEngine !== 'legacy' && startMissing.length > 0 && (
                     <div role="alert" style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
                       <small style={{ color: 'var(--warn)' }}>Für {ENGINE_LABEL[startEngine]} fehlt: {startMissing.map((m) => m.name).join(', ')}.</small>
-                      {startMissing.some((m) => m.id === 'python-runtime-v3') && <RuntimeInstall onDone={() => void setStartEngine(startEngine)} />}
-                      {startMissing.some((m) => m.id !== 'python-runtime-v3') && <Button variant="secondary" onClick={() => { openSheet(false); go('models') }}>Modell-Manager öffnen</Button>}
+                      {startMissing.some((m) => m.id.startsWith('python-runtime-v3')) && <RuntimeInstall onDone={() => void setStartEngine(startEngine)} />}
+                      {startMissing.some((m) => !m.id.startsWith('python-runtime-v3')) && <Button variant="secondary" onClick={() => { openSheet(false); go('models') }}>Modell-Manager öffnen</Button>}
                     </div>
                   )}
                   {startEngine !== 'legacy' && startMissing.length === 0 && <small style={{ color: 'var(--ok)' }}>{ENGINE_LABEL[startEngine]} gewählt · Voraussetzungen installiert</small>}

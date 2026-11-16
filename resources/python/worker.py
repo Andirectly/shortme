@@ -20,12 +20,17 @@ import traceback
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+# numba (über librosa) will seinen JIT-Cache neben die Pakete schreiben; auf nicht beschreibbaren/umgeleiteten Pfaden wiederholt es das ewig (gemessen: Hänger bei analyze_av)
+os.environ.setdefault("NUMBA_CACHE_DIR", os.path.join(os.environ.get("TEMP") or os.path.expanduser("~"), "shortme-numba-cache"))
 
 PROTOCOL_VERSION = 1
 WORKER_VERSION = "1.0.0"
-SUPPORTED_MODELS = {"qwen3-vl-embedding-2b"}
+EMBED_MODELS = {"qwen3-vl-embedding-2b"}
+TEMPORAL_MODELS = {"lighthouse-cg-detr-clip"}
+AV_MODELS = {"minicpm-o-4_5"}
+SUPPORTED_MODELS = EMBED_MODELS | TEMPORAL_MODELS | AV_MODELS
 
-_state = {"embedder": None, "model_id": None, "cancel": set(), "busy": False}
+_state = {"embedder": None, "temporal": None, "av": None, "tokenizer": None, "model_id": None, "cancel": set(), "busy": False}
 _args = None
 
 
@@ -33,9 +38,14 @@ def log(msg: str) -> None:
     print(f"[worker] {msg}", file=sys.stderr, flush=True)
 
 
+_OUT = None  # Protokoll-Ausgabe (privates Handle, siehe main)
+_IN = None  # Protokoll-Eingabe
+
+
 def send(obj: dict) -> None:
-    sys.stdout.write(json.dumps(obj, ensure_ascii=False, allow_nan=False) + "\n")
-    sys.stdout.flush()
+    out = _OUT or sys.stdout
+    out.write(json.dumps(obj, ensure_ascii=False, allow_nan=False) + "\n")
+    out.flush()
 
 
 def fail(req: dict, code: str, message: str, recoverable: bool = True) -> dict:
@@ -100,19 +110,46 @@ def op_health(req, p):
     return info
 
 
+def _importable(name: str) -> bool:
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec(name) is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def op_capabilities(req, p):
-    return {
-        "ops": ["health", "capabilities", "load_model", "unload_model", "embed_frames", "embed_text", "cancel", "shutdown"],
-        "models": [{"id": m, "role": "visual-semantic-retrieval", "status": "available"} for m in sorted(SUPPORTED_MODELS)],
-        "notImplemented": ["temporal_ground", "analyze_av", "select_frames", "rank_candidates"],
-    }
+    """Welche Modelle diese Umgebung wirklich laden kann (aus den installierten Paketen), nicht was der Code theoretisch kennt."""
+    ver = ""
+    try:
+        import transformers
+
+        ver = transformers.__version__
+    except Exception:  # noqa: BLE001
+        pass
+    models = []
+    if ver and tuple(int(x) for x in ver.split(".")[:2]) >= (4, 57):
+        models.append({"id": "qwen3-vl-embedding-2b", "role": "visual-semantic-retrieval", "status": "available"})
+    if _importable("lighthouse") and _importable("clip"):
+        models.append({"id": "lighthouse-cg-detr-clip", "role": "temporal-grounding", "status": "available"})
+    if ver == "4.51.0" and _importable("minicpmo"):
+        models.append({"id": "minicpm-o-4_5", "role": "av-verification", "status": "available"})
+    ops = ["health", "capabilities", "load_model", "unload_model", "cancel", "shutdown"]
+    if any(m["id"] == "qwen3-vl-embedding-2b" for m in models):
+        ops += ["embed_frames", "embed_text"]
+    if any(m["id"] == "lighthouse-cg-detr-clip" for m in models):
+        ops += ["temporal_ground"]
+    if any(m["id"] == "minicpm-o-4_5" for m in models):
+        ops += ["analyze_av"]
+    return {"ops": ops, "models": models, "notImplemented": ["select_frames", "rank_candidates"]}
 
 
 def op_load_model(req, p):
     model_id = p.get("modelId")
     if model_id not in SUPPORTED_MODELS:
         raise WorkerError("unknown-model", f"Unbekanntes Modell: {model_id}")
-    if _state["embedder"] is not None:
+    if _state["model_id"] is not None:
         if _state["model_id"] == model_id:
             return {"modelId": model_id, "alreadyLoaded": True}
         raise WorkerError("model-busy", "Ein anderes Modell ist geladen; zuerst unload_model", True)
@@ -121,6 +158,10 @@ def op_load_model(req, p):
 
     if not torch.cuda.is_available():
         raise WorkerError("no-cuda", "Keine CUDA-GPU verfügbar", False)
+    if model_id in TEMPORAL_MODELS:
+        return _load_temporal(model_id, path)
+    if model_id in AV_MODELS:
+        return _load_av(model_id, path)
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor"))
     from qwen3_vl_embedding import Qwen3VLEmbedder  # type: ignore  # vendored, Apache-2.0 (siehe vendor/NOTICE)
 
@@ -131,12 +172,53 @@ def op_load_model(req, p):
     return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": int(torch.cuda.memory_allocated()), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
 
 
+def _load_temporal(model_id: str, path: str) -> dict:
+    """Lighthouse (LY Corp., Apache-2.0) mit CG-DETR + CLIP-ViT-B/32-Features. Checkpoint (Zenodo 13960580, CC-BY-4.0) und CLIP-Gewicht liegen im Modellordner;
+    clip.load prüft die SHA-256 der vorhandenen Datei und lädt nichts nach, solange sie da ist."""
+    import functools
+
+    import torch
+
+    ckpt = os.path.join(path, "clip_cg_detr_qvhighlight.ckpt")
+    if not os.path.isfile(ckpt) or not os.path.isfile(os.path.join(path, "ViT-B-32.pt")):
+        raise WorkerError("model-files-missing", "Lighthouse-Checkpoint oder CLIP-Gewicht fehlt im Modellordner", False)
+    import clip  # type: ignore
+
+    if not getattr(clip.load, "_shortme", False):
+        orig = clip.load
+        patched = functools.partial(orig, download_root=path)
+        patched._shortme = True  # type: ignore[attr-defined]
+        clip.load = patched  # type: ignore[assignment]
+    from lighthouse.models import CGDETRPredictor  # type: ignore
+
+    t0 = time.time()
+    torch.cuda.reset_peak_memory_stats()
+    # torch.load(weights_only=False) liegt in Lighthouse: Pickle! Nur der geprüfte Checkpoint (MD5 laut Zenodo, SHA-256 im Katalog) darf hierher.
+    _state["temporal"] = CGDETRPredictor(ckpt, device="cuda", feature_name="clip", slowfast_path=None, pann_path=None)
+    _state["model_id"] = model_id
+    return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": int(torch.cuda.memory_allocated()), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+
+
+def _load_av(model_id: str, path: str) -> dict:
+    """MiniCPM-o 4.5 (OpenBMB, Apache-2.0): Video + Audio, ohne TTS. trust_remote_code führt den Modellcode aus dem fest gepinnten Snapshot aus."""
+    import torch
+    from transformers import AutoModel, AutoTokenizer  # type: ignore
+
+    t0 = time.time()
+    torch.cuda.reset_peak_memory_stats()
+    model = AutoModel.from_pretrained(path, trust_remote_code=True, attn_implementation="sdpa", torch_dtype=torch.bfloat16, init_vision=True, init_audio=True, init_tts=False, local_files_only=True)
+    _state["av"] = model.eval().cuda()
+    _state["tokenizer"] = AutoTokenizer.from_pretrained(path, trust_remote_code=True, local_files_only=True)
+    _state["model_id"] = model_id
+    return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": int(torch.cuda.memory_allocated()), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+
+
 def op_unload_model(req, p):
     import gc
 
     import torch
 
-    _state["embedder"], _state["model_id"] = None, None
+    _state["embedder"], _state["temporal"], _state["av"], _state["tokenizer"], _state["model_id"] = None, None, None, None, None
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -199,6 +281,62 @@ def op_embed_text(req, p):
     return {"count": int(arr.shape[0]), "dimension": int(arr.shape[1]), "outPath": out_path, "dtype": "float16"}
 
 
+def op_temporal_ground(req, p):
+    """Lighthouse über kurze Fenster (≤ 150 s, vom Aufrufer zugeschnitten). payload: windows=[{path, startSec}], queries=[str].
+    Antwort je Fenster/Anfrage: Momente [start, ende, Wert] in QUELLsekunden und Saliency je Clip-Schritt. Werte gelten nur innerhalb dieses Modells (nicht kalibriert)."""
+    import torch
+
+    m = _state["temporal"]
+    if m is None:
+        raise WorkerError("no-model", "Kein Temporal-Modell geladen")
+    windows = finite_list(p.get("windows"), "windows", 256)
+    queries = finite_list(p.get("queries"), "queries", 32)
+    if not all(isinstance(q, str) and 0 < len(q) <= 300 for q in queries):
+        raise WorkerError("bad-payload", "queries: nicht leere Strings (≤ 300 Zeichen)")
+    out = []
+    t0 = time.time()
+    for w in windows:
+        if req.get("requestId") in _state["cancel"]:
+            raise WorkerError("cancelled", "abgebrochen")
+        path = inside(w.get("path"), _args.allowed_root)
+        start = float(w.get("startSec"))
+        video = m.encode_video(path)
+        per_q = []
+        for q in queries:
+            pred = m.predict(q, video)
+            moments = [[round(start + float(a), 2), round(start + float(b), 2), round(float(c), 4)] for a, b, c in pred.get("pred_relevant_windows", [])[:6]]
+            sal = [round(float(x), 3) for x in pred.get("pred_saliency_scores", [])]
+            per_q.append({"query": q, "moments": moments, "saliency": sal})
+        out.append({"startSec": start, "clipLength": float(getattr(m, "_clip_len", 2.0)), "queries": per_q})
+    return {"windows": out, "seconds": round(time.time() - t0, 2), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+
+
+def op_analyze_av(req, p):
+    """MiniCPM-o: Video UND Audio eines kurzen Ausschnitts (≤ 60 s, vom Aufrufer zugeschnitten) mit einer Aufgabe. Liefert den Modelltext (wird im Aufrufer gegen ein Schema geprüft)."""
+    import torch
+
+    m, tok = _state["av"], _state["tokenizer"]
+    if m is None:
+        raise WorkerError("no-model", "Kein AV-Modell geladen")
+    path = inside(p.get("path"), _args.allowed_root)
+    prompt = p.get("prompt")
+    if not isinstance(prompt, str) or not 0 < len(prompt) <= 4000:
+        raise WorkerError("bad-payload", "prompt: String (≤ 4000 Zeichen)")
+    max_new = max(16, min(int(p.get("maxNewTokens", 300)), 600))
+    from minicpmo.utils import get_video_frame_audio_segments  # type: ignore
+
+    t0 = time.time()
+    frames, audio_chunks, _ = get_video_frame_audio_segments(path, stack_frames=1, use_ffmpeg=True)
+    if not frames or len(frames) > 75:
+        raise WorkerError("bad-media", f"Ausschnitt hat {len(frames)} Sekunden (erlaubt 1–75)")
+    contents = []
+    for f, a in zip(frames, audio_chunks):
+        contents += [f, a]
+    msgs = [{"role": "user", "content": contents + [prompt]}]
+    text = m.chat(msgs=msgs, tokenizer=tok, omni_mode=True, max_slice_nums=1, use_tts_template=False, max_new_tokens=max_new, do_sample=False)
+    return {"text": text if isinstance(text, str) else str(text), "seconds": round(time.time() - t0, 2), "frames": len(frames), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+
+
 def op_cancel(req, p):
     rid = p.get("targetRequestId")
     if isinstance(rid, str):
@@ -206,7 +344,7 @@ def op_cancel(req, p):
     return {"cancelled": rid}
 
 
-OPS = {"health": op_health, "capabilities": op_capabilities, "load_model": op_load_model, "unload_model": op_unload_model, "embed_frames": op_embed_frames, "embed_text": op_embed_text}
+OPS = {"health": op_health, "capabilities": op_capabilities, "load_model": op_load_model, "unload_model": op_unload_model, "embed_frames": op_embed_frames, "embed_text": op_embed_text, "temporal_ground": op_temporal_ground, "analyze_av": op_analyze_av}
 
 
 def handle(req: dict) -> dict | None:
@@ -245,16 +383,29 @@ def main() -> int:
     if not _args.allowed_root or not _args.model_root:
         log("--allowed-root und --model-root sind Pflicht")
         return 2
-    for stream in (sys.stdin, sys.stdout):
-        stream.reconfigure(encoding="utf-8")
+    # Protokoll-Pipes auf private Handles legen und fd 0/1 umleiten: Kindprozesse (z. B. das ffmpeg von Lighthouse) erben sonst stdin und
+    # fressen Anfragezeilen bzw. schreiben in den Protokollstrom (gemessen: Worker hing bei temporal_ground).
+    global _OUT, _IN
+    _IN = os.fdopen(os.dup(0), "r", encoding="utf-8", newline="\n")
+    _OUT = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
+    devnull = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(devnull, 0)
+    os.dup2(2, 1)
+    sys.stdin = open(os.devnull, "r")
+    if os.environ.get("SHORTME_WORKER_DEBUG"):
+        import faulthandler
+
+        faulthandler.dump_traceback_later(20, repeat=True, file=sys.stderr)  # Diagnose: wo hängt der Worker?
     # Schwere Importe im Hauptthread VOR dem Lesen von stdin: das Laden der numpy-/torch-DLLs aus einem Nebenthread, während der Hauptthread auf
     # stdin wartet, blockiert unter Windows (gemessen). Fehlschläge werden in health gemeldet, nicht verschluckt.
     t0 = time.time()
-    for name in ("numpy", "torch"):
+    # auch die Pakete der AV-Umgebung (nur wenn installiert): sonst laden ihre DLLs später im Hauptthread, während der Leser-Thread auf stdin blockiert
+    for name in ("numpy", "torch", "transformers", "scipy", "librosa", "clip", "lighthouse.models", "minicpmo.utils"):
         try:
             __import__(name)
         except Exception as e:  # noqa: BLE001
-            log(f"Import {name} fehlgeschlagen: {e}")
+            if name in ("numpy", "torch"):
+                log(f"Import {name} fehlgeschlagen: {e}")
     log(f"Importe fertig in {time.time() - t0:.1f} s")
     send({"protocolVersion": PROTOCOL_VERSION, "event": "ready", "worker": WORKER_VERSION})
 
@@ -268,7 +419,7 @@ def main() -> int:
     def reader() -> None:
         """Liest Anfragen. Abbruch und Statusabfragen werden sofort beantwortet, auch während eine lange Operation im Hauptthread läuft."""
         while True:
-            line = sys.stdin.readline()
+            line = _IN.readline()
             if not line:
                 inbox.put(None)
                 return

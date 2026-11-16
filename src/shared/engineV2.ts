@@ -111,6 +111,8 @@ export interface RawProposal {
   /** Zeitpunkt des Moments (Standard: Mitte). */
   anchor?: number
   source: EvidenceModality
+  /** Engine 3: eigener Rangkanal (z. B. 'visual-embed', 'temporal'); Rangfusion arbeitet je Kanal, Standard = Quelle. */
+  channel?: string
   kind?: EventKind
   summary?: string
   /** Stärke innerhalb der Quelle 0..1 (nur zum Ordnen innerhalb der Quelle, kein Qualitätsmaß). */

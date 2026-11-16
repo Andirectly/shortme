@@ -92,3 +92,38 @@ export async function installRuntime(onLine: (l: string) => void, signal?: Abort
   await writeFileAtomic(markerFile(), JSON.stringify({ lockSha256: sha256(await readFile(lockFile())), torch, uv: UV_VERSION, installedAt: new Date().toISOString() }))
   return runtimeStatus()
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------
+// Zweite Umgebung (AV): MiniCPM-o braucht transformers==4.51.0, das Embedding-Modell ≥ 4.57 → getrennte Umgebung statt Versionskonflikt.
+// Die Liste ist fest gepinnt, aber ohne Hashes (Lighthouse und CLIP kommen als Git-Commit, siehe Kopf der Datei).
+export const avVenvDir = (): string => join(runtimeRoot(), 'py312-v3av')
+export const avPythonExe = (): string => join(avVenvDir(), 'Scripts', 'python.exe')
+const avLockFile = (): string => join(pythonResourceDir(), 'requirements-av.lock.txt')
+const avMarker = (): string => join(avVenvDir(), 'shortme-runtime.json')
+
+export async function avRuntimeStatus(): Promise<RuntimeStatus> {
+  if (!existsSync(avPythonExe())) return { state: 'missing', detail: 'AV-Laufzeit (MiniCPM-o, Lighthouse) nicht installiert' }
+  try {
+    const m = JSON.parse(await readFile(avMarker(), 'utf8')) as { lockSha256?: string; torch?: string }
+    if (m.lockSha256 !== sha256(await readFile(avLockFile()))) return { state: 'outdated', detail: 'AV-Laufzeit passt nicht zur Paketliste (Reparatur nötig)', python: avPythonExe() }
+    return { state: 'ready', detail: `AV-Laufzeit bereit (torch ${m.torch ?? '?'})`, python: avPythonExe() }
+  } catch { return { state: 'missing', detail: 'AV-Laufzeit unvollständig (kein Marker) – Reparatur nötig' } }
+}
+
+export async function installAvRuntime(onLine: (l: string) => void, signal?: AbortSignal): Promise<RuntimeStatus> {
+  await mkdir(runtimeRoot(), { recursive: true })
+  await ensureUv(onLine, signal)
+  onLine('AV-Umgebung (Python 3.12) anlegen …')
+  await run(uvExe(), ['venv', avVenvDir(), '--python', '3.12', '--allow-existing'], onLine, signal)
+  onLine('AV-Pakete installieren (mehrere GB) …')
+  await run(uvExe(), ['pip', 'install', '--python', avPythonExe(), '--extra-index-url', TORCH_INDEX, '--index-strategy', 'unsafe-best-match', '-r', avLockFile()], onLine, signal)
+  const torch = await new Promise<string>((resolve) => {
+    let out = ''
+    const p = spawn(avPythonExe(), ['-c', 'import torch;print(torch.__version__)'], { windowsHide: true })
+    p.stdout.on('data', (d: Buffer) => { out += d.toString() })
+    p.on('close', () => resolve(out.trim()))
+    p.on('error', () => resolve(''))
+  })
+  await writeFileAtomic(avMarker(), JSON.stringify({ lockSha256: sha256(await readFile(avLockFile())), torch, uv: UV_VERSION, installedAt: new Date().toISOString() }))
+  return avRuntimeStatus()
+}

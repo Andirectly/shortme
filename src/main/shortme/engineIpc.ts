@@ -11,8 +11,8 @@ import { engineRevisions } from './clips/engines'
 import { loadState, setSelected, stopStaleRuns } from './clips/engines/state'
 import { v2MissingModels } from './clips/engines/v2/models'
 import { v3MissingModels } from './clips/engines/v3/models'
-import { installRuntime, runtimeStatus } from './clips/engines/v3/runtime'
-import { addOverride, addReview, clipIndex, blindPresentation, createComparison, getComparison, listComparisons } from './clips/compare'
+import { installAvRuntime, installRuntime, runtimeStatus } from './clips/engines/v3/runtime'
+import { addOverride, addRecheck, listRechecks, addReview, clipIndex, blindPresentation, createComparison, getComparison, listComparisons } from './clips/compare'
 import type { EventMatchOverride } from '../../shared/compare'
 import { ENGINE_IDS, isV3Profile, type AnalysisState, type SelectionEngineId, type V3Profile } from '../../shared/engine'
 import type { ContentType, FrameChoice } from '../../shared/videoKind'
@@ -44,8 +44,10 @@ export function registerEngineControlIpc(jobs: JobQueue): void {
   ipcMain.handle('shortme:engineMissing', (_e, engine: SelectionEngineId) => missingModelsFor(engine))
   ipcMain.handle('shortme:v3RuntimeStatus', () => runtimeStatus())
   ipcMain.handle('shortme:compareCreate', (_e, hash: string, runIds: string[]) => createComparison(hash, runIds))
+  ipcMain.handle('shortme:compareRechecks', (_e, hash: string, id: string) => listRechecks(hash, id))
+  ipcMain.handle('shortme:compareRecheck', (_e, hash: string, id: string, clipId: string, engine: 'multimodal-v2' | 'legacy') => addRecheck(hash, id, clipId, engine))
   ipcMain.handle('shortme:compareList', (_e, hash: string) => listComparisons(hash))
-  ipcMain.handle('shortme:compareGet', async (_e, hash: string, id: string) => { const c = await getComparison(hash, id); return c ? { c, clips: await clipIndex(hash, c) } : null })
+  ipcMain.handle('shortme:compareGet', async (_e, hash: string, id: string) => { const c = await getComparison(hash, id); return c ? { c, clips: await clipIndex(hash, c), sourcePath: (await loadMeta(hash))?.sourcePath ?? null } : null })
   ipcMain.handle('shortme:compareOverride', (_e, hash: string, id: string, o: Omit<EventMatchOverride, 'createdAt'>) => addOverride(hash, id, o))
   ipcMain.handle('shortme:compareBlind', async (_e, hash: string, id: string, matchId: string) => { const c = await getComparison(hash, id); return c ? blindPresentation(c, matchId) : [] })
   ipcMain.handle('shortme:compareReview', (_e, hash: string, id: string, r: { matchId: string; choice: 'a' | 'b' | 'c' | 'tie' | 'all-weak'; reasonTags: string[] }) => addReview(hash, id, { ...r, reviewerSessionId: 'local' }))
@@ -54,7 +56,7 @@ export function registerEngineControlIpc(jobs: JobQueue): void {
   ipcMain.handle('shortme:v3RuntimeInstall', async () => {
     if (installing) throw new Error('Die Installation läuft schon.')
     const send = (line: string): void => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('shortme:v3-runtime-progress', line.slice(0, 300)) }
-    installing = installRuntime(send)
+    installing = (async () => { await installRuntime(send); return installAvRuntime(send) })()
     try { return await installing } finally { installing = null }
   })
 

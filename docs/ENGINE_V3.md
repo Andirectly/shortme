@@ -1,34 +1,19 @@
-# Engine 3 – Adaptive AI (Status)
+# Engine 3 – Adaptive AI
 
-Stand: nur gemessene Werte. Alles andere steht als „nicht umgesetzt“ da.
+Kurzfassung. Details: `ENGINE_V3_ARCHITECTURE.md` (Aufbau), `ENGINE_V3_STATUS.md` (Modellrollen, Befehle, Fehler), `ENGINE_V3_BENCHMARKS.md` (Messungen), `ENGINE_COMPARISON.md` (Vergleich), `ENGINE_V3_LICENSES.md` (Lizenzen).
 
 ## Ablauf
-Text-Suche → Embedding-Index (Qwen3-VL-Embedding-2B, Python-Worker) → 14 feste Anfragen (`queries-v1`) → Spitzen (z-Wert) → Rohvorschläge → RRF-Fusion mit den Text-/Ton-Vorschlägen → Detailprüfung, Bewertung, Schnittvarianten, Nahtprüfung = Code von Engine 2 (`compat`, ausdrücklich nicht neu).
-Profile: Schnell (12-s-Fenster), Ausgewogen (8 s), Gründlich (8-s-Fenster, 4-s-Schritt, 6 Bilder).
+Text-/Ton-Quellen → Embedding-Index (Qwen3-VL-Embedding-2B) → Lighthouse-Verortung (CG-DETR/CLIP) → Rangfusion je Kanal → **Bild+Ton-Prüfung mit MiniCPM-o 4.5** → Bewertung, Schnitt, Naht, Paarvergleich (Engine-2-Code, als „compat“ gekennzeichnet).
+Profile: Schnell (grobe Fenster, keine Lighthouse-Verortung, 6 Ereignisse mit Bild+Ton), Ausgewogen (8-s-Fenster, Verortung, 16 Prüfungen), Gründlich (4-s-Schritt, 32 Prüfungen).
 
-## Laufzeit
-- Python 3.12 unter `<Daten>/runtime/py312-v3`, per `uv` 0.13.1 (SHA-256 fest), Lock mit Hashes (`resources/python/requirements.lock.txt`), torch 2.8.0+cu128.
-- Worker `resources/python/worker.py`, Zeilen-JSON (Protokoll v1), Pfade nur unter erlaubten Wurzeln, kein Pickle.
-- Modell `qwen3-vl-embedding-2b` (feste HF-Revision, SHA-256 je Datei) über den Modell-Manager; liegt nicht im Repo/Installer.
-- ASR und Embedding-Modell nie gleichzeitig im VRAM (VramSequencer, Resident `v3-embed`).
+## Voraussetzungen (Pflicht, keine stille Rückstufung)
+- Python-Umgebungen `py312-v3` und `py312-v3av` (App installiert sie selbst; Knopf „Erneut versuchen“ bei Fehlern).
+- Modelle im Modell-Manager: `qwen3-vl-embedding-2b` (4,3 GB), `minicpm-o-4_5` (18,8 GB), `lighthouse-cg-detr-clip` (0,5 GB) sowie die Engine-2-Modelle (Ersatzprüfer, Text, Naht).
+- GPU: gemessen 22 GB Spitze für MiniCPM-o allein; Modelle laufen nacheinander (VramSequencer).
 
-## Gemessen (RTX 5090, 293-s-Stream, Ausgewogen)
-- Modell laden 2,26 s, 4,26 GB; Peak 4,49 GB; Index 37 Fenster in 13,2 s.
-- Gesamtlauf 367 s, 4 Clips, Bildprüfung als `signal-only` markiert (Embedding-Signal, keine Detailprüfung am Bild).
-- Eine einzige Messung, ein Video. Keine Qualitätsaussage „besser als Engine 2“.
-
-## Vergleich (`docs`-Kurzfassung)
-`src/shared/compare.ts` (Zuordnung, Zeitabbildung, Blind-Reihenfolge), `src/main/shortme/clips/compare.ts` (Speicher `analysis/comparisons/<id>.json`), Ansicht `CompareScreen.tsx`.
-Nur Läufe eines Projekts. Zuordnung: zeitliche IoU ≥ 0,25 oder Anker im Fenster; je Lauf ein Ereignis pro Match; knappe Zweitkandidaten → `ambiguous`; manuelles Zusammenführen/Trennen wird gespeichert. „Nur hier“ gilt für das Endergebnis, nicht für den Rohpool.
-Nicht umgesetzt: synchrones Nebeneinander-Abspielen; getrennter `clip-recheck`-Lauf; Rohpool-Vergleich.
-
-## Adapter-Status (keine Fake-Einträge)
-| Baustein | Status |
-|---|---|
-| Qwen3-VL-Embedding-2B | umgesetzt, real getestet |
-| Lighthouse, MiniCPM-o 4.5, MOSS-VL, TEMPURA, TRINITY, QB-Highlights, Qwen3-VL-Reranker, Marlin, TripleSumm | nicht umgesetzt, nicht geprüft |
-| VideoITG | `license-blocked` (nichtkommerzielle Gewichte), kein Download |
-| `temporal_ground`, `analyze_av`, `select_frames`, `rank_candidates` im Worker | nicht implementiert (Worker meldet das) |
+## Reproduzieren
+`ENGINE=adaptive-v3 PROFILE=balanced SHORTME_DATA=<Daten> npx tsx --tsconfig tsconfig.node.json scripts/engine-run.ts <projekt> stream 5`
+Die App vorher schließen: ihr `llama-server` belegt sonst VRAM, MiniCPM-o wird dann extrem langsam.
 
 ## Offen
-Schätzung (`estimate.ts`) nutzt Startwerte, nicht kalibriert. `manifest.json`/`embedding.json` je Lauf laut Spezifikation fehlen. Oberfläche (Schalter, Profil, Laufzeit-Installation, Vergleich) per Typecheck geprüft, nicht im laufenden Fenster durchgeklickt.
+Lauf auf langen Videos, Blindtests, Schätzung (`estimate.ts`) nicht kalibriert, Adapter MOSS-VL/TEMPURA/TRINITY/QB-Highlights/Reranker nicht gebaut, VideoITG gesperrt.

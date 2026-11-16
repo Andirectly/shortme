@@ -89,6 +89,49 @@ export const CATALOG: AssetSpec[] = [
     vramMb: 5000
   },
   {
+    id: 'minicpm-o-4_5',
+    name: 'MiniCPM-o 4.5 (Engine 3, Video + Audio, PyTorch)',
+    kind: 'vision',
+    note: 'Engine 3: prüft Ereignisse mit echtem Bild UND Ton in einem Modell (läuft im Python-Worker) · Apache-2.0 (Modellkarte) · ca. 18,8 GB, ca. 19 GB VRAM (gemessen: 18,1 GB geladen, 22 GB Spitze)',
+    // Revision fest gebunden; Prüfsummen der LFS-Dateien gegen die Hugging-Face-API geprüft, kleine Dateien selbst berechnet; Gewichte der Sprachausgabe (assets/) werden nicht geladen
+    files: [
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/added_tokens.json`, name: 'added_tokens.json', size: 2706, sha256: '34d823f7a691ddec4816ac5dfe5fc487963e3d75ab3be374590c02fc0a7fa3f5' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/config.json`, name: 'config.json', size: 6439, sha256: 'b0c03cf9f0cfc1178ade50e4ba62727ca7a77aa6a6a71eda6668d8f289e96c1d' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/configuration_minicpmo.py`, name: 'configuration_minicpmo.py', size: 10135, sha256: 'b0c56c192d4aa57d3dc358338a4a93413b8b68e7c7a7c5b82a5af35afab1d86a' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/generation_config.json`, name: 'generation_config.json', size: 178, sha256: 'cf29e6aecb72503bd220cccb6d86bde84a9f57e77c741dedb8670036106e2119' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/merges.txt`, name: 'merges.txt', size: 1402109, sha256: 'ac8ff86a72bee70828fbc1119bc4398c6f3a9a6e490d7b0dbe917be025478bd0' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model-00001-of-00004.safetensors`, name: 'model-00001-of-00004.safetensors', size: 5273477136, sha256: '30c40b9a10386c1bc404568d8829e5aada2e3501d9de6fb46ff80451aff7e077' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model-00002-of-00004.safetensors`, name: 'model-00002-of-00004.safetensors', size: 5301855080, sha256: 'fe0faef420aca8f771bec1f9fcfaae01206c56b8e64e4429a1ff500c962fbf96' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model-00003-of-00004.safetensors`, name: 'model-00003-of-00004.safetensors', size: 5301855048, sha256: '5d0b20153f9bfa88ebcd1cb6bbd5b7cac4c217b3cafb137a291a1b380d8b7821' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model-00004-of-00004.safetensors`, name: 'model-00004-of-00004.safetensors', size: 2866549964, sha256: 'f61addf4747c94fedcaee059e5d9918ed15543beec494404139a99f2f86c9b31' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/model.safetensors.index.json`, name: 'model.safetensors.index.json', size: 117202, sha256: 'e578de05a95804bb15237a6fd7c236414e0160cd76751da82c9f7f0d134596e7' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/modeling_minicpmo.py`, name: 'modeling_minicpmo.py', size: 214356, sha256: '25359f891d1aa81de16b51a24a97b8c8262b83ce3920c36b92be441fde8e4282' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/modeling_navit_siglip.py`, name: 'modeling_navit_siglip.py', size: 42559, sha256: '1a40a58cb7dfa93f723685f860d1cf3caf3a0ecf52b7904db0c4007aacd1536f' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/preprocessor_config.json`, name: 'preprocessor_config.json', size: 842, sha256: '10350f12d5636b24e19265d72c5543b462251f54ca18afaa147f6f2ece9591e0' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/processing_minicpmo.py`, name: 'processing_minicpmo.py', size: 67284, sha256: '3a1f017339b92c2fa768d7737db76cc4689d2280b68a71866b06f7dedc8ac1c2' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/special_tokens_map.json`, name: 'special_tokens_map.json', size: 12002, sha256: 'a119f5bb22d8818d33514e0b58a224c111bb8e7aa1702d625a23fbe82e6e86b5' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/tokenization_minicpmo_fast.py`, name: 'tokenization_minicpmo_fast.py', size: 3249, sha256: 'c9c71d0d7ef0c113829e2d810619c9e0a69cffe04c732c4d80599b40a33bc7bf' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/tokenizer.json`, name: 'tokenizer.json', size: 11437712, sha256: '6d55eb34389b8c87403763cc1d80447d91c85c7cd39cd5e3c0dc2d49edad989d' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/tokenizer_config.json`, name: 'tokenizer_config.json', size: 101726, sha256: 'cb1325fdb3b0b9f38b64607399d3e163fbe32bf49c273c229755a0dbce83f813' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/utils.py`, name: 'utils.py', size: 95702, sha256: '0372698343830d4a96524f56a91a8cabf628fd7c57dde8b25db43eed1f6042c1' },
+      { url: `${HF}/openbmb/MiniCPM-o-4_5/resolve/fb09628e98b1f55d8d5b863e0eccfcdd11bff499/vocab.json`, name: 'vocab.json', size: 2776833, sha256: 'ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910' }
+    ],
+    expect: ['model-00001-of-00004.safetensors', 'model-00004-of-00004.safetensors', 'config.json', 'modeling_minicpmo.py'],
+    vramMb: 19000
+  },
+  {
+    id: 'lighthouse-cg-detr-clip',
+    name: 'Lighthouse CG-DETR (CLIP) + CLIP ViT-B/32 (Engine 3, Zeitpunkt-Suche)',
+    kind: 'vision',
+    note: 'Engine 3: findet zu einer Beschreibung die passenden Momente und Saliency im Video · Checkpoint Zenodo 13960580 (CC-BY-4.0, MD5 laut Zenodo geprüft), Code Apache-2.0 · CLIP-Gewicht von OpenAI (MIT) · ca. 0,5 GB, unter 1 GB VRAM',
+    files: [
+      { url: 'https://zenodo.org/api/records/13960580/files/clip_cg_detr_qvhighlight.ckpt/content', name: 'clip_cg_detr_qvhighlight.ckpt', size: 143416407, sha256: 'a47b5de4cfb0c3050affffd7cdec8347bb1e135b343bfc202077c781a065be9c' },
+      { url: 'https://openaipublic.azureedge.net/clip/models/40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt', name: 'ViT-B-32.pt', size: 353976522, sha256: '40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af' }
+    ],
+    expect: ['clip_cg_detr_qvhighlight.ckpt', 'ViT-B-32.pt'],
+    vramMb: 1000
+  },
+  {
     id: 'qwen3-vl-4b',
     name: 'Qwen3-VL 4B Instruct (Q4_K_M + Projektor F16)',
     kind: 'vision',

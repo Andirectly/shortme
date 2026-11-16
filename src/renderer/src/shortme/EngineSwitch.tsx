@@ -92,8 +92,8 @@ export function EngineBar(): React.JSX.Element | null {
       {engine.missing.length > 0 && (st.selected !== 'legacy' || engine.msg) && (
         <div role="alert" className="sm-glass" style={{ padding: '10px 14px', display: 'grid', gap: 6, justifyItems: 'start' }}>
           <small>Für {ENGINE_LABEL[st.selected]} fehlt: {engine.missing.map((m) => `${m.name}${m.sizeBytes ? ` (${fmtMB(m.sizeBytes)})` : ''}`).join(', ')}.</small>
-          {engine.missing.some((m) => m.id === 'python-runtime-v3') && <RuntimeInstall onDone={() => void loadEngine(hash)} />}
-          {engine.missing.some((m) => m.id !== 'python-runtime-v3') && <Button variant="primary" onClick={() => go('models')}>Modell-Manager öffnen</Button>}
+          {engine.missing.some((m) => m.id.startsWith('python-runtime-v3')) && <RuntimeInstall onDone={() => void loadEngine(hash)} />}
+          {engine.missing.some((m) => !m.id.startsWith('python-runtime-v3')) && <Button variant="primary" onClick={() => go('models')}>Modell-Manager öffnen</Button>}
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@ import { dirname } from 'node:path'
 import type { ShortmeClip } from '@shared/shortme'
 import { defaultWanted } from '@shared/estimate'
 import { withAudio, withLlm, withVision } from '../../../../engines'
+import type { AvResult, AvTarget } from '../v3/avCheck'
 import { projectFile } from '../../../project'
 import { runFile } from '../state'
 import { marksBySentence } from '../../audioEvents'
@@ -45,6 +46,12 @@ export interface V3Hooks {
   discover: (ctx: { project: SelectionRequest['project']; signal?: AbortSignal; report: (f: number, msg: string) => void; query?: string }) => Promise<V3Discovery>
   /** Rangfusion über alle Quellen (je Quelle normalisiert, dann zusammengeführt). */
   fuse: (raw: RawProposal[]) => RawProposal[]
+  /** Lighthouse: zeitliche Verortung über das ganze Video (nur Profile mit `temporal`). */
+  temporal?: (ctx: Parameters<V3Hooks['discover']>[0]) => Promise<V3Discovery>
+  /** Maximale Zahl Ereignisse für die Audio+Video-Prüfung. */
+  avMax: number
+  /** MiniCPM-o: Ausschnitte mit Bild und Ton prüfen. */
+  verifyAv: (ctx: { targets: AvTarget[]; signal?: AbortSignal; report: (f: number, msg: string) => void }) => Promise<AvResult & { models: Record<string, string> }>
   revisions: () => string[]
   missing: () => Promise<Array<{ id: string; name: string; sizeBytes: number }>>
 }
@@ -128,8 +135,10 @@ export async function runPipeline(req: SelectionRequest, mode: PipelineMode): Pr
   let picked: Ev[] = []
   let events: Ev[] = []
   const visionRan = new Set<string>()
-  const needsVision = (e: Ev): boolean => stream || e.kind === 'gameplay' || e.foundBy.includes('visual')
-  const needsAudio = (e: Ev): boolean => project.hasAudio && (stream || e.foundBy.includes('audio') || ['performance', 'witz', 'reaktion', 'konflikt'].includes(e.kind))
+  const avDone = new Set<string>()
+  const avDoneRef = (): Set<string> => avDone
+  const needsVision = (e: Ev): boolean => !avDoneRef().has(e.id) && (stream || e.kind === 'gameplay' || e.foundBy.includes('visual'))
+  const needsAudio = (e: Ev): boolean => !avDoneRef().has(e.id) && project.hasAudio && (stream || e.foundBy.includes('audio') || ['performance', 'witz', 'reaktion', 'konflikt'].includes(e.kind))
   let v3Cov = 0
   if (v3) {
     report('candidates', 0.4, 'Video semantisch durchsuchen (Embedding-Index) …')
@@ -142,10 +151,51 @@ export async function runPipeline(req: SelectionRequest, mode: PipelineMode): Pr
       modalities.visual = 'failed'; problems.push(`Embedding-Suche fehlgeschlagen: ${e instanceof Error ? e.message.slice(0, 200) : e}`)
     }
   }
+  if (v3?.temporal) {
+    report('candidates', 0.7, 'Zeitliche Verortung (Lighthouse) …')
+    try {
+      const d = await stage('verortung', () => v3.temporal!({ project, signal, query, report: (f, m) => report('candidates', 0.7 + 0.3 * f, m) }))
+      raw.push(...d.proposals); addEv(d.evidence); problems.push(...d.problems)
+      diag.v3Temporal = d.diag; diag.v3Models = { ...(diag.v3Models as object), ...d.models }
+    } catch (e) {
+      if (signal?.aborted) throw e
+      problems.push(`Zeitliche Verortung (Lighthouse) fehlgeschlagen: ${e instanceof Error ? e.message.slice(0, 200) : e}`)
+      diag.v3Temporal = { status: 'failed', reason: e instanceof Error ? e.message.slice(0, 200) : String(e) }
+    }
+  } else if (v3) diag.v3Temporal = { status: 'not-run', reason: 'Profil ohne zeitliche Verortung' }
   const fusedRaw = (): RawProposal[] => (v3 ? v3.fuse(raw) : raw)
+  // Engine 3: Ereignisse jetzt bilden und mit MiniCPM-o (Bild + Ton gemeinsam) prüfen; Qwen3-VL/Voxtral prüfen nur, was dabei nicht geprüft werden konnte (sichtbar im Lauf)
+  if (v3) {
+    events = clusterProposals(fusedRaw(), dur) as Ev[]
+    events.forEach((e) => { e.requiredModalities = [] })
+    const pick = pickDetailSet(events, dur, detailMax, V2_LIMITS.reservePerSource)
+    picked = pick.picked
+    diag.events = { raw: raw.length, clustered: events.length, picked: picked.length, timeBinsCovered: `${pick.binsCovered}/${pick.bins}`, skipped: pick.skipped.length }
+    const strongest = (e: Ev): number => Math.max(0, ...Object.values(e.strength).map((v) => v ?? 0))
+    const targets: AvTarget[] = [...picked].sort((a, b) => strongest(b) - strongest(a)).slice(0, v3.avMax).map((e) => ({ id: e.id, start: e.start, end: e.end, anchor: e.anchor, summary: e.summary || '' }))
+    if (targets.length) {
+      report('rate', 0, 'Bild und Ton prüfen (MiniCPM-o) …')
+      try {
+        const r = await stage('av-pruefung', () => v3.verifyAv({ targets, signal, report: (f, m) => report('rate', f * 0.5, m) }))
+        addEv(r.evidence)
+        for (const [id, ids] of r.checked) { const ev = picked.find((x) => x.id === id); if (ev) { ev.evidenceIds.push(...ids); avDone.add(id) } }
+        diag.v3Av = { model: r.models, targets: targets.length, checked: r.checked.size, failed: r.failed, calls: r.calls, seconds: Math.round(r.seconds * 10) / 10, peakVramBytes: r.peakVramBytes ?? 'nicht gemessen' }
+        if (r.failed.length) problems.push(`Bild+Ton-Prüfung: ${r.failed.length}/${targets.length} Ereignisse nicht geprüft (Ersatzprüfer Qwen3-VL/Voxtral)`)
+        if (r.checked.size) { modalities.visual = 'checked'; if (project.hasAudio) modalities.audio = 'checked' }
+      } catch (e) {
+        if (signal?.aborted) throw e
+        problems.push(`MiniCPM-o nicht nutzbar: ${e instanceof Error ? e.message.slice(0, 200) : e} – Ersatzprüfer Qwen3-VL/Voxtral`)
+        diag.v3Av = { status: 'failed', reason: e instanceof Error ? e.message.slice(0, 200) : String(e), fallback: 'qwen3-vl-4b + voxtral-mini-3b (V2-Prüfer)' }
+      }
+    }
+  }
   report('rate', 0, 'Bild prüfen …')
+  // Engine 3: der Bildserver (Qwen3-VL) startet nur, wenn Ereignisse bei der Bild+Ton-Prüfung durchgefallen sind
+  const visionNeeded = !v3 || picked.some(needsVision)
+  if (v3 && !visionNeeded) diag.visionFallback = { used: false }
+  else if (v3) diag.visionFallback = { used: true, events: picked.filter(needsVision).length, model: V2_MODELS.vision }
   try {
-    await stage('bild', () => withVision(async (url) => {
+    if (visionNeeded) await stage('bild', () => withVision(async (url) => {
       const sw = v3 ? { proposals: [] as RawProposal[], evidence: [] as Evidence[], sampled: 0, failed: 0, step: 0, calls: 0 } : await stage('bild-rundgang', () => sweep(project.sourcePath, url, dur, { maxFrames: SWEEP_MAX_FRAMES, signal, modelRev: V2_MODELS.vision, onProgress: (f) => report('rate', f * 0.15, 'Bild-Rundgang …') }))
       raw.push(...sw.proposals); addEv(sw.evidence)
       for (let i = 0; i < sw.sampled; i++) sweepCov.push([(i + 0.5) * sw.step - sw.step / 2, (i + 0.5) * sw.step + sw.step / 2])
@@ -154,12 +204,14 @@ export async function runPipeline(req: SelectionRequest, mode: PipelineMode): Pr
         modalities.visual = sw.failed === 0 ? 'checked' : sw.failed >= sw.sampled ? 'failed' : 'checked'
         if (sw.failed) problems.push(`Bild-Rundgang: ${sw.failed}/${sw.sampled} Bilder nicht geprüft`)
       }
-      // Ereignisse bilden und für die Detailprüfung auswählen (reine Logik)
-      events = clusterProposals(fusedRaw(), dur) as Ev[]
-      events.forEach((e) => { e.requiredModalities = [] })
-      const pick = pickDetailSet(events, dur, detailMax, V2_LIMITS.reservePerSource)
-      picked = pick.picked
-      diag.events = { raw: raw.length, clustered: events.length, picked: picked.length, timeBinsCovered: `${pick.binsCovered}/${pick.bins}`, skipped: pick.skipped.length }
+      // Ereignisse bilden und für die Detailprüfung auswählen (reine Logik); Engine 3 hat das schon vor der Bild+Ton-Prüfung getan
+      if (!v3) {
+        events = clusterProposals(fusedRaw(), dur) as Ev[]
+        events.forEach((e) => { e.requiredModalities = [] })
+        const pick = pickDetailSet(events, dur, detailMax, V2_LIMITS.reservePerSource)
+        picked = pick.picked
+        diag.events = { raw: raw.length, clustered: events.length, picked: picked.length, timeBinsCovered: `${pick.binsCovered}/${pick.bins}`, skipped: pick.skipped.length }
+      }
       let i = 0
       for (const ev of picked.filter(needsVision)) {
         report('rate', 0.15 + 0.5 * (i++ / Math.max(1, picked.filter(needsVision).length)), `Bild prüfen (${i}/${picked.filter(needsVision).length}) …`)

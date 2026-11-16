@@ -7,11 +7,14 @@ import type { SelectionOutcome, SelectionRequest } from '..'
 import { isV3Profile, type V3Profile } from '../../../../../shared/engine'
 import { runPipeline, type V3Discovery, type V3Hooks } from '../v2'
 import { buildIndex } from './embedIndex'
+import { verifyAv } from './avCheck'
+import { withAv, withTemporal } from './avWorker'
+import { groundVideo } from './temporal'
 import { withEmbedder } from './embedWorker'
 import { v3MissingModels } from './models'
 import { readNpy } from './npy'
-import { V3_EMBED_CODE, V3_EMBED_MODEL, V3_PROFILE_CONFIG, v3Revisions } from './revisions'
-import { QUERY_SET, fuseRrf, peaksOf, peaksToProposals, scoreQueries, type Peak, type SearchQuery } from './search'
+import { V3_AV_MODEL, V3_EMBED_CODE, V3_EMBED_MODEL, V3_PROFILE_CONFIG, V3_TEMPORAL_MODEL, v3Revisions } from './revisions'
+import { QUERY_SET, fuseRrf, peaksOf, peaksToProposals, scoreQueries, temporalProposals, type Peak, type SearchQuery } from './search'
 
 export function activeQueries(profile: V3Profile, userQuery?: string): SearchQuery[] {
   const base = QUERY_SET.filter((q) => q.rank <= V3_PROFILE_CONFIG[profile].queries)
@@ -47,9 +50,28 @@ async function discover(req: SelectionRequest, profile: V3Profile, ctx: Paramete
   })
 }
 
+/** Lighthouse: zeitliche Verortung der Anfragen über das ganze Video (eigener Rangkanal 'temporal'). */
+async function temporal(req: SelectionRequest, profile: V3Profile, ctx: Parameters<V3Hooks['discover']>[0]): Promise<V3Discovery> {
+  const { project } = ctx
+  const queries = activeQueries(profile, ctx.query)
+  const topK = Math.max(2, Math.ceil(project.durationSec / 900))
+  const total = Math.max(6, Math.ceil(project.durationSec / 150)) // Gesamtbudget Verortungs-Vorschläge
+  return withTemporal(req.runId, async (s) => {
+    const r = await groundVideo(s, { hash: project.hash, video: project.sourcePath, durationSec: project.durationSec, queries, topK, total, signal: ctx.signal, onProgress: ctx.report })
+    const { proposals, evidence } = temporalProposals(r.moments, queries, `${V3_TEMPORAL_MODEL.id}@${V3_TEMPORAL_MODEL.codeCommit.slice(0, 8)}`, project.durationSec)
+    const failedSec = r.failed.reduce((n, [a, b]) => n + (b - a), 0)
+    return {
+      proposals, evidence, modality: r.failed.length ? 'failed' : 'signal-only', coverage: Math.max(0, 1 - failedSec / project.durationSec),
+      problems: r.failed.length ? [`Lighthouse: ${r.failed.length} Fenster (${Math.round(failedSec)} s) nicht ausgewertet`] : [],
+      models: { temporal: `${V3_TEMPORAL_MODEL.id} (Code ${V3_TEMPORAL_MODEL.codeCommit.slice(0, 8)}, Checkpoint Zenodo 13960580)` },
+      diag: { windows: r.windows, cached: r.cached, seconds: Math.round(r.seconds * 10) / 10, moments: r.moments.length, proposals: proposals.length, failed: r.failed, peakVramBytes: r.peakVramBytes ?? 'nicht gemessen', queries: queries.length, note: 'Modellwerte nicht kalibriert; Rangfusion je Kanal. Modell ist auf Vlogs (QVHighlights, ≤ 150 s) trainiert, Fenster 120 s mit 10 s Überlappung' }
+    }
+  })
+}
+
 export function v3Hooks(req: SelectionRequest, profile: V3Profile): V3Hooks {
   const cfg = V3_PROFILE_CONFIG[profile]
-  return { profile, detailMax: cfg.detailMax, finalists: cfg.finalists, discover: (ctx) => discover(req, profile, ctx), fuse: (raw) => fuseRrf(raw), revisions: () => v3Revisions(profile), missing: v3MissingModels }
+  return { profile, detailMax: cfg.detailMax, finalists: cfg.finalists, discover: (ctx) => discover(req, profile, ctx), ...(cfg.temporal ? { temporal: (ctx: Parameters<V3Hooks['discover']>[0]) => temporal(req, profile, ctx) } : {}), avMax: cfg.avMax, verifyAv: (ctx) => withAv(req.runId, async (s) => ({ ...(await verifyAv(s, { hash: req.project.hash, video: req.project.sourcePath, durationSec: req.project.durationSec, targets: ctx.targets, signal: ctx.signal, onProgress: ctx.report })), models: { av: `${V3_AV_MODEL.id}@${V3_AV_MODEL.revision}`, torch: String(s.health.torch ?? '?'), gpu: String(s.health.gpu ?? '?') } })), fuse: (raw) => fuseRrf(raw), revisions: () => v3Revisions(profile), missing: v3MissingModels }
 }
 
 export function selectV3(req: SelectionRequest): Promise<SelectionOutcome> {

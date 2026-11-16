@@ -6,7 +6,8 @@ import { writeFileAtomic } from '../atomic'
 import { projectFile } from '../project'
 import { LEGACY_RUN_ID } from '../../../shared/engine'
 import { blindOrder, matchEvents, type BlindReview, type CmpRun, type EngineComparison, type EventMatchOverride } from '../../../shared/compare'
-import { loadClips } from './analysis'
+import { findClip, loadClips } from './analysis'
+import { recheckClip, type ClipRecheck } from './engines/recheck'
 import { loadState } from './engines/state'
 
 const dir = (hash: string): string => projectFile(hash, 'analysis/comparisons')
@@ -91,4 +92,22 @@ export async function clipIndex(hash: string, c: EngineComparison): Promise<Reco
   const out: Record<string, { title: string; start: number; end: number; score: number; autoCuts: Array<{ start: number; end: number }> }> = {}
   for (const r of await runsOf(hash, c.runIds)) for (const k of r.clips) out[k.id] = { title: k.title, start: k.start, end: k.end, score: k.score, autoCuts: k.autoCuts ?? [] }
   return out
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------
+// clip-recheck: getrennt von der Quellanalyse gespeichert (<id>.rechecks.json), nie in Matches/Exklusiv-Zahlen eingerechnet.
+const recheckFile = (hash: string, id: string): string => file(hash, id).replace(/\.json$/, '.rechecks.json')
+export async function listRechecks(hash: string, id: string): Promise<ClipRecheck[]> {
+  try { return JSON.parse(await readFile(recheckFile(hash, id), 'utf8')) as ClipRecheck[] } catch { return [] }
+}
+export async function addRecheck(hash: string, id: string, clipId: string, byEngine: 'multimodal-v2' | 'legacy'): Promise<ClipRecheck[]> {
+  const c = await getComparison(hash, id)
+  if (!c) throw new Error('Vergleich nicht gefunden')
+  const found = await findClip(hash, clipId)
+  if (!found || !c.runIds.includes(found.runId)) throw new Error('Clip gehört nicht zu diesem Vergleich')
+  const r = await recheckClip(hash, found.clip, found.runId, byEngine)
+  const all = [...(await listRechecks(hash, id)), r]
+  await mkdir(dir(hash), { recursive: true })
+  await writeFileAtomic(recheckFile(hash, id), JSON.stringify(all, null, 1))
+  return all
 }

@@ -82,7 +82,7 @@ export function peaksToProposals(peaks: Peak[], queries: SearchQuery[], modelRev
     const id = `em${n + 1}`
     const start = Math.max(0, p.start - 8), end = Math.min(durationSec, Math.max(p.end + 4, start + 20))
     evidence.push({ id, modality: 'visual', state: 'signal-only', source: 'qwen3-vl-embedding-2b', start: p.start, end: p.end, observation: `Bild-Embedding ähnlich zu „${q.label}“ (Kosinus ${p.cos.toFixed(3)}, z ${p.z.toFixed(1)})`, modelRev, uncertainty: 'Abruf-Treffer im Embedding-Raum, kein Verständnis des Ablaufs; Ähnlichkeit ist kein Qualitätswert' })
-    proposals.push({ start, end, anchor: p.anchor, source: 'visual', kind: q.kind, summary: q.label, strength: Math.min(1, p.z / zmax), evidenceIds: [id] })
+    proposals.push({ start, end, anchor: p.anchor, source: 'visual', channel: 'visual-embed', kind: q.kind, summary: q.label, strength: Math.min(1, p.z / zmax), evidenceIds: [id] })
   })
   return { proposals, evidence }
 }
@@ -93,9 +93,68 @@ export function peaksToProposals(peaks: Peak[], queries: SearchQuery[], modelRev
  */
 export function fuseRrf(raw: RawProposal[], k = 60): RawProposal[] {
   const out: RawProposal[] = []
-  for (const src of ['text', 'audio', 'visual', 'chat'] as const) {
-    const mine = raw.filter((r) => r.source === src).sort((a, b) => b.strength - a.strength)
+  const channels = [...new Set(raw.map((r) => r.channel ?? r.source))]
+  for (const ch of channels) {
+    const mine = raw.filter((r) => (r.channel ?? r.source) === ch).sort((a, b) => b.strength - a.strength)
     mine.forEach((r, rank) => out.push({ ...r, strength: k / (k + rank) }))
   }
   return out
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------
+// Zeitliche Verortung (Lighthouse CG-DETR, CLIP-Features): Fenster ≤ 150 s (Modellgrenze), Rückrechnung in Quellsekunden, Momente → Rohvorschläge
+
+/** Lighthouse ist auf kurze Videos trainiert (QVHighlights, ≤ 150 s): lange Videos werden in überlappende Fenster geteilt; jede Sekunde liegt in mindestens einem. */
+export const TEMPORAL_WINDOW_SEC = 120
+export const TEMPORAL_OVERLAP_SEC = 10
+export function temporalWindows(durationSec: number, windowSec = TEMPORAL_WINDOW_SEC, overlapSec = TEMPORAL_OVERLAP_SEC): Array<{ start: number; end: number }> {
+  const out: Array<{ start: number; end: number }> = []
+  if (!(durationSec > 4)) return out
+  const hop = windowSec - overlapSec
+  for (let s = 0; s < durationSec - 2; s += hop) {
+    const e = Math.min(durationSec, s + windowSec)
+    out.push({ start: s, end: e })
+    if (e >= durationSec) break
+  }
+  return out
+}
+
+export interface TemporalMoment { query: string; start: number; end: number; score: number }
+const iou1 = (a: { start: number; end: number }, b: { start: number; end: number }): number => { const i = Math.max(0, Math.min(a.end, b.end) - Math.max(a.start, b.start)); const u = a.end - a.start + (b.end - b.start) - i; return u > 0 ? i / u : 0 }
+
+/**
+ * Momente je Anfrage: Dubletten aus den Fensterüberlappungen entfernen (IoU > 0,5 → der stärkere bleibt), dann die besten K behalten. Kein fester Schwellwert:
+ * die Werte des Modells sind nicht kalibriert, entscheidend ist der Rang innerhalb der Anfrage (danach Rangfusion).
+ */
+export function pickMoments(moments: TemporalMoment[], topK: number, total = Infinity): TemporalMoment[] {
+  const out: TemporalMoment[] = []
+  for (const q of [...new Set(moments.map((m) => m.query))]) {
+    const kept: TemporalMoment[] = []
+    for (const m of moments.filter((x) => x.query === q && x.end > x.start).sort((a, b) => b.score - a.score)) {
+      if (kept.length >= topK) break
+      if (kept.every((k) => iou1(k, m) <= 0.5)) kept.push(m)
+    }
+    out.push(...kept)
+  }
+  // Gesamtbudget: die besten Momente über alle Anfragen (Modellwerte gelten nur für dieselbe Anfrage vergleichbar → Rang je Anfrage, dann abwechselnd auffüllen)
+  if (out.length <= total) return out
+  const byQ = [...new Set(out.map((m) => m.query))].map((q) => out.filter((m) => m.query === q))
+  const res: TemporalMoment[] = []
+  for (let r = 0; res.length < total && byQ.some((l) => l[r]); r++) for (const l of byQ) if (l[r] && res.length < total) res.push(l[r])
+  return res
+}
+
+export function temporalProposals(moments: TemporalMoment[], queries: SearchQuery[], modelRev: string, durationSec: number): { proposals: RawProposal[]; evidence: Evidence[] } {
+  const byId = new Map(queries.map((q) => [q.id, q]))
+  const proposals: RawProposal[] = [], evidence: Evidence[] = []
+  moments.forEach((m, n) => {
+    const q = byId.get(m.query)
+    if (!q) return
+    const id = `tg${n + 1}`
+    const mid = (m.start + m.end) / 2
+    const start = Math.max(0, m.start - 4), end = Math.min(durationSec, Math.max(m.end + 3, start + 15))
+    evidence.push({ id, modality: 'visual', state: 'signal-only', source: 'lighthouse-cg-detr', start: m.start, end: m.end, observation: `Lighthouse-Moment passend zu „${q.label}“ (Modellwert ${m.score.toFixed(2)})`, modelRev, uncertainty: 'Zeitliche Verortung durch ein auf Vlogs trainiertes Modell (QVHighlights); Wert nicht kalibriert, kein Verständnis des Ablaufs' })
+    proposals.push({ start, end, anchor: mid, source: 'visual', channel: 'temporal', kind: q.kind, summary: q.label, strength: Math.max(0, Math.min(1, m.score)), evidenceIds: [id] })
+  })
+  return { proposals, evidence }
 }

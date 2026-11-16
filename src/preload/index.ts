@@ -32,7 +32,7 @@ import type { PlatformId, UploadOverview } from '@shared/upload'
 import type { WbOverview, WbProject, WbStatus, WorkItem } from '@shared/workbench'
 import type { LearnSettings } from '@shared/learn'
 import type { CatalogStatus } from '@shared/catalog'
-import type { BlindReview, EngineComparison, EventMatchOverride } from '@shared/compare'
+import type { BlindReview, ClipRecheckView, EngineComparison, EventMatchOverride } from '@shared/compare'
 import type { AnalysisState, EngineSwitchResult, SelectionEngineId, V3Profile } from '@shared/engine'
 import type { LearnStats } from '@shared/learnStats'
 import type { Rule } from '@shared/learnStats'
@@ -186,8 +186,10 @@ const api = {
     engineMissing: (engine: SelectionEngineId): Promise<Array<{ id: string; name: string; sizeBytes: number }>> => ipcRenderer.invoke('shortme:engineMissing', engine),
     engineSetDefault: (engine: SelectionEngineId): Promise<SelectionEngineId> => ipcRenderer.invoke('shortme:engineSetDefault', engine),
     compareCreate: (hash: string, runIds: string[]): Promise<EngineComparison> => ipcRenderer.invoke('shortme:compareCreate', hash, runIds),
+    compareRechecks: (hash: string, id: string): Promise<ClipRecheckView[]> => ipcRenderer.invoke('shortme:compareRechecks', hash, id),
+    compareRecheck: (hash: string, id: string, clipId: string, engine: 'multimodal-v2' | 'legacy'): Promise<ClipRecheckView[]> => ipcRenderer.invoke('shortme:compareRecheck', hash, id, clipId, engine),
     compareList: (hash: string): Promise<Array<{ comparisonId: string; createdAt: string; runIds: string[] }>> => ipcRenderer.invoke('shortme:compareList', hash),
-    compareGet: (hash: string, id: string): Promise<{ c: EngineComparison; clips: Record<string, { title: string; start: number; end: number; score: number; autoCuts: Array<{ start: number; end: number }> }> } | null> => ipcRenderer.invoke('shortme:compareGet', hash, id),
+    compareGet: (hash: string, id: string): Promise<{ c: EngineComparison; sourcePath: string | null; clips: Record<string, { title: string; start: number; end: number; score: number; autoCuts: Array<{ start: number; end: number }> }> } | null> => ipcRenderer.invoke('shortme:compareGet', hash, id),
     compareOverride: (hash: string, id: string, o: Omit<EventMatchOverride, 'createdAt'>): Promise<EngineComparison> => ipcRenderer.invoke('shortme:compareOverride', hash, id, o),
     compareBlind: (hash: string, id: string, matchId: string): Promise<string[]> => ipcRenderer.invoke('shortme:compareBlind', hash, id, matchId),
     compareReview: (hash: string, id: string, r: { matchId: string; choice: BlindReview['choice']; reasonTags: string[] }): Promise<EngineComparison> => ipcRenderer.invoke('shortme:compareReview', hash, id, r),

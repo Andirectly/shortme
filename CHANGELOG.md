@@ -11,7 +11,9 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 ### Added
 
 - Engine 3 (Adaptive AI, Beta): sucht per Bild-Embedding (Qwen3-VL-Embedding-2B, lokal) über das ganze Video, mit Profilen Schnell/Ausgewogen/Gründlich. Dritter Schalter im Erstellen-Dialog und in der Clip-Liste. Braucht die Python-Laufzeit (Knopf „Python-Laufzeit installieren") und das Modell (ca. 4,3 GB, Modell-Manager).
-- Engines vergleichen: Ergebnisse mehrerer Läufe desselben Videos Ereignis für Ereignis zuordnen, blind bewerten (A/B/C), Zuordnung per Hand trennen/zusammenführen.
+- Engine 3 prüft Ereignisse jetzt mit MiniCPM-o (Bild und Ton gemeinsam) und sucht zusätzlich mit Lighthouse (zeitliche Verortung). Dafür eine zweite Python-Umgebung und zwei Modelle (ca. 19 GB), die App installiert die Umgebung selbst, die Modelle kommen aus dem Modell-Manager.
+- Engines vergleichen: gemeinsame Quellzeit-Wiedergabe und Einzelwiedergabe, Re-Analyse des Originals mit anderer Engine, Clip-Recheck getrennt von der Analyse, blinde Bewertung als Variante A/B/C.
+- Engines vergleichen (Grundfunktion): Ergebnisse mehrerer Läufe desselben Videos Ereignis für Ereignis zuordnen, blind bewerten (A/B/C), Zuordnung per Hand trennen/zusammenführen.
 
 ## [0.32.0] - 2026-11-14
 

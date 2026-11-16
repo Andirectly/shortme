@@ -163,3 +163,6 @@ export function blindOrder(ids: string[], seed: string): string[] {
   for (let i = a.length - 1; i > 0; i--) { h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0; const j = h % (i + 1); [a[i], a[j]] = [a[j], a[i]] }
   return a
 }
+
+/** Anzeigeform eines clip-recheck (Quelle: main/shortme/clips/engines/recheck.ts). Eigene Art, nie mit Quellanalyse-Matches vermischt. */
+export interface ClipRecheckView { kind: 'clip-recheck'; recheckId: string; clipId: string; fromRunId: string; byEngine: 'multimodal-v2' | 'legacy'; at: string; status: 'done' | 'unavailable' | 'failed'; note: string; qualityLabel?: string; reasons?: string; uncertain?: string[]; unchecked?: string[]; observations?: string[] }
