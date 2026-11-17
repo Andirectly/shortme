@@ -129,9 +129,9 @@ export function registerShortmeIpc(): void {
       await saveMeta(meta)
       await rememberChoice(sourceKey({ channel: meta.twitch?.channel, url: meta.sourceUrl, path: meta.sourcePath }), { kind: opts.contentType, frame: opts.frame ?? (await loadProfile(opts.contentType)).frame })
     }
-    return jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
+    return jobs.enqueue(hash, meta.title, async ({ signal, report, timing }) => {
       await runTranscription(meta, { diarize: !!opts?.diarize, signal, onProgress: (p) => report(p.stage, p.fraction, p.message) })
-      await runAnalysis(meta, { engine, profile: isV3Profile(opts?.profile) ? opts.profile : undefined, query: opts?.query, contentType: opts?.contentType, frame: opts?.frame, wanted: opts?.wanted, signal, onProgress: report })
+      await runAnalysis(meta, { engine, profile: isV3Profile(opts?.profile) ? opts.profile : undefined, query: opts?.query, contentType: opts?.contentType, frame: opts?.frame, wanted: opts?.wanted, signal, onProgress: report, timing })
     }, () => discardProject(hash))
   })
   const personsView = async (hash: string): Promise<ShortmePersons | null> => {

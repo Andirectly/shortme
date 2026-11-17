@@ -1,6 +1,6 @@
 # Engine 4 – Status
 
-Git 61cb67749841c1ef96dde9fb13f7597ed17e50d8 · erzeugt 2026-11-17T09:11:59.366Z von `scripts/v4-status.mjs`.
+Git 2938e1da406c747533fd3082dcc6c6d7201ff9df · erzeugt 2026-11-17T11:16:12.019Z von `scripts/v4-status.mjs`.
 
 - Anforderungen: 54 (core 50, quality 4)
 - passed 48 · in_progress 0 · blocked 6 · failed 0 · pending 0

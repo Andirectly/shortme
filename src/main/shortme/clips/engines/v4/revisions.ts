@@ -4,7 +4,7 @@ import { V3_AV_MODEL, V3_EMBED_MODEL, V3_PROFILE_CONFIG, type V3ProfileConfig } 
 import { V2_MODELS, V2_PROMPT_REVISION } from '../v2/revisions'
 
 export const V4_PIPELINE_VERSION = '4.0'
-export const V4_ALGORITHM_REVISION = 'v4-algo-2'
+export const V4_ALGORITHM_REVISION = 'v4-algo-3'
 export const V4_QUERYBANK_REVISION = 'v4-queries-1'
 export const V4_PROMPT_REVISION = { investigator: 'v4-inv-3', cutJudge: 'v4-cut-2', finalJudge: 'v4-final-2' } as const
 export const V4_EDGE_REVISION = 'v4-edges-1'
@@ -28,8 +28,8 @@ export interface V4Profile {
 
 export const V4_PROFILES: Record<V3Profile, V4Profile> = {
   fast: { embed: V3_PROFILE_CONFIG.fast, perLane: 3, seedsMax: 12, investigatorCalls: 2, investigatorSecPerSeed: 90, cutCandidates: 2, finalists: 6, repairs: 1 },
-  balanced: { embed: V3_PROFILE_CONFIG.balanced, perLane: 5, seedsMax: 24, investigatorCalls: 4, investigatorSecPerSeed: 150, cutCandidates: 3, finalists: 10, repairs: 2 },
-  deep: { embed: V3_PROFILE_CONFIG.deep, perLane: 8, seedsMax: 40, investigatorCalls: 5, investigatorSecPerSeed: 240, cutCandidates: 4, finalists: 16, repairs: 2 }
+  balanced: { embed: V3_PROFILE_CONFIG.balanced, perLane: 5, seedsMax: 24, investigatorCalls: 4, investigatorSecPerSeed: 150, cutCandidates: 2, finalists: 10, repairs: 2 },
+  deep: { embed: V3_PROFILE_CONFIG.deep, perLane: 8, seedsMax: 40, investigatorCalls: 5, investigatorSecPerSeed: 240, cutCandidates: 2, finalists: 16, repairs: 2 }
 }
 
 export const V4_MODELS = {

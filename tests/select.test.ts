@@ -58,7 +58,9 @@ describe('Länge', () => {
   })
   it('Zielanzahl wächst mit der Dauer (≈ 1 je 2,5 Min), begrenzt auf 4–50', () => {
     expect(defaultWanted(100)).toBe(4)
-    expect(defaultWanted(729)).toBe(5)
+    expect(defaultWanted(300)).toBe(5)
+    expect(defaultWanted(729)).toBe(10)
+    expect(defaultWanted(888)).toBe(10)
     expect(defaultWanted(3600)).toBe(24)
     expect(defaultWanted(3 * 3600)).toBe(50)
     expect(defaultWanted(100000)).toBe(50)

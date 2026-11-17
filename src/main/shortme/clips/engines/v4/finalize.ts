@@ -37,7 +37,7 @@ export async function renderVariant(meta: ProjectMeta, t: Transcript, signals: S
   await rm(outDir, { recursive: true, force: true }).catch(() => undefined)
   await mkdir(outDir, { recursive: true })
   const extra = (clip.autoCuts ?? []).map((c) => [c.start, c.end] as [number, number])
-  const res = await exportClip(meta, clip, t, signals, { outDir, engine: 'ass', captions: true, removePauses: false, hook: false, extraCuts: extra, quality: 'standard', signal })
+  const res = await exportClip(meta, clip, t, signals, { outDir, engine: 'ass', captions: true, removePauses: false, hook: false, extraCuts: extra, quality: 'draft', signal }) // nur zur Prüfung: der Nutzer-Export rendert neu
   const pr = await probeOutput(res.path, signal)
   return { path: res.path, sha256: pr.sha256, durationSeconds: pr.durationSeconds, streams: pr.streams, clip, trims: clip.autoCuts ?? [], pieces: planExport(clip, t, signals, false, extra).map.keeps.length, faceRatio, emptyShots, layoutOk, captionWords: res.wordsOut.length }
 }

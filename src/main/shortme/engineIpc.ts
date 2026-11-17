@@ -28,14 +28,14 @@ export const hasActiveJob = (jobs: JobQueue, hash: string): boolean => jobs.list
 
 /** Analyse in die Warteschlange legen (synchron, damit `hasActiveJob` sofort stimmt). Inhaltstyp und Ausschnitt werden wie bisher als Auswahl der Quelle gemerkt. */
 export function enqueueAnalysis(jobs: JobQueue, meta: ProjectMeta, o: { engine: SelectionEngineId; query?: string; contentType: ContentType; frame: FrameChoice; wanted?: number; profile?: V3Profile }): string {
-  const info = jobs.enqueue(meta.hash, meta.title, async ({ signal, report }) => {
+  const info = jobs.enqueue(meta.hash, meta.title, async ({ signal, report, timing }) => {
     // Quellvideo gelöscht (z. B. Speicher sparen)? Bei Links neu laden, sonst klare Meldung
     if (!existsSync(meta.sourcePath)) {
       if (!meta.sourceUrl) throw new Error('Das Quellvideo gibt es nicht mehr. Bitte die Datei erneut importieren.')
       report('audio', 0, 'Video wird neu geladen …')
       await importUrl(meta.sourceUrl, (p, message) => report('audio', p, message))
     }
-    await runAnalysis(meta, { engine: o.engine, query: o.query, contentType: o.contentType, frame: o.frame, wanted: o.wanted, profile: o.profile, signal, onProgress: report })
+    await runAnalysis(meta, { engine: o.engine, query: o.query, contentType: o.contentType, frame: o.frame, wanted: o.wanted, profile: o.profile, signal, onProgress: report, timing })
   })
   return info.id
 }

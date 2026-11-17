@@ -3,8 +3,9 @@ export const MAX_CLIPS = 50
 /** Höchstzahl bewerteter Kandidaten: je Kandidat 3–5 LLM-Aufrufe, darüber wächst die Zeit bei sehr langen Videos zu stark. */
 export const MAX_CANDS = 90
 
-/** Automatische Clip-Anzahl: etwa ein Clip je 2,5 Minuten Material (mindestens 4, höchstens 50). */
-export const defaultWanted = (durationSec: number): number => Math.max(4, Math.min(MAX_CLIPS, Math.round(durationSec / 150)))
+/** Automatische Clip-Anzahl: ab 10 Minuten Material mindestens 10 zur Auswahl (Wunsch des Nutzers), darunter ein Clip je Minute (mindestens 4),
+ *  lange Videos ein Clip je 2,5 Minuten (höchstens 50). */
+export const defaultWanted = (durationSec: number): number => Math.min(MAX_CLIPS, Math.max(Math.min(10, Math.max(4, Math.round(durationSec / 60))), Math.round(durationSec / 150)))
 export const candidateBudget = (wanted: number): number => Math.min(MAX_CANDS, Math.max(10, Math.ceil(wanted * 3)))
 
 export const STAGES = ['audio', 'asr', 'gaps', 'speakers', 'finalize', 'signals', 'shots', 'topics', 'candidates', 'rate', 'compare', 'snap', 'proofread', 'layout'] as const

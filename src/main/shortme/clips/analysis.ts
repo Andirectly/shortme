@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { ShortmeClip } from '@shared/shortme'
+import type { RunTiming, ShortmeClip } from '@shared/shortme'
 import { assets } from '../../engines'
 import { markStage, projectFile, type ProjectMeta } from '../project'
 import { writeFileAtomic } from '../atomic'
@@ -50,6 +50,8 @@ export interface AnalysisOptions {
   /** Erzwingt den Fallback ohne LLM (Tests / kein Modell). */
   noLlm?: boolean
   onProgress?: (stage: string, fraction: number, message: string) => void
+  /** Gemessene Dauer des Jobs (inkl. Transkription davor), wird am Ende in die Clipliste geschrieben. */
+  timing?: () => RunTiming
 }
 
 export const layoutFile = (hash: string, clipId: string): string => projectFile(hash, `layout/${clipId.replace(/[^\w.-]/g, '_')}.json`)
@@ -287,7 +289,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     if (pf) for (let i = 0; i < clips.length; i++) await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(applyPersons(layouts[i].input, clips[i].id, pf)))
   }
   clips.sort((x, y) => y.score - x.score)
-  const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, ...meta0, clips }
+  const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, ...meta0, clips, ...(opts.timing ? { timing: opts.timing() } : {}) }
   await writeFileAtomic(clipsPath, JSON.stringify(file, null, 1))
   if (engine === 'legacy') {
     if (trace.length && (await collecting())) await writeFileAtomic(projectFile(meta.hash, 'candidates.json'), JSON.stringify(trace))

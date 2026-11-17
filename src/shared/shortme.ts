@@ -144,6 +144,9 @@ export interface ShortmeShot {
   auto?: 'empty'
 }
 
+/** Gemessene Dauer eines Laufs (Job-Start bis Clipliste) und je gemeldeter Stufe, in Sekunden. */
+export interface RunTiming { totalSec: number; stages: Array<{ stage: string; sec: number }> }
+
 export interface ShortmeClips {
   version: 1
   hash: string
@@ -157,6 +160,8 @@ export interface ShortmeClips {
   /** Gewählter Inhaltstyp des Projekts und (bei Twitch) der Kanal. */
   contentType?: ContentType | null
   channel?: string | null
+  /** Wie lange der Lauf gedauert hat (Transkription bis fertige Clips), falls gemessen. */
+  timing?: RunTiming
   /** Vorschaubilder als Data-URL je Clip-ID. */
   thumbs: Record<string, string | null>
   /** Quellvideo (für die Editor-Vorschau über media://). */

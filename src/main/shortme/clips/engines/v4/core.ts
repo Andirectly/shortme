@@ -227,12 +227,24 @@ export interface InvObservation { role: EventRole; segmentIds: string[]; state: 
 export interface InvAnswer { observations: InvObservation[]; next: { op: InvestigatorOp; reason: string }; confidence: 'low' | 'medium' | 'high' | 'unavailable'; contradiction: boolean }
 
 /** Investigator-Antwort prüfen: Rollen aus der Liste, Segment-IDs aus dem gezeigten Fenster (keine freien Zeiten), Operation aus der erlaubten Liste. */
+/** Eindeutige andere Schreibweise eines gezeigten Segments auf seine ID abbilden (echter Lauf: Modell schrieb „0“, „00:00-00:05“ oder „S3“ statt „g3.w1.S3“).
+ *  Segmente sind 5-s-Stücke in Reihenfolge; Zahlen/Zeiten gelten als Sekunde im Ausschnitt (so nennt sie der Prompt). Unbekanntes bleibt unverändert → wird abgelehnt. */
+export function segmentRef(s: unknown, segmentIds: string[]): string {
+  const raw = typeof s === 'number' ? String(s) : typeof s === 'string' ? s.trim() : ''
+  if (segmentIds.includes(raw)) return raw
+  const bySuffix = /^S(\d+)$/i.exec(raw)
+  if (bySuffix) return segmentIds.find((id) => id.endsWith(`.S${Number(bySuffix[1])}`)) ?? raw
+  const t = /^(\d+(?:\.\d+)?)$/.exec(raw)?.[1] ?? /^(\d{1,2}):(\d{2})/.exec(raw)?.slice(1).reduce((m, x) => String(Number(m) * 60 + Number(x)))
+  if (t === undefined) return raw
+  return segmentIds[Math.floor(Number(t) / 5)] ?? raw
+}
+
 export function validateInvestigator(x: unknown, segmentIds: string[]): InvAnswer {
   const o = x as Record<string, unknown>
   if (!o || !Array.isArray(o.observations)) throw new Error('observations fehlt')
   const obs = (o.observations as Array<Record<string, unknown>>).slice(0, 12).map((b) => {
     const role = ROLES.includes(b.role as EventRole) ? (b.role as EventRole) : 'unknown'
-    const seg = Array.isArray(b.segmentIds) ? (b.segmentIds as unknown[]).filter((s): s is string => typeof s === 'string') : []
+    const seg = Array.isArray(b.segmentIds) ? [...new Set((b.segmentIds as unknown[]).map((s) => segmentRef(s, segmentIds)))] : []
     const bad = seg.filter((s) => !segmentIds.includes(s))
     if (bad.length) throw new Error(`erfundene Segment-ID: ${bad[0]}`)
     let state = (['observed', 'inferred', 'unknown'] as const).includes(b.state as 'observed') ? (b.state as InvObservation['state']) : 'unknown'

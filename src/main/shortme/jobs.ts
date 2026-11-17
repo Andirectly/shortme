@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { friendlyError } from './errors'
+import type { RunTiming } from '../../shared/shortme'
 
 export type JobState = 'queued' | 'running' | 'paused' | 'stopped' | 'done' | 'error'
 
@@ -15,7 +16,21 @@ export interface JobInfo {
   error?: string
 }
 
-export interface JobContext { signal: AbortSignal; report: (stage: string, progress: number, message: string) => void }
+export interface JobContext { signal: AbortSignal; report: (stage: string, progress: number, message: string) => void; /** Bisher gemessene Dauer des Jobs, je gemeldeter Stufe. */ timing: () => RunTiming }
+
+/** Misst, wie lange jede gemeldete Stufe lief (Stufenwechsel = Zeitpunkt der ersten Meldung der neuen Stufe). */
+export function stageClock(now: () => number = Date.now): { mark: (stage: string) => void; timing: () => RunTiming } {
+  const t0 = now(), sec = new Map<string, number>()
+  let cur = '', at = t0
+  return {
+    mark: (stage) => { if (stage === cur) return; const t = now(); if (cur) sec.set(cur, (sec.get(cur) ?? 0) + (t - at) / 1000); cur = stage; at = t },
+    timing: () => {
+      const t = now(), out = new Map(sec)
+      if (cur) out.set(cur, (out.get(cur) ?? 0) + (t - at) / 1000)
+      return { totalSec: Math.round((t - t0) / 100) / 10, stages: [...out].map(([stage, s]) => ({ stage, sec: Math.round(s * 10) / 10 })) }
+    }
+  }
+}
 /** Rückgabe (optional) = Abschlussmeldung des Jobs, z. B. „Exportiert nach …“. */
 type Runner = (ctx: JobContext) => Promise<void | string>
 
@@ -64,7 +79,8 @@ export class JobQueue extends EventEmitter {
     e.ac = ac
     this.set(e, { state: 'running', error: undefined })
     try {
-      const done = await e.run({ signal: ac.signal, report: (stage, progress, message) => this.set(e, { stage, progress, message }) })
+      const clock = stageClock()
+      const done = await e.run({ signal: ac.signal, report: (stage, progress, message) => { clock.mark(stage); this.set(e, { stage, progress, message }) }, timing: clock.timing })
       this.set(e, { state: 'done', progress: 1, message: typeof done === 'string' ? done : 'Fertig' })
     } catch (err) {
       const reason = ac.signal.aborted ? String(ac.signal.reason) : ''

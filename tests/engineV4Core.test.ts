@@ -81,6 +81,12 @@ describe('V4 Modellantworten (V4-029/034/026)', () => {
   })
   it('Investigator: Segment-IDs nur aus dem Fenster, unbekannte Operation → stop, „observed“ ohne Fundstelle → unknown', () => {
     expect(() => validateInvestigator({ observations: [{ role: 'payoff', segmentIds: ['S9'], state: 'observed' }] }, ['S1', 'S2'])).toThrow()
+    // andere Schreibweise desselben Segments (echter Lauf) wird abgebildet, Segmente außerhalb des Fensters bleiben erfunden
+    const ids = ['g3.w1.S1', 'g3.w1.S2', 'g3.w1.S3']
+    const alt = validateInvestigator({ observations: [{ role: 'payoff', segmentIds: ['0', '00:05-00:10', 'S3', 7], state: 'observed' }] }, ids)
+    expect(alt.observations[0].segmentIds).toEqual(['g3.w1.S1', 'g3.w1.S2', 'g3.w1.S3'])
+    expect(() => validateInvestigator({ observations: [{ role: 'payoff', segmentIds: ['g3.w1.S7'], state: 'observed' }] }, ids)).toThrow()
+    expect(() => validateInvestigator({ observations: [{ role: 'payoff', segmentIds: ['20'], state: 'observed' }] }, ids)).toThrow()
     const a = validateInvestigator({ observations: [{ role: 'reaction', segmentIds: [], state: 'observed', description: 'x' }], nextAction: { op: 'rm -rf' } }, ['S1'])
     expect(a.next.op).toBe('stop'); expect(a.observations[0].state).toBe('unknown')
   })

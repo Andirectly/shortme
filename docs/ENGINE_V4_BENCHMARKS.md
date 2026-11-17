@@ -20,5 +20,15 @@ Laden 13–27 s, 18,1 GB · 10-s-Ausschnitt 9,5 s (mit Aufwärmen) · 20 s 4,7 s
 ## Reparaturprobe (scripts/v4-repair-check.ts, Lauf v4-mwjtg728)
 Clip absichtlich 35 % vor dem Ende abgeschnitten → Endprüfung: `payoff: fail` → Reparatur „Ende auf spätere Kante E67“ → neu gerendert (SHA fd6ad357…) → `acceptable`.
 
+## Beschleunigung 0.35.0 (gleiches Video, 888 s, Profil Ausgewogen, RTX 5090)
+| | vorher `v4-mwkfvx0y` (0.34.0) | nachher `v4-mwkkcmxj` |
+|---|---|---|
+| Clips (automatisch) | 6 | 10 |
+| Gesamt | 1523 s | 1600 s |
+| je Clip | 254 s | 160 s (−37 %) |
+| Cut-Judge-Aufrufe | 30 | 24 |
+| ungültige Nachuntersuchungen | 1/23 (Gründlich-Lauf: 8/30) | 1/29 |
+Maßnahmen: Überlappende Ereignisse vor dem Schneiden aussortiert (3 übersprungen), 2 statt 3–4 Cut-Kandidaten je Ereignis, andere Schreibweisen derselben Segment-ID (`0`, `00:05`, `S3`) werden abgebildet statt verworfen, Keyframe-Scan parallel zur Sprach-Lane (CPU-Konkurrenz: nur ~25 s), Prüf-Render in Entwurfsqualität. Urteilsverteilung unverändert (meist `needs-review` wegen `natural-end`/`payoff: unknown`).
+
 ## Nicht gemessen
 1–6-h-Quelle (geplant: Projekt 12b742dd, 1,8 h), Profile „Schnell“/„Gründlich“, 16-/12-GB-GPU, sauberer Windows-Erststart, Laufzeit je Stunde Material.

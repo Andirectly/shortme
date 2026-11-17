@@ -88,6 +88,10 @@ function DemoProcessing(): React.JSX.Element {
   )
 }
 
+/** Gemessene Laufzeit je Stufe (Tooltip an „Laufzeit“). */
+const STAGE_TIME_LABEL: Record<string, string> = { audio: 'Ton/Video vorbereiten', asr: 'Transkription', gaps: 'Transkription (Lücken)', speakers: 'Sprecher', finalize: 'Transkript abschließen', signals: 'Signale', shots: 'Kamerawechsel', topics: 'Themen (LLM)', llm: 'Themen (LLM)', candidates: 'Suche (alle Spuren)', rate: 'Nachuntersuchung (Bild+Ton)', snap: 'Schnitte prüfen', compare: 'Rendern und prüfen', proofread: 'Korrektur', layout: 'Bildausschnitt', thumbs: 'Vorschaubilder' }
+const fmtDur = (s: number): string => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : s >= 60 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')} min` : `${Math.round(s)} s`)
+
 function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: boolean; onSelect: () => void; onOpen: () => void; pct: number }): React.JSX.Element {
   const { base, reduced } = useSprings()
   const deleteClip = useProject((s) => s.deleteClip)
@@ -149,10 +153,12 @@ export function ClipsScreen(): React.JSX.Element {
   const job = useProject((s) => s.job)
   const pending = list.filter((c) => c.pending).length
   const pct = job && job.stage === 'layout' ? Math.round(job.progress * 100) : 0
+  const timing = useProject((s) => s.clipsFile?.timing)
   return (
     <div style={{ display: 'grid', gap: 18, paddingTop: 12, paddingBottom: 90 }}>
       <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}>
-        <div><h1>{title ?? PROJECTS[0].name}</h1><small>{pending ? `${list.length - pending} von ${list.length} fertig · Analyse läuft` : `${list.length} Clips · nach Score sortiert`}</small></div>
+        <div><h1>{title ?? PROJECTS[0].name}</h1><small>{pending ? `${list.length - pending} von ${list.length} fertig · Analyse läuft` : `${list.length} Clips · nach Score sortiert`}
+          {!pending && timing && <span title={timing.stages.map((s) => `${STAGE_TIME_LABEL[s.stage] ?? s.stage}: ${fmtDur(s.sec)}`).join('\n')}> · Laufzeit {fmtDur(timing.totalSec)}</span>}</small></div>
         <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
           <EngineBar />
           <div style={{ display: 'flex', gap: 8 }}>

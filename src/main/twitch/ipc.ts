@@ -18,9 +18,9 @@ async function analyze(hash: string): Promise<void> {
   meta.contentType = 'stream'
   await saveMeta(meta)
   await rememberChoice(sourceKey({ channel: meta.twitch?.channel }), { kind: 'stream', frame: (await loadProfile('stream')).frame })
-  await jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
+  await jobs.enqueue(hash, meta.title, async ({ signal, report, timing }) => {
     await runTranscription(meta, { diarize: false, signal, onProgress: (p) => report(p.stage, p.fraction, p.message) })
-    await runAnalysis(meta, { contentType: 'stream', frame: (await loadProfile('stream')).frame, signal, onProgress: report })
+    await runAnalysis(meta, { contentType: 'stream', frame: (await loadProfile('stream')).frame, signal, onProgress: report, timing })
   }, () => discardProject(hash))
 }
 

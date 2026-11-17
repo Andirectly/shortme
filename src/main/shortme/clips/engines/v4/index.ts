@@ -24,7 +24,7 @@ import { ensureSeries, decodeSeries } from '../v2/audioIndex'
 import { frameDiffs, keyframeScan } from '../v2/visualIndex'
 import { withEmbedder } from '../v3/embedWorker'
 import { withAv } from '../v3/avWorker'
-import { decilesCovered, fuseSeeds, rankFinal, requiredSpan, selectBalanced, type CoverageWindow, type CutCandidate, type Finalist, type Seed, type SeedGroup, type Span } from './core'
+import { decilesCovered, fuseSeeds, overlapRatio, rankFinal, requiredSpan, selectBalanced, type CoverageWindow, type CutCandidate, type Finalist, type Seed, type SeedGroup, type Span } from './core'
 import { audioLane, crossModalLane, expandQueries, QUERY_BANK, speechLane, speechUncertainWindows, visualLane, type LaneResult } from './lanes'
 import { investigateGroup, type InvestigationResult } from './investigate'
 import { actionEdges, audioPhraseEdges, buildEdges, judgeCuts, makeVariants, type Variant } from './cut'
@@ -85,10 +85,10 @@ export async function selectV4(req: SelectionRequest): Promise<SelectionOutcome>
 
     // ASR: vorhandenes, über die ganze Tonspur gelaufenes Transkript (Wortzeiten aus dem Modell)
     await tracer.record({ role: 'asr', modelRevision: t.model ?? 'parakeet-v3', realInputModalities: hasAudio ? ['audio'] : [], actualMediaWindowIds: ['audio.wav'], success: hasAudio, validatedOutput: true, wallClockMs: 0, status: `${t.words.length} Wörter (gespeichertes Transkript, Version ${t.version})`, input: { wav: 'audio.wav', durationSec: dur }, output: { words: t.words.length, speech: t.speech?.length ?? null } })
+    // Keyframe-Scan (CPU/FFmpeg) läuft parallel zu YAMNet und Sprach-Lane (GPU/LLM); gemessen 83 s auf 15 min Material
+    const scanP = src.video ? stage('keyframes', () => keyframeScan(project.sourcePath, signal)).catch((e) => { if (signal?.aborted) throw e; fail('keyframes', e); return null }) : Promise.resolve(null)
     report('signals', 0.3, 'Ton-Klassen (YAMNet) …')
     const series = hasAudio ? await stage('yamnet', async () => (await ensureSeries(project.hash, wav, signal)).series).catch((e) => { fail('yamnet', e); return null }) : null
-    report('signals', 0.6, 'Bildänderungen …')
-    const scan = src.video ? await stage('keyframes', () => keyframeScan(project.sourcePath, signal)).catch((e) => { fail('keyframes', e); return null }) : null
     report('signals', 1, 'Billige Merkmale fertig')
 
     // ---------------------------------------------------------------------------------------------------------------- S3 vier Lanes
@@ -98,6 +98,8 @@ export async function selectV4(req: SelectionRequest): Promise<SelectionOutcome>
     const speech = await stage('lane-speech', () => withLlm((url) => speechLane(url, sentences, { duration: dur, query: req.options.query, asrModel: t.model ?? 'parakeet', max: P.perLane * 4, tracer, signal, onProgress: (f) => report('candidates', 0.3 * f, 'Sprach-Lane …') })))
     report('candidates', 0.3, 'Ton-Lane …')
     const audio = await stage('lane-audio', () => audioLane(series, req.input.signals, { duration: dur, max: P.perLane * 4, tracer, hasAudio }))
+    report('candidates', 0.35, 'Bildänderungen …')
+    const scan = await scanP
     const visual = visualLane(scan, { duration: dur, max: P.perLane * 4 })
     report('candidates', 0.4, 'Video-Embedding-Index und Anfragen …')
     const queries = expandQueries(QUERY_BANK, req.options.query, speech.seeds)
@@ -132,7 +134,8 @@ export async function selectV4(req: SelectionRequest): Promise<SelectionOutcome>
       return xm.wins.map((w, i) => { let c = 0; for (let k = 0; k < d; k++) c += xm.vectors.data[base + k] * xm.vectors.data[i * d + k]; return { w, c } }).filter((x) => Math.abs(x.w.start - g.anchor) > 30).sort((a, b) => b.c - a.c).slice(0, 3).map((x) => ({ start: x.w.start, end: x.w.end }))
     }
     const wordsIn = (sp: Span): string => t.words.map((w, i) => ({ w, i })).filter(({ w }) => w.start >= sp.start && w.end <= sp.end).map(({ w, i }) => `[w${i}] ${w.w}`).join(' ').slice(0, 1800)
-    const toInvestigate = selected.slice(0, Math.min(selected.length, P.finalists + 4))
+    const finalistsN = Math.max(P.finalists, wanted + 3)
+    const toInvestigate = selected.slice(0, Math.min(selected.length, finalistsN + 4))
     const investigations: Array<{ group: SeedGroup; inv: InvestigationResult }> = []
     const variantsAll: Variant[] = []
     const rounds: JudgeRound[] = []
@@ -158,11 +161,16 @@ export async function selectV4(req: SelectionRequest): Promise<SelectionOutcome>
       // S5 Schnitte
       let ei = 0
       const finalistsPool: Array<{ group: SeedGroup; inv: InvestigationResult; variants: Variant[] }> = []
-      for (const { group, inv } of events.slice(0, P.finalists)) {
-        report('snap', 0.5 * (ei++ / Math.max(1, Math.min(events.length, P.finalists))), `Schnittkanten prüfen (${ei}) …`)
+      // Ereignisse, deren Pflichtbereich großteils schon in einem besser gereihten liegt, werden nicht geschnitten/gerendert (landeten sonst als Doppel im Ranking und kosteten je ~2 min)
+      const taken: Span[] = []
+      for (const { group, inv } of events) {
+        if (finalistsPool.length >= finalistsN) break
+        report('snap', 0.5 * (ei++ / Math.max(1, Math.min(events.length, finalistsN))), `Schnittkanten prüfen (${ei}) …`)
         try {
           const req0 = requiredSpan(inv.graph, { start: Math.max(0, group.anchor - 6), end: Math.min(dur, group.anchor + 6) })
           const reqSpan = req0.end - req0.start > maxSec - 4 ? { start: req0.start, end: req0.start + maxSec - 6 } : req0
+          if (taken.some((s) => overlapRatio(s, reqSpan) > 0.5)) { await tracer.log('investigation.jsonl', { groupId: group.id, skipped: 'Überlappung mit besser gereihtem Ereignis', reqSpan }); continue }
+          taken.push(reqSpan)
           const ckey = checkpointKey([src.sha256, inv.graph, reqSpan, V4_EDGE_REVISION, edges.length, minSec, maxSec, P.cutCandidates, V4_PROMPT_REVISION.cutJudge, V3_AV_MODEL.revision])
           const prev = await loadCheckpoint<Awaited<ReturnType<typeof judgeCuts>>>(project.hash, 'cut', ckey)
           const { judged } = prev ?? await judgeCuts(s, inv.graph, reqSpan, edges, { video: project.sourcePath, hasAudio, duration: dur, minSec, maxSec, limit: P.cutCandidates, tmpDir: tmp, tracer, signal })

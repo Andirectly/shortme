@@ -6,6 +6,17 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.35.0] - 2026-11-17
+
+### Added
+
+- Laufzeit: Nach jeder Analyse steht in der Clip-Übersicht, wie lange der ganze Lauf gedauert hat (Transkription bis fertige Clips); beim Darüberfahren die Zeit je Schritt.
+
+### Changed
+
+- „Automatisch“ liefert ab 10 Minuten Material mindestens 10 Clips zur Auswahl (vorher etwa einen je 2,5 Minuten).
+- Engine 4 ist schneller: doppelte Ereignisse werden vor dem Schneiden aussortiert, weniger Schnittprüfungen je Ereignis, weniger verworfene Modellantworten. Gemessen: 160 statt 254 Sekunden je Clip.
+
 ## [0.34.1] - 2026-11-17
 
 ### Fixed
