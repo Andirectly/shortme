@@ -1,0 +1,148 @@
+{
+  "name": "Shortme Engine V4 Reviewed Implementation Contract",
+  "created": "2026-11-16",
+  "specRevision": "4.1",
+  "engineId": "engine4",
+  "engineVersion": "4.0",
+  "numberOfRequirements": 54,
+  "requirementsSha256": "75ab594df21630d196969a402332691b74af3fa2f3058f74236eb50e7265fed2",
+  "sourceRepoIncluded": false,
+  "description": "Reviewed, clarified and hardened implementation contract. NOT a built or benchmark-validated Shortme app.",
+  "files": [
+    {
+      "path": "00_START_HERE.md",
+      "size": 4724,
+      "sha256": "1841cc1c6085d7dbf3297d0adfa949aa546e22ced2583489101da2094f2b49c5"
+    },
+    {
+      "path": "01_CLAUDE_CODE_MASTER_PROMPT.md",
+      "size": 8487,
+      "sha256": "7f1cbd8ecaeb9ba0d8a1884d30d29317b7a17152d391e7226695ad54cc3b33db"
+    },
+    {
+      "path": "02_PRODUCT_PIPELINE_SPEC.md",
+      "size": 7384,
+      "sha256": "fdffc588cab5f649f4b35a88942e84bbbcfc6c82da8df268f60248b12c12a392"
+    },
+    {
+      "path": "03_INTEGRATION_AND_DATA_CONTRACTS.md",
+      "size": 7067,
+      "sha256": "9d60682b396dafe4bbade64f019bceac945758c457c56d1de724e0e7be42be21"
+    },
+    {
+      "path": "04_IMPLEMENTATION_SEQUENCE.md",
+      "size": 4927,
+      "sha256": "ed91540b6d3a6d8c1cc1b4efa3e2bdf6af6126ceae1961b98ff1335129fbdf9c"
+    },
+    {
+      "path": "05_TESTS_AND_RELEASE_GATES.md",
+      "size": 5884,
+      "sha256": "3612cd89def727c1c39710242dd54d9bd4e0098dfc66194ef15c7b55cabe5e42"
+    },
+    {
+      "path": "06_RESEARCH_AND_LICENSES.md",
+      "size": 4920,
+      "sha256": "e34f0d1fa27da2a95f3843be20ce3ea8941ad4d3d4d2e0430a3b461a443ccc43"
+    },
+    {
+      "path": "07_PROGRESS_AND_ANTI_SHORTCUT.md",
+      "size": 3087,
+      "sha256": "5325f9af73ede561005610459efb39f59913a941b4ff9bd17e5cdb0ea397cf2e"
+    },
+    {
+      "path": "08_COPY_PASTE_INTO_CLAUDE_CODE.md",
+      "size": 3277,
+      "sha256": "8d5b6df6600ca19ab419c4e2ce5b0d583646d4f2fe992fc50f3ce9e3f6b5570b"
+    },
+    {
+      "path": "09_DECISIONS_AND_HARDWARE.md",
+      "size": 3472,
+      "sha256": "f0459ac77b9e6b7875a80b87636195f79244809f52d3638a0e29efb14c615541"
+    },
+    {
+      "path": "10_LOCAL_MODEL_PROMPTS_AND_JSON_SCHEMAS.md",
+      "size": 3844,
+      "sha256": "6f8c0cf50aa367466dc172184a7ed863008faae88853e3b23f153aa814ca5b16"
+    },
+    {
+      "path": "11_AUDIT_AND_SIGNOFF.md",
+      "size": 9165,
+      "sha256": "ba1d28f82522f726e081ec0aa89dbed61bc8dfa25b21e3e4b25c2bdd598c8da5"
+    },
+    {
+      "path": "12_QUALITY_FRONTIER_AND_CANDIDATES.md",
+      "size": 6167,
+      "sha256": "0ac23e9532a30f0baa2c08a60fc811960727684f72063af041d7cf2a813d6c44"
+    },
+    {
+      "path": "examples/quality_evidence.EMPTY_TEMPLATE.json",
+      "size": 369,
+      "sha256": "4773e48c78e2d165d92e262c1306b5e77b784c79ec288df86ea4b8e94f231fb6"
+    },
+    {
+      "path": "reference_core/README.md",
+      "size": 624,
+      "sha256": "32201e0e0725816fb852da3dea8f61cdc552973d15a3bf510d30833123afac64"
+    },
+    {
+      "path": "reference_core/__init__.py",
+      "size": 87,
+      "sha256": "773ecdfcf1cedcafdc1dedf1e8c42b10465343fca54b9f81979fff33095f8b9a"
+    },
+    {
+      "path": "reference_core/algorithms.py",
+      "size": 9535,
+      "sha256": "9a0e05cdedead0740cb1330d54fa50cfe9b6eaf5720dff2a68cbe39f256c011a"
+    },
+    {
+      "path": "requirements/v4_requirements.json",
+      "size": 19569,
+      "sha256": "75ab594df21630d196969a402332691b74af3fa2f3058f74236eb50e7265fed2"
+    },
+    {
+      "path": "schemas/README.md",
+      "size": 278,
+      "sha256": "4d493dfc350fa101f32ebb4e6e323ae65dd1c7f3ee69d1dd3367a1b528b2647b"
+    },
+    {
+      "path": "schemas/cut_judge.schema.json",
+      "size": 1248,
+      "sha256": "c3e598213b136efe10673a2f269b557895fb86a92de83fa80fbf786200637991"
+    },
+    {
+      "path": "schemas/final_judge.schema.json",
+      "size": 4933,
+      "sha256": "8c7a01dfcaea38df656ff60908d0c9b07a9cb2d1d6d6ebef64cec6bae9ce327f"
+    },
+    {
+      "path": "tests/test_v4_audit_extended.py",
+      "size": 4884,
+      "sha256": "2b5ca583524a1c79bca9276bfd2aeb33a2f79b580aa747bea219e0f6ba93448f"
+    },
+    {
+      "path": "tests/test_v4_eval.py",
+      "size": 1519,
+      "sha256": "ad603c41d717f2c156b19beb95a0b126ca9da0a30131159fb75340259c0c8f86"
+    },
+    {
+      "path": "tests/test_v4_package.py",
+      "size": 2892,
+      "sha256": "f367d78cd5b91d01ec823dc4c77f0de957250b5ce84438d80c70bd503bd1a50f"
+    },
+    {
+      "path": "tools/v4_eval.py",
+      "size": 4559,
+      "sha256": "cb4979840b1f643e15d5402ee699180ca2de03b7983b2e58c4c1721bf4379be5"
+    },
+    {
+      "path": "tools/v4_gate.py",
+      "size": 20314,
+      "sha256": "ef68a71c4b7fcbc27185040555bc85e133493937a47bad67f72815a27047dd93"
+    },
+    {
+      "path": "tools/v4_probe_media.py",
+      "size": 2440,
+      "sha256": "8d6ff477e2f10353879e694ac8d161da10eb2156fb6a13d9ba84bd62bc576bcc"
+    }
+  ]
+}

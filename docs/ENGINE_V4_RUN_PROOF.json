@@ -1,0 +1,749 @@
+{
+  "runId": "v4-mwjv82xk-2z62m",
+  "engineId": "engine4",
+  "runKind": "full-source-analysis",
+  "runManifestAbsolutePath": "C:\\Users\\Andirectly\\AppData\\Local\\Temp\\claude\\279ce4322d959de6\\a4fe169a-000d-4939-b10c-00703a7ff567\\scratchpad\\v2data\\projects\\f6b279f9806ef5b9bc5e5eaadbe5afcc\\analysis\\runs\\v4-mwjv82xk-2z62m\\manifest.json",
+  "sourceSha256": "35ab966931de6606ead3c71b371af2eae356f0a5d833fa0c31182deafdd6de58",
+  "sourceMediaAbsolutePath": "C:\\Users\\Andirectly\\AppData\\Roaming\\cutawan\\downloads\\3296466283.mp4",
+  "sourceProbe": {
+    "durationSeconds": 60.033333,
+    "streams": [
+      "video",
+      "audio"
+    ]
+  },
+  "outputSha256": "442a3fa715c1192fe97775d1f1c4299e10f584b820c0fe17c47bb61e599e0938",
+  "outputMediaAbsolutePath": "C:\\Users\\Andirectly\\AppData\\Local\\Temp\\claude\\279ce4322d959de6\\a4fe169a-000d-4939-b10c-00703a7ff567\\scratchpad\\v2data\\projects\\f6b279f9806ef5b9bc5e5eaadbe5afcc\\analysis\\runs\\v4-mwjv82xk-2z62m\\previews\\eg-g1-v1-r0\\a person reacting strongly with face and body.mp4",
+  "outputProbe": {
+    "durationSeconds": 16.6,
+    "streams": [
+      "video",
+      "audio"
+    ]
+  },
+  "modelCalls": [
+    {
+      "role": "asr",
+      "modelRevision": "parakeet-v3",
+      "realInputModalities": [
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0001-asr.json",
+      "status": "99 Wörter (gespeichertes Transkript, Version 1)"
+    },
+    {
+      "role": "speech_lane",
+      "modelRevision": "qwen3-14b-q4_k_m (llama-server)",
+      "realInputModalities": [
+        "speech"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0002-speech_lane.json",
+      "status": "windows 1, failed 0"
+    },
+    {
+      "role": "audio_event",
+      "modelRevision": "yamnet (yamnet-groups-1, hop 0.48s)",
+      "realInputModalities": [
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0003-audio_event.json",
+      "status": "frames 124, Vorschläge 0"
+    },
+    {
+      "role": "video_embedding",
+      "modelRevision": "qwen3-vl-embedding-2b@9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda",
+      "realInputModalities": [
+        "video"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0004-video_embedding.json",
+      "status": "8 Fenster, 0 Lücken, cached=true"
+    },
+    {
+      "role": "query_embedding",
+      "modelRevision": "qwen3-vl-embedding-2b@9f2f7e710d6d81056aa5c0a4f04764fec6bb7bda",
+      "realInputModalities": [
+        "text"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0005-query_embedding.json",
+      "status": "15 Anfragen"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0006-av_verification.json",
+      "windowId": "g5.w1",
+      "status": "next=stop"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0007-av_verification.json",
+      "windowId": "g5.w2",
+      "status": "next=stop"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0008-av_verification.json",
+      "windowId": "g6.w1",
+      "status": "next=stop"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0009-av_verification.json",
+      "windowId": "g4.w1",
+      "status": "next=stop"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0010-av_verification.json",
+      "windowId": "g4.w2",
+      "status": "next=stop"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0011-av_verification.json",
+      "windowId": "g2.w1",
+      "status": "next=stop"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0012-av_verification.json",
+      "windowId": "g2.w2",
+      "status": "next=stop"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0013-av_verification.json",
+      "windowId": "g3.w1",
+      "status": "next=stop"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0014-av_verification.json",
+      "windowId": "g3.w2",
+      "status": "next=stop"
+    },
+    {
+      "role": "av_verification",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0015-av_verification.json",
+      "windowId": "g1.w1",
+      "status": "next=stop"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0016-local_cut_judge.json",
+      "windowId": "eg-g5:E12__E70",
+      "status": "E9→E71 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0017-local_cut_judge.json",
+      "windowId": "eg-g5:E12__E71",
+      "status": "E9→E71 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0018-local_cut_judge.json",
+      "windowId": "eg-g5:E12__E72",
+      "status": "E9→E71 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0019-local_cut_judge.json",
+      "windowId": "eg-g6:E59__E75",
+      "status": "E61→E75 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0020-local_cut_judge.json",
+      "windowId": "eg-g6:E52__E75",
+      "status": "E50→E75 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0021-local_cut_judge.json",
+      "windowId": "eg-g6:E48__E75",
+      "status": "E50→E75 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0022-local_cut_judge.json",
+      "windowId": "eg-g4:E42__E75",
+      "status": "E38→E75 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": false,
+      "tracePath": "traces\\c0023-local_cut_judge.json",
+      "windowId": "eg-g4:E39__E75",
+      "status": "ungültig: startEdgeId nicht erlaubt: E38 @0,5 s (action)"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0024-local_cut_judge.json",
+      "windowId": "eg-g4:E28__E75",
+      "status": "E30→E75 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": false,
+      "tracePath": "traces\\c0025-local_cut_judge.json",
+      "windowId": "eg-g2:E1__E47",
+      "status": "ungültig: reasonCode fehlt"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0026-local_cut_judge.json",
+      "windowId": "eg-g2:E2__E47",
+      "status": "E1→E47 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0027-local_cut_judge.json",
+      "windowId": "eg-g2:E1__E48",
+      "status": "E1→E47 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0028-local_cut_judge.json",
+      "windowId": "eg-g3:E1__E54",
+      "status": "E1→E54 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0029-local_cut_judge.json",
+      "windowId": "eg-g3:E2__E54",
+      "status": "E1→E54 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0030-local_cut_judge.json",
+      "windowId": "eg-g3:E1__E56",
+      "status": "E1→E56 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0031-local_cut_judge.json",
+      "windowId": "eg-g1:E1__E23",
+      "status": "E1→E23 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0032-local_cut_judge.json",
+      "windowId": "eg-g1:E2__E23",
+      "status": "E1→E25 preferred=true"
+    },
+    {
+      "role": "local_cut_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0033-local_cut_judge.json",
+      "windowId": "eg-g1:E1__E25",
+      "status": "E1→E23 preferred=true"
+    },
+    {
+      "role": "rendered_output_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0034-rendered_output_judge.json",
+      "windowId": "eg-g5-v1#r0",
+      "inputArtifactSha256": "3eaffe0e0da6665eda0927bff06a30ddbdb13fd8820be32133b2ef1b7c88351d",
+      "status": "needs-review"
+    },
+    {
+      "role": "rendered_output_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0035-rendered_output_judge.json",
+      "windowId": "eg-g6-v1#r0",
+      "inputArtifactSha256": "688c15ddf112b34dbf0d2cac12cf8d6996688520e6dee70bcb812fb3f6e4168a",
+      "status": "acceptable"
+    },
+    {
+      "role": "rendered_output_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0036-rendered_output_judge.json",
+      "windowId": "eg-g4-v1#r0",
+      "inputArtifactSha256": "aa44cd42509b59a9de2cb24a4fccc1b0d79a99cd34eba343c4b31f488e220729",
+      "status": "acceptable"
+    },
+    {
+      "role": "rendered_output_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0037-rendered_output_judge.json",
+      "windowId": "eg-g2-v1#r0",
+      "inputArtifactSha256": "e60f91b25af47e04fe3e10dda5c736fa4ed93ee59dea64b665ee5c783dfff9e9",
+      "status": "needs-review"
+    },
+    {
+      "role": "rendered_output_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0038-rendered_output_judge.json",
+      "windowId": "eg-g3-v1#r0",
+      "inputArtifactSha256": "3337c9db6d886306cee8b1e8e66ed6d8d2a7eaf44768a4aad48d597af147bbdb",
+      "status": "needs-review"
+    },
+    {
+      "role": "rendered_output_judge",
+      "modelRevision": "minicpm-o-4_5@fb09628e98b1f55d8d5b863e0eccfcdd11bff499",
+      "realInputModalities": [
+        "video",
+        "audio"
+      ],
+      "success": true,
+      "tracePath": "traces\\c0039-rendered_output_judge.json",
+      "windowId": "eg-g1-v1#r0",
+      "inputArtifactSha256": "442a3fa715c1192fe97775d1f1c4299e10f584b820c0fe17c47bb61e599e0938",
+      "status": "acceptable"
+    }
+  ],
+  "coverage": [
+    {
+      "lane": "speech",
+      "startSeconds": 0,
+      "endSeconds": 60,
+      "status": "inspected",
+      "source": "asr:parakeet-v3",
+      "inspected": true
+    },
+    {
+      "lane": "speech",
+      "startSeconds": 60,
+      "endSeconds": 60.03,
+      "status": "inspected",
+      "source": "asr:parakeet-v3",
+      "inspected": true
+    },
+    {
+      "lane": "speech",
+      "startSeconds": 0.294,
+      "endSeconds": 59.925999999999995,
+      "status": "inspected",
+      "source": "speech-lane-llm",
+      "inspected": true
+    },
+    {
+      "lane": "audio",
+      "startSeconds": 0,
+      "endSeconds": 60,
+      "status": "inspected",
+      "source": "loudness-rms",
+      "inspected": true
+    },
+    {
+      "lane": "audio",
+      "startSeconds": 60,
+      "endSeconds": 60.03,
+      "status": "inspected",
+      "source": "loudness-rms",
+      "inspected": true
+    },
+    {
+      "lane": "audio",
+      "startSeconds": 0,
+      "endSeconds": 59.52,
+      "status": "inspected",
+      "source": "yamnet",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 0,
+      "endSeconds": 4.16667,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 4.16667,
+      "endSeconds": 8.33333,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 8.33333,
+      "endSeconds": 12.5,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 12.5,
+      "endSeconds": 16.6667,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 16.6667,
+      "endSeconds": 20.8333,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 20.8333,
+      "endSeconds": 25,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 25,
+      "endSeconds": 29.1667,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 29.1667,
+      "endSeconds": 33.3333,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 33.3333,
+      "endSeconds": 37.5,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 37.5,
+      "endSeconds": 41.6667,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 41.6667,
+      "endSeconds": 45.8333,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 45.8333,
+      "endSeconds": 50,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 50,
+      "endSeconds": 54.1667,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 54.1667,
+      "endSeconds": 58.3333,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 58.3333,
+      "endSeconds": 59.3333,
+      "status": "inspected",
+      "source": "keyframe-diff",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 0,
+      "endSeconds": 8,
+      "status": "inspected",
+      "source": "qwen3-vl-embedding",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 8,
+      "endSeconds": 16,
+      "status": "inspected",
+      "source": "qwen3-vl-embedding",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 16,
+      "endSeconds": 24,
+      "status": "inspected",
+      "source": "qwen3-vl-embedding",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 24,
+      "endSeconds": 32,
+      "status": "inspected",
+      "source": "qwen3-vl-embedding",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 32,
+      "endSeconds": 40,
+      "status": "inspected",
+      "source": "qwen3-vl-embedding",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 40,
+      "endSeconds": 48,
+      "status": "inspected",
+      "source": "qwen3-vl-embedding",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 48,
+      "endSeconds": 56,
+      "status": "inspected",
+      "source": "qwen3-vl-embedding",
+      "inspected": true
+    },
+    {
+      "lane": "visual",
+      "startSeconds": 56,
+      "endSeconds": 60.033333,
+      "status": "inspected",
+      "source": "qwen3-vl-embedding",
+      "inspected": true
+    }
+  ],
+  "eventIds": [
+    "eg-g5",
+    "eg-g6",
+    "eg-g4",
+    "eg-g2",
+    "eg-g3",
+    "eg-g1"
+  ],
+  "clipIds": [
+    "v4-mwjv82xk-2z62m-c1",
+    "v4-mwjv82xk-2z62m-c2",
+    "v4-mwjv82xk-2z62m-c3"
+  ],
+  "judgementIds": [
+    "eg-g5-v1#r0",
+    "eg-g6-v1#r0",
+    "eg-g4-v1#r0",
+    "eg-g2-v1#r0",
+    "eg-g3-v1#r0",
+    "eg-g1-v1#r0"
+  ],
+  "timeMapId": "v4-mwjv82xk-2z62m-eg-g1-v1-r0:exporter-timemap",
+  "renderedArtifactJudged": true,
+  "generatedAt": "2026-11-16T23:23:00.665Z",
+  "generator": "scripts/v4-run-proof.ts"
+}

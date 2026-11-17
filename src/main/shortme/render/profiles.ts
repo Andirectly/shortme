@@ -18,6 +18,8 @@ export function safeFileName(title: string, fallback = 'Clip'): string {
   let n = title
     .normalize('NFC')
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
+    // trennen oder brechen das Quoting im FFmpeg-Filtergraphen (ass='…'): Titel mit Apostroph/Komma ließen den Export scheitern
+    .replace(/['’‘,;[\]=]/g, '')
     .replace(/\s+/g, ' ')
     .replace(/^[\s.]+|[\s.]+$/g, '')
   if (n.length > 100) n = n.slice(0, 100).replace(/[\s.]+$/g, '')

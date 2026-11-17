@@ -1,0 +1,684 @@
+{
+ "V4-001": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/index.ts",
+   "src/shared/engine.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts",
+   "tests/engineV4Registry.test.ts",
+   "tests/engineV4Stages.test.ts",
+   "tests/engineV4Cache.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": "Inventar: docs/ENGINE_V4_BASELINE.md (Pfade, SHA, Baseline-Logs docs/v4-logs/baseline-*)"
+ },
+ "V4-002": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/models.ts",
+   "src/main/shortme/clips/engines/index.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Registry.test.ts"
+  ],
+  "testCommand": "npx vitest run",
+  "maxStatus": "passed",
+  "notes": "volle Regression aller Tests; abschaltbar über SHORTME_ENGINE4=off oder <Daten>/engine4.disabled"
+ },
+ "V4-003": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/index.ts",
+   "src/main/shortme/render/timeline.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Registry.test.ts",
+   "tests/engineV4Stages.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": "docs/ENGINE_V4_ARCHITECTURE.md"
+ },
+ "V4-004": {
+  "implementationFiles": [
+   "src/shared/engine.ts",
+   "src/renderer/src/shortme/EngineSwitch.tsx",
+   "src/renderer/src/shortme/StartScreen.tsx"
+  ],
+  "testFiles": [
+   "tests/engineV4Registry.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": "Schalter im echten Fenster: Engine 1/2/3/4 sichtbar, Engine-4-Lauf angezeigt"
+ },
+ "V4-005": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/index.ts",
+   "resources/python/worker.py",
+   "src/main/shortme/clips/engines/v3/avWorker.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Registry.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": "echte Läufe: siehe Run-Proof"
+ },
+ "V4-006": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/index.ts",
+   "src/main/shortme/clips/engines/v4/revisions.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Registry.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-007": {
+  "implementationFiles": [
+   "src/shared/engine.ts",
+   "src/main/shortme/clips/engines/state.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Registry.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-008": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/index.ts",
+   "src/main/shortme/clips/engines/v4/checkpoint.ts",
+   "src/main/shortme/jobs.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-cancel-check.ts",
+   "tests/engineV4Cache.test.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-cancel-check.ts f6b279f9806ef5b9bc5e5eaadbe5afcc 45",
+  "maxStatus": "passed",
+  "notes": "echter Abbruch mitten im Lauf; Checkpoints für Investigator/Cut-Judge; VRAM-Freigabe am Ende"
+ },
+ "V4-009": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/media.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Registry.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-010": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/lanes.ts",
+   "src/main/shortme/clips/engines/v4/core.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts",
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-010",
+  "maxStatus": "passed",
+  "notes": "Proof-Lauf (60 s) und Langlauf 1,8 h (docs/ENGINE_V4_LONG_RUN.json): alle Zehntel je Lane geprüft"
+ },
+ "V4-011": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/lanes.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Stages.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-012": {
+  "implementationFiles": [
+   "src/main/shortme/transcription.ts",
+   "src/main/shortme/clips/engines/v4/lanes.ts",
+   "scripts/v4-asr-check.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-asr-check.ts",
+   "tests/engineV4Stages.test.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-asr-check.ts 0bd25d0107887a96850802d929fed11c e9c2cc32f86e8708f257452b29a999c3",
+  "maxStatus": "passed",
+  "notes": "Parakeet-Wortzeiten geprüft, Gegenprobe Qwen3-ASR DE/EN (docs/v4-logs/asr-check.json), Gesang/Musik → unknown/partial"
+ },
+ "V4-013": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/cut.ts",
+   "src/main/shortme/clips/engines/v2/visualIndex.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Stages.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-014": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/lanes.ts",
+   "src/main/shortme/clips/engines/v3/embedIndex.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-014",
+  "maxStatus": "passed",
+  "notes": "",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-015": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/investigate.ts",
+   "src/main/shortme/clips/engines/v4/finalize.ts",
+   "resources/python/worker.py"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-015",
+  "maxStatus": "passed",
+  "notes": "",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-016": {
+  "implementationFiles": [
+   "resources/python/worker.py",
+   "src/main/engines/catalog.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Stages.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": "Lizenzen: docs/ENGINE_V4_MODELS.md, docs/ENGINE_V3_LICENSES.md"
+ },
+ "V4-017": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/lanes.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts",
+   "tests/engineV4Registry.test.ts",
+   "tests/engineV4Stages.test.ts",
+   "tests/engineV4Cache.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-018": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/lanes.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-018",
+  "maxStatus": "passed",
+  "notes": "",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-019": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/lanes.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-019",
+  "maxStatus": "passed",
+  "notes": "",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-020": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/lanes.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Stages.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-021": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/core.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-022": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/core.ts",
+   "src/main/shortme/clips/engines/v4/lanes.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts",
+   "tests/engineV4Registry.test.ts",
+   "tests/engineV4Stages.test.ts",
+   "tests/engineV4Cache.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-023": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/investigate.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-023",
+  "maxStatus": "passed",
+  "notes": "",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-024": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/core.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-025": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/investigate.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-025",
+  "maxStatus": "passed",
+  "notes": "Gaming-Stream (docs/ENGINE_V4_GAMING_RUN.json): wortloses Ereignis mit beobachteter Handlung/Reaktion"
+ },
+ "V4-026": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/core.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-027": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/investigate.ts",
+   "src/main/shortme/clips/engines/v4/trace.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts",
+   "tests/engineV4Registry.test.ts",
+   "tests/engineV4Stages.test.ts",
+   "tests/engineV4Cache.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-028": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/core.ts",
+   "src/main/shortme/clips/engines/v4/cut.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-028",
+  "maxStatus": "passed",
+  "notes": "",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-029": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/core.ts",
+   "src/main/shortme/clips/engines/v4/cut.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-030": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/cut.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Stages.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-031": {
+  "implementationFiles": [
+   "src/main/shortme/render/timeline.ts",
+   "src/main/shortme/clips/engines/v4/finalize.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Stages.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-032": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/finalize.ts",
+   "src/main/shortme/clips/engines/v4/core.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-033": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/finalize.ts",
+   "src/main/shortme/render/exporter.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-033",
+  "maxStatus": "passed",
+  "notes": "",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-034": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/finalize.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-034",
+  "maxStatus": "passed",
+  "notes": "",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-035": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/finalize.ts",
+   "scripts/v4-repair-check.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-035",
+  "maxStatus": "passed",
+  "notes": "Reparaturprobe: scripts/v4-repair-check.ts",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-036": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/core.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-037": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/core.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-038": {
+  "implementationFiles": [
+   "src/main/shortme/render/exporter.ts",
+   "src/main/shortme/clips/engines/v4/finalize.ts",
+   "src/shared/edits.ts"
+  ],
+  "testFiles": [
+   "tests/edits.test.ts",
+   "tests/editHistory.test.ts",
+   "tests/shortmeCaptions.test.ts",
+   "tests/shortmePreview.test.ts",
+   "tests/timeline.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/edits.test.ts tests/editHistory.test.ts tests/shortmeCaptions.test.ts tests/shortmePreview.test.ts tests/timeline.test.ts tests/engineV4Stages.test.ts",
+  "maxStatus": "passed",
+  "notes": "V4 rendert über denselben Exporter/TimeMap; Editor-Regression; V4-Clip im echten Editor mit Untertiteln und 9:16-Ausschnitt geöffnet und exportiert"
+ },
+ "V4-039": {
+  "implementationFiles": [
+   "src/renderer/src/shortme/V4Provenance.tsx",
+   "src/main/shortme/clips/engines/v4/provenance.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts",
+   "tests/engineV4Registry.test.ts",
+   "tests/engineV4Stages.test.ts",
+   "tests/engineV4Cache.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": "im echten Fenster geöffnet (Screenshot .tmp/v4-provenance.png, per CDP)"
+ },
+ "V4-040": {
+  "implementationFiles": [
+   "src/shared/compare.ts",
+   "src/main/shortme/clips/compare.ts",
+   "src/renderer/src/shortme/CompareScreen.tsx"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts",
+   "tests/engineCompare.test.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-040",
+  "maxStatus": "passed",
+  "notes": "Vergleich der vier echten Läufe derselben Quelle: docs/ENGINE_V4_COMPARE_PROOF.json",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-041": {
+  "implementationFiles": [
+   "src/main/shortme/clips/compare.ts",
+   "src/main/shortme/clips/engines/recheck.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-041",
+  "maxStatus": "passed",
+  "notes": "echter Engine-4-Recheck eines Engine-2-Clips, getrennt gespeichert"
+ },
+ "V4-042": {
+  "implementationFiles": [
+   "src/renderer/src/shortme/EditorScreen.tsx",
+   "src/main/shortme/render/exporter.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts",
+   "tests/engineV4Registry.test.ts",
+   "tests/engineV4Stages.test.ts",
+   "tests/engineV4Cache.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": "im echten Fenster: V4-Clip im Editor geöffnet und exportiert (1080x1920, Bild+Ton, 15,4 s; per CDP), siehe ENGINE_V4_RELEASE_REPORT"
+ },
+ "V4-043": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/media.ts",
+   "src/main/shortme/clips/engines/v4/checkpoint.ts",
+   "src/main/shortme/clips/engines/v3/embedIndex.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Cache.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-044": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/revisions.ts",
+   "src/main/shortme/clips/engines/v4/media.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Registry.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "blocked",
+  "notes": "16/12-GB-GPU nicht vorhanden (nur RTX 5090 gemessen); OOM führt zu klarer Fehlermeldung"
+ },
+ "V4-045": {
+  "implementationFiles": [
+   "package.json",
+   "src/main/shortme/clips/engines/v3/runtime.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts",
+   "tests/engineV4Registry.test.ts",
+   "tests/engineV4Stages.test.ts",
+   "tests/engineV4Cache.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "blocked",
+  "notes": "sauberer Windows-Erststart auf frischem Rechner nicht möglich (nur Entwicklungsrechner)"
+ },
+ "V4-046": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/media.ts",
+   "src/main/shortme/clips/engines/v4/core.ts",
+   "src/main/shortme/render/graph.ts",
+   "resources/python/worker.py"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts",
+   "tests/engineV4Stages.test.ts",
+   "tests/engineV4Registry.test.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-046",
+  "maxStatus": "passed",
+  "notes": "echter Lauf ohne Ton/Sprache (docs/ENGINE_V4_SILENT_RUN.json); Unit: kaputte Datei, ungültiges JSON, außerhalb der Quelle; Abbruch: V4-008"
+ },
+ "V4-047": {
+  "implementationFiles": [
+   "resources/python/worker.py",
+   "src/main/shortme/clips/engines/v3/pyWorker.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Stages.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": ""
+ },
+ "V4-048": {
+  "implementationFiles": [
+   "src/main/shortme/clips/engines/v4/index.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-048",
+  "maxStatus": "passed",
+  "notes": "Lauf mit Bild+Ton über die ganze Kette",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-049": {
+  "implementationFiles": [
+   "src/main/shortme/clips/compare.ts",
+   "src/main/shortme/clips/analysis.ts"
+  ],
+  "testFiles": [
+   "scripts/v4-e2e-verify.ts"
+  ],
+  "testCommand": "npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts V4-049",
+  "maxStatus": "passed",
+  "notes": "vier getrennte Vollquellen-Läufe derselben Datei",
+  "realMediaRunId": "v4-mwjv82xk-2z62m"
+ },
+ "V4-050": {
+  "implementationFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "",
+  "maxStatus": "blocked",
+  "notes": "braucht ≥ 20 autorisierte, gelabelte Originalvideos (externer Input)"
+ },
+ "V4-051": {
+  "implementationFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "",
+  "maxStatus": "blocked",
+  "notes": "braucht 2 unabhängige Blind-Reviewer (externer Input)"
+ },
+ "V4-052": {
+  "implementationFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "",
+  "maxStatus": "blocked",
+  "notes": "Metriken erst mit Goldlabels/Reviews"
+ },
+ "V4-053": {
+  "implementationFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "",
+  "maxStatus": "blocked",
+  "notes": "Ablation erst mit Goldlabels"
+ },
+ "V4-054": {
+  "implementationFiles": [
+   "scripts/v4-evidence.mjs",
+   "scripts/v4-status.mjs"
+  ],
+  "testFiles": [
+   "tests/engineV4Core.test.ts"
+  ],
+  "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
+  "maxStatus": "passed",
+  "notes": "docs/ENGINE_V4_RELEASE_REPORT.md"
+ }
+}

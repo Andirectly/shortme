@@ -10,8 +10,8 @@ import { SoloClip, SyncPlayers, type SyncMember } from './CompareSync'
 type Info = Record<string, { title: string; start: number; end: number; score: number; autoCuts: Array<{ start: number; end: number }> }>
 const api = (): Window['cutawan']['shortme'] | null => (typeof window !== 'undefined' ? window.cutawan?.shortme ?? null : null)
 const mmss = (s: number): string => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
-const LETTER = ['A', 'B', 'C']
-const CHOICE: Array<[string, 'a' | 'b' | 'c' | 'tie' | 'all-weak']> = [['A', 'a'], ['B', 'b'], ['C', 'c'], ['Gleich gut', 'tie'], ['Alle schwach', 'all-weak']]
+const LETTER = ['A', 'B', 'C', 'D']
+const CHOICE: Array<[string, 'a' | 'b' | 'c' | 'd' | 'tie' | 'all-weak']> = [['A', 'a'], ['B', 'b'], ['C', 'c'], ['D', 'd'], ['Gleich gut', 'tie'], ['Alle schwach', 'all-weak']]
 
 /** Engine-Vergleich über dieselbe Originaldatei: Ereignis-Zuordnung, Exklusiv-Treffer, blinde Bewertung. Die Läufe selbst bleiben unverändert. */
 export function CompareScreen(): React.JSX.Element {
@@ -48,7 +48,7 @@ export function CompareScreen(): React.JSX.Element {
   const create = async (): Promise<void> => { setErr(''); try { const r = await api()!.compareCreate(hash, pick); setOrder({}); setRevealed(new Set()); await reload(r.comparisonId) } catch (e) { setErr(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e)) } }
   const split = async (m: EventMatch): Promise<void> => { if (cmp) { await api()!.compareOverride(hash, cmp.c.comparisonId, { action: 'split', memberRefs: m.members.map((x) => ({ runId: x.runId, eventId: x.eventId })) }); setOrder({}); await reload(cmp.c.comparisonId) } }
   const merge = async (a: EventMatch, b: EventMatch): Promise<void> => { if (cmp) { await api()!.compareOverride(hash, cmp.c.comparisonId, { action: 'merge', memberRefs: [...a.members, ...b.members].map((x) => ({ runId: x.runId, eventId: x.eventId })) }); setOrder({}); await reload(cmp.c.comparisonId) } }
-  const review = async (m: EventMatch, choice: 'a' | 'b' | 'c' | 'tie' | 'all-weak'): Promise<void> => { if (cmp) { await api()!.compareReview(hash, cmp.c.comparisonId, { matchId: m.matchId, choice, reasonTags: [] }); setRevealed((p) => new Set(p).add(m.matchId)); await reload(cmp.c.comparisonId) } }
+  const review = async (m: EventMatch, choice: 'a' | 'b' | 'c' | 'd' | 'tie' | 'all-weak'): Promise<void> => { if (cmp) { await api()!.compareReview(hash, cmp.c.comparisonId, { matchId: m.matchId, choice, reasonTags: [] }); setRevealed((p) => new Set(p).add(m.matchId)); await reload(cmp.c.comparisonId) } }
 
   const c = cmp?.c
   const exclusive = (rid: string): number => c?.eventMatches.filter((m) => m.kind === 'engine-exclusive' && m.members[0].runId === rid).length ?? 0
@@ -66,9 +66,9 @@ export function CompareScreen(): React.JSX.Element {
     <div style={{ display: 'grid', gap: 14, paddingTop: 12, alignContent: 'start' }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Button variant="secondary" onClick={() => go('clips')}><ArrowLeft size={14} /> Zurück</Button><h1 style={{ margin: 0 }}>Engines vergleichen</h1></div>
       <div className="sm-glass" style={{ padding: 14, display: 'grid', gap: 8 }}>
-        <small>Zwei oder drei fertige Läufe desselben Videos wählen. Neue Läufe entstehen über „Neu berechnen“ mit der jeweiligen Engine (volle Analyse des Originals).</small>
+        <small>Zwei bis vier fertige Läufe desselben Videos wählen. Neue Läufe entstehen über „Neu berechnen“ mit der jeweiligen Engine (volle Analyse des Originals).</small>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {runs.map((r) => <label key={r.runId} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={pick.includes(r.runId)} onChange={(e) => setPick((p) => (e.target.checked ? [...p, r.runId].slice(-3) : p.filter((x) => x !== r.runId)))} />{label(r.runId)}{r.clipCount != null ? ` (${r.clipCount})` : ''}</label>)}
+          {runs.map((r) => <label key={r.runId} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={pick.includes(r.runId)} onChange={(e) => setPick((p) => (e.target.checked ? [...p, r.runId].slice(-4) : p.filter((x) => x !== r.runId)))} />{label(r.runId)}{r.clipCount != null ? ` (${r.clipCount})` : ''}</label>)}
         </div>
         <div><Button variant="primary" disabled={pick.length < 2} onClick={() => void create()}>Vergleich erstellen</Button></div>
         {err && <small role="alert" style={{ color: 'var(--warn)' }}>{err}</small>}
@@ -108,7 +108,7 @@ export function CompareScreen(): React.JSX.Element {
                 <option value="">Clip wählen …</option>
                 {Object.entries(cmp.clips).map(([id, k]) => <option key={id} value={id}>{id.slice(-12)} · {mmss(k.start)}–{mmss(k.end)} · {k.title.slice(0, 40)}</option>)}
               </select>
-              {(['multimodal-v2', 'legacy'] as const).map((e) => <Button key={e} variant="secondary" disabled={!rcClip || rcBusy} onClick={() => { setRcBusy(true); void api()!.compareRecheck(hash, c.comparisonId, rcClip, e).then(setRechecks).catch((x: unknown) => setErr(String(x))).finally(() => setRcBusy(false)) }}>{rcBusy ? 'Prüft …' : `Mit ${ENGINE_LABEL[e]} prüfen`}</Button>)}
+              {(['engine4', 'multimodal-v2', 'legacy'] as const).map((e) => <Button key={e} variant="secondary" disabled={!rcClip || rcBusy} onClick={() => { setRcBusy(true); void api()!.compareRecheck(hash, c.comparisonId, rcClip, e).then(setRechecks).catch((x: unknown) => setErr(String(x))).finally(() => setRcBusy(false)) }}>{rcBusy ? 'Prüft …' : `Mit ${ENGINE_LABEL[e]} prüfen`}</Button>)}
             </div>
             {rechecks.map((r) => <small key={r.recheckId} style={{ display: 'block' }}><b>Clip-Recheck · {ENGINE_LABEL[r.byEngine]} · {r.clipId.slice(-12)}</b>: {r.status === 'done' ? `${r.qualityLabel ?? ''} – ${r.reasons ?? ''}` : r.note}{r.uncertain?.length ? ` (unsicher: ${r.uncertain.join('; ')})` : ''}</small>)}
           </div>
@@ -122,16 +122,16 @@ export function CompareScreen(): React.JSX.Element {
               return (
                 <div key={m.matchId} className="sm-glass" style={{ padding: 12, display: 'grid', gap: 6 }}>
                   <small>{mmss(m.alignment.sourceAnchorSec)} · {m.kind === 'shared-event' ? (m.confidenceLabel === 'manual-match' ? 'von dir zusammengeführt' : m.confidenceLabel === 'strong-match' ? 'gemeinsames Ereignis' : 'mögliches gemeinsames Ereignis') : m.kind === 'ambiguous' ? 'unklar zugeordnet' : `nur ${hide ? 'eine Engine' : label(m.members[0].runId)}`}{m.alignment.temporalIou != null ? ` · Überlappung ${Math.round(m.alignment.temporalIou * 100)} %` : ''}</small>
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, ord.length)}, minmax(0, 1fr))`, gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
                     {ord.map((rid, i) => { const mi = memberInfo(rid, m); return (
                       <div key={rid}><b>{hide ? `Variante ${LETTER[i]}` : label(rid)}</b><div>{mi.titles}</div><small>{mi.span}</small>{mi.at && <div><small style={{ color: 'var(--warn)' }}>{mi.at}</small></div>}</div>
                     ) })}
                   </div>
                   {m.members.length > 1 && (
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {CHOICE.filter(([, v]) => (v !== 'c' || ord.length > 2)).map(([l, v]) => <Button key={v} variant={done?.choice === v ? 'primary' : 'secondary'} onClick={() => void review(m, v)}>{l}</Button>)}
+                      {CHOICE.filter(([, v]) => ((v !== 'c' || ord.length > 2) && (v !== 'd' || ord.length > 3))).map(([l, v]) => <Button key={v} variant={done?.choice === v ? 'primary' : 'secondary'} onClick={() => void review(m, v)}>{l}</Button>)}
                       <Button variant="secondary" onClick={() => void split(m)}>Trennen</Button>
-                      {done && <small>Bewertet: {done.choice === 'tie' ? 'gleich gut' : done.choice === 'all-weak' ? 'alle schwach' : `Variante ${done.choice.toUpperCase()} = ${label(done.anonymizedPresentationOrder['abc'.indexOf(done.choice)] ?? '')}`}</small>}
+                      {done && <small>Bewertet: {done.choice === 'tie' ? 'gleich gut' : done.choice === 'all-weak' ? 'alle schwach' : `Variante ${done.choice.toUpperCase()} = ${label(done.anonymizedPresentationOrder['abcd'.indexOf(done.choice)] ?? '')}`}</small>}
                     </div>
                   )}
                   {m.members.length > 1 && cmp.sourcePath && (
@@ -142,7 +142,7 @@ export function CompareScreen(): React.JSX.Element {
                         const mem: SyncMember[] = ord.flatMap((rid, oi) => { const k = m.members.find((x) => x.runId === rid)?.clipIds.map((id) => cmp.clips[id]).find(Boolean); return k ? [{ key: rid, label: hide ? `Variante ${LETTER[oi]}` : label(rid), start: k.start, end: k.end, autoCuts: k.autoCuts }] : [] })
                         return play[m.matchId] === 'sync'
                           ? <SyncPlayers src={src} members={mem} union={m.alignment.sourceUnion} />
-                          : <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, mem.length)}, minmax(0, 1fr))`, gap: 10 }}>{mem.map((x) => <div key={x.key}><small>{x.label}</small><SoloClip src={src} member={x} /></div>)}</div>
+                          : <div style={{ display: 'grid', gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>{mem.map((x) => <div key={x.key}><small>{x.label}</small><SoloClip src={src} member={x} /></div>)}</div>
                       })()}
                       <small>Zeigt das Original ohne Ausschnitt und Untertitel; die Spalten teilen eine Quellzeit-Uhr. Im Modus „Blind bewerten“ heißen die Spalten Variante A/B/C; die Engine wird erst nach dem Urteil gezeigt.</small>
                     </div>

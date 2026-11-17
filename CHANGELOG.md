@@ -6,6 +6,19 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.34.0] - 2026-11-17
+
+### Added
+
+- Engine 4 (Beta): sucht über vier Spuren (Sprache, Ton, Bild, Bild+Text-Embedding), prüft jeden Kandidaten mit MiniCPM-o in Bild und Ton nach, setzt Schnitte nur an gemessenen Kanten (Satz, Pause, Bildwechsel), rendert 2–3 Varianten, bewertet das fertige Video und repariert bis zu zweimal. Vierter Schalter im Erstellen-Dialog und in der Clip-Liste.
+- „Herkunft“ an Engine-4-Clips: zeigt Fundspuren, Modellaufrufe und Bewertungen des Clips.
+- Engines vergleichen mit bis zu vier Läufen (A–D), Clip-Recheck auch mit Engine 4.
+
+### Fixed
+
+- Export: Titel mit Apostroph oder Komma brachen den Export ab; sehr lange Titel überschritten die Windows-Pfadgrenze; Videos ohne Tonspur ließen sich nicht exportieren.
+- MiniCPM-o: Speicherverbrauch wuchs mit jedem Aufruf; Clips ohne Ton scheiterten; abgeschnittene Antworten bei langen Ausgaben.
+
 ## [0.33.0] - 2026-11-15
 
 ### Added

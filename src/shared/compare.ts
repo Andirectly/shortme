@@ -18,7 +18,7 @@ export interface EventMatch {
   confidenceLabel: 'strong-match' | 'possible-match' | 'manual-match'
 }
 export interface EventMatchOverride { createdAt: string; action: 'merge' | 'split'; memberRefs: Array<{ runId: string; eventId: string }>; reviewerNote?: string }
-export interface BlindReview { reviewId: string; comparisonId: string; matchId: string; reviewerSessionId: string; anonymizedPresentationOrder: string[]; choice: 'a' | 'b' | 'c' | 'tie' | 'all-weak'; judgedAt: string; reasonTags: string[] }
+export interface BlindReview { reviewId: string; comparisonId: string; matchId: string; reviewerSessionId: string; anonymizedPresentationOrder: string[]; choice: 'a' | 'b' | 'c' | 'd' | 'tie' | 'all-weak'; judgedAt: string; reasonTags: string[] }
 export interface EngineComparison {
   comparisonId: string
   projectId: string
@@ -165,4 +165,4 @@ export function blindOrder(ids: string[], seed: string): string[] {
 }
 
 /** Anzeigeform eines clip-recheck (Quelle: main/shortme/clips/engines/recheck.ts). Eigene Art, nie mit Quellanalyse-Matches vermischt. */
-export interface ClipRecheckView { kind: 'clip-recheck'; recheckId: string; clipId: string; fromRunId: string; byEngine: 'multimodal-v2' | 'legacy'; at: string; status: 'done' | 'unavailable' | 'failed'; note: string; qualityLabel?: string; reasons?: string; uncertain?: string[]; unchecked?: string[]; observations?: string[] }
+export interface ClipRecheckView { kind: 'clip-recheck'; recheckId: string; clipId: string; fromRunId: string; byEngine: 'multimodal-v2' | 'legacy' | 'engine4'; at: string; status: 'done' | 'unavailable' | 'failed'; note: string; qualityLabel?: string; reasons?: string; uncertain?: string[]; unchecked?: string[]; observations?: string[] }

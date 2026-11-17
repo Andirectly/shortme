@@ -16,7 +16,7 @@ import { useSprings } from './motion'
 import { estimateStages, fmtEta, totalSec } from '@shared/estimate'
 import { getSpeed } from './speed'
 import { EngineSwitch, ProfilePicker, RuntimeInstall } from './EngineSwitch'
-import { ENGINE_BLURB, ENGINE_LABEL } from '@shared/engine'
+import { ENGINE_BLURB, ENGINE_LABEL, hasProfiles } from '@shared/engine'
 
 export function StartScreen(): React.JSX.Element {
   const openSheet = useStore((s) => s.openSheet)
@@ -201,7 +201,7 @@ function CreateSheet(): React.JSX.Element {
                 <div style={{ display: 'grid', gap: 8 }}>
                   <EngineSwitch value={startEngine} onSelect={(e) => void setStartEngine(e)} />
                   <small>{ENGINE_BLURB[startEngine]}</small>
-                  {startEngine === 'adaptive-v3' && <ProfilePicker value={startProfile} onChange={setStartProfile} />}
+                  {hasProfiles(startEngine) && <ProfilePicker value={startProfile} onChange={setStartProfile} />}
                   {startEngine !== 'legacy' && startMissing.length > 0 && (
                     <div role="alert" style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
                       <small style={{ color: 'var(--warn)' }}>Für {ENGINE_LABEL[startEngine]} fehlt: {startMissing.map((m) => m.name).join(', ')}.</small>

@@ -27,6 +27,8 @@ export interface Clip {
   criteria: { label: string; value: number }[]
   /** Neue Engine: Klartext statt Kriterienbalken (Ereignisqualität, Prüfung, Belege, Unsicherheit). */
   notes?: string[]
+  /** Engine 4: Lauf-ID für die Herkunftsansicht. */
+  v4RunId?: string
   /** Layout-Analyse läuft noch (ausgegraut, nicht anklickbar). */
   pending?: boolean
 }

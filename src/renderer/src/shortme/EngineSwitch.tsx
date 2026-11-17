@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Check, Loader2 } from 'lucide-react'
-import { ENGINE_IDS, ENGINE_LABEL, V3_PROFILES, V3_PROFILE_LABEL, displayedRunId, engineOfRun, type SelectionEngineId, type V3Profile } from '@shared/engine'
+import { hasProfiles, ENGINE_IDS, ENGINE_LABEL, V3_PROFILES, V3_PROFILE_LABEL, displayedRunId, engineOfRun, type SelectionEngineId, type V3Profile } from '@shared/engine'
 import { Button, Segmented } from './ui'
 import { useProject } from './projectStore'
 import { useStore } from './store'
@@ -49,7 +49,7 @@ export function RuntimeInstall({ onDone }: { onDone: () => void }): React.JSX.El
 
 /** Gut sichtbares Kennzeichen, welche Engine gemeint ist (neue Engine hervorgehoben). */
 export function EngineBadge({ engine, prefix }: { engine: SelectionEngineId; prefix?: string }): React.JSX.Element {
-  const bg = engine === 'adaptive-v3' ? '#7c3aed' : engine === 'multimodal-v2' ? '#3b6df0' : 'rgba(255,255,255,0.16)'
+  const bg = engine === 'engine4' ? '#0f9d74' : engine === 'adaptive-v3' ? '#7c3aed' : engine === 'multimodal-v2' ? '#3b6df0' : 'rgba(255,255,255,0.16)'
   return <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: bg, color: '#fff' }}>{prefix}{ENGINE_LABEL[engine]}</span>
 }
 
@@ -80,14 +80,14 @@ export function EngineBar(): React.JSX.Element | null {
         <Button variant="secondary" disabled={running || engine.pending} onClick={() => void recompute(cur)}>Neu berechnen</Button>
         {st.runs.filter((r) => r.status === 'done').length > 1 && <Button variant="secondary" onClick={() => go('compare')}>Engines vergleichen</Button>}
       </div>
-      {st.selected === 'adaptive-v3' && <ProfilePicker value={profile} onChange={setProfile} disabled={running || engine.pending} />}
+      {hasProfiles(st.selected) && <ProfilePicker value={profile} onChange={setProfile} disabled={running || engine.pending} />}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {running && <Loader2 size={14} className="sm-spin" />}
         {running ? <EngineBadge engine={st.selected} prefix={`Läuft (${Math.round((job?.progress ?? 0) * 100)} %): `} /> : shownEngine ? <EngineBadge engine={shownEngine} prefix="Angezeigt: " /> : <small>Noch keine Ergebnisse</small>}
         {!running && shownEngine && st.selected !== shownEngine && <small>Nächster Lauf: {ENGINE_LABEL[st.selected]}</small>}
       </div>
       {running && <small>{job?.message} · Angezeigt bleiben die Ergebnisse der {shownEngine ? ENGINE_LABEL[shownEngine] : 'bisherigen Anzeige'}. „Stoppen & behalten“ beendet den Lauf.</small>}
-      {engine.modelsChecked && engine.missing.length === 0 && <small style={{ display: 'flex', gap: 5, alignItems: 'center', color: 'var(--ok)' }}><Check size={12} /> Modelle für Engine 2 und 3 installiert</small>}
+      {engine.modelsChecked && engine.missing.length === 0 && <small style={{ display: 'flex', gap: 5, alignItems: 'center', color: 'var(--ok)' }}><Check size={12} /> Voraussetzungen für {ENGINE_LABEL[st.selected]} installiert</small>}
       {engine.msg && <small role="alert" style={{ color: 'var(--warn)', display: 'flex', gap: 6, alignItems: 'center' }}><AlertTriangle size={12} /> {engine.msg}</small>}
       {engine.missing.length > 0 && (st.selected !== 'legacy' || engine.msg) && (
         <div role="alert" className="sm-glass" style={{ padding: '10px 14px', display: 'grid', gap: 6, justifyItems: 'start' }}>

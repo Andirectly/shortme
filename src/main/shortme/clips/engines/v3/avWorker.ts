@@ -5,6 +5,8 @@ import { vram } from '../../../../engines'
 import { projectsRoot } from '../../../project'
 import { PyWorker } from './pyWorker'
 import { avPythonExe, workerScript } from './runtime'
+import { dirname } from 'node:path'
+import { FFMPEG_PATH, FFPROBE_PATH } from '../../../../pipeline/ffmpeg'
 
 export interface AvSession { worker: PyWorker; runId: string; modelId: string; loadInfo: Record<string, unknown>; health: Record<string, unknown> }
 
@@ -14,7 +16,8 @@ function resident(name: string, modelId: string, loadTimeoutMs: number): <T>(run
   vram.register({
     name,
     load: async () => {
-      const worker = new PyWorker({ python: avPythonExe(), script: workerScript(), allowedRoots: [projectsRoot()], modelRoots: [modelsRoot()] })
+      // MiniCPM-o/Lighthouse rufen „ffmpeg“ aus dem PATH auf: das gebündelte FFmpeg voranstellen (im installierten Programm gibt es sonst keins)
+      const worker = new PyWorker({ python: avPythonExe(), script: workerScript(), allowedRoots: [projectsRoot()], modelRoots: [modelsRoot()], env: { PATH: `${dirname(FFMPEG_PATH)};${dirname(FFPROBE_PATH)};${process.env.PATH ?? ''}` } })
       try {
         await worker.start()
         const health = await worker.request<Record<string, unknown>>('health', {}, { runId: currentRun, timeoutMs: 60_000 })

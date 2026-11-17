@@ -1,0 +1,16 @@
+{
+  "engineId": "engine4",
+  "notes": "EMPTY TEMPLATE. Do not mark quality IDs passed until private real review assets are present.",
+  "sources": [],
+  "benchmarkReport": {
+    "measured": false,
+    "reportPath": "",
+    "enginesCompared": [],
+    "metrics": []
+  },
+  "ablationReport": {
+    "measured": false,
+    "reportPath": "",
+    "componentsTested": []
+  }
+}

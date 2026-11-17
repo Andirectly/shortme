@@ -311,6 +311,29 @@ def op_temporal_ground(req, p):
     return {"windows": out, "seconds": round(time.time() - t0, 2), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
 
 
+def _has_audio_stream(path: str) -> bool:
+    import subprocess
+
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", path], capture_output=True, text=True, timeout=60)
+    return bool(r.stdout.strip())
+
+
+def _frames_1fps(path: str) -> list:
+    """Bilder (1 pro Sekunde) per ffmpeg in einen temporären Ordner, danach als PIL-Bilder (Argumentliste, kein Shell)."""
+    import subprocess
+    import tempfile
+
+    from PIL import Image
+
+    with tempfile.TemporaryDirectory(prefix="shortme-frames-") as d:
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", path, "-vf", "fps=1", os.path.join(d, "f%04d.jpg")], check=True, timeout=300)
+        out = []
+        for name in sorted(os.listdir(d)):
+            with Image.open(os.path.join(d, name)) as im:
+                out.append(im.convert("RGB"))
+        return out
+
+
 def op_analyze_av(req, p):
     """MiniCPM-o: Video UND Audio eines kurzen Ausschnitts (≤ 60 s, vom Aufrufer zugeschnitten) mit einer Aufgabe. Liefert den Modelltext (wird im Aufrufer gegen ein Schema geprüft)."""
     import torch
@@ -320,21 +343,38 @@ def op_analyze_av(req, p):
         raise WorkerError("no-model", "Kein AV-Modell geladen")
     path = inside(p.get("path"), _args.allowed_root)
     prompt = p.get("prompt")
-    if not isinstance(prompt, str) or not 0 < len(prompt) <= 4000:
-        raise WorkerError("bad-payload", "prompt: String (≤ 4000 Zeichen)")
+    if not isinstance(prompt, str) or not 0 < len(prompt) <= 8000:
+        raise WorkerError("bad-payload", "prompt: String (≤ 8000 Zeichen)")
     max_new = max(16, min(int(p.get("maxNewTokens", 300)), 600))
     from minicpmo.utils import get_video_frame_audio_segments  # type: ignore
 
     t0 = time.time()
-    frames, audio_chunks, _ = get_video_frame_audio_segments(path, stack_frames=1, use_ffmpeg=True)
+    if _has_audio_stream(path):
+        frames, audio_chunks, _ = get_video_frame_audio_segments(path, stack_frames=1, use_ffmpeg=True)
+    else:
+        # Datei ohne Tonspur: nur Bilder (1/s); die Hilfsfunktion von MiniCPM-o scheitert sonst am Tonauszug
+        frames, audio_chunks = _frames_1fps(path), []
     if not frames or len(frames) > 75:
         raise WorkerError("bad-media", f"Ausschnitt hat {len(frames)} Sekunden (erlaubt 1–75)")
     contents = []
-    for f, a in zip(frames, audio_chunks):
-        contents += [f, a]
+    has_audio = bool(audio_chunks) and len(audio_chunks) == len(frames)
+    for i, f in enumerate(frames):
+        contents += [f, audio_chunks[i]] if has_audio else [f]  # ohne Tonspur nur Bilder, kein erfundener Ton
     msgs = [{"role": "user", "content": contents + [prompt]}]
-    text = m.chat(msgs=msgs, tokenizer=tok, omni_mode=True, max_slice_nums=1, use_tts_template=False, max_new_tokens=max_new, do_sample=False)
-    return {"text": text if isinstance(text, str) else str(text), "seconds": round(time.time() - t0, 2), "frames": len(frames), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+    torch.cuda.reset_peak_memory_stats()
+    # inference_mode: ohne ihn behielt MiniCPM-o Zwischenwerte, der VRAM wuchs je Aufruf bis zur Auslagerung (gemessen: 32 GB voll nach 8 Aufrufen)
+    with torch.inference_mode():
+        temp = float(p.get("temperature", 0) or 0)
+        # Wiederholung nach ungültiger Antwort mit leichter Streuung: bei do_sample=False käme exakt dieselbe Antwort zurück
+        sampling = {"do_sample": True, "temperature": min(max(temp, 0.05), 1.0), "top_p": 0.9} if temp > 0 else {"do_sample": False}
+        text = m.chat(msgs=msgs, tokenizer=tok, omni_mode=has_audio, max_slice_nums=1, use_tts_template=False, max_new_tokens=max_new, **sampling)
+    peak = int(torch.cuda.max_memory_allocated())
+    del msgs, contents, frames, audio_chunks
+    import gc
+
+    gc.collect()
+    torch.cuda.empty_cache()
+    return {"text": text if isinstance(text, str) else str(text), "seconds": round(time.time() - t0, 2), "hasAudio": has_audio, "vramPeakBytes": peak, "vramAllocatedBytes": int(torch.cuda.memory_allocated())}
 
 
 def op_cancel(req, p):

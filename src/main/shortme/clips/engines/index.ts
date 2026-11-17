@@ -6,10 +6,11 @@ import { selectClips, type CandTrace, type SelectInput, type SelectOptions } fro
 import type { ModalityStatus, RunInfo, SelectionEngineId, V3Profile } from '../../../../shared/engine'
 import { v2Revisions } from './v2/revisions'
 import { v3Revisions } from './v3/revisions'
+import { v4Revisions } from './v4/revisions'
 
 export interface SelectionOutcome {
   clips: ShortmeClip[]
-  mode: 'llm' | 'texttiling' | 'v2' | 'v3'
+  mode: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4'
   /** Nur Legacy: Kandidaten-Spur für das Lernen. */
   trace?: CandTrace[]
   /** Nur V2: Angaben zum Lauf (Modalitäten, Abdeckung, Modelle). */
@@ -49,7 +50,7 @@ async function selectLegacy(req: SelectionRequest): Promise<SelectionOutcome> {
 
 /** Modell-/Prompt-/Algorithmusversionen der Engine für den Eingabefingerabdruck (Legacy: keine, sein Ergebnis hängt nicht an solchen Revisionen). */
 export function engineRevisions(engine: SelectionEngineId, profile: V3Profile = 'balanced'): string[] {
-  return engine === 'multimodal-v2' ? v2Revisions() : engine === 'adaptive-v3' ? v3Revisions(profile) : []
+  return engine === 'multimodal-v2' ? v2Revisions() : engine === 'adaptive-v3' ? v3Revisions(profile) : engine === 'engine4' ? v4Revisions(profile) : []
 }
 
 export async function runSelection(req: SelectionRequest): Promise<SelectionOutcome> {
@@ -60,6 +61,11 @@ export async function runSelection(req: SelectionRequest): Promise<SelectionOutc
   if (req.engine === 'adaptive-v3') {
     const { selectV3 } = await import('./v3')
     return selectV3(req)
+  }
+  if (req.engine === 'engine4') {
+    // Eigener Orchestrator (v4/), ruft weder runPipeline (Engine 2/3) noch selectV3 auf
+    const { selectV4 } = await import('./v4')
+    return selectV4(req)
   }
   return selectLegacy(req)
 }

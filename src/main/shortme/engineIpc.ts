@@ -11,6 +11,8 @@ import { engineRevisions } from './clips/engines'
 import { loadState, setSelected, stopStaleRuns } from './clips/engines/state'
 import { v2MissingModels } from './clips/engines/v2/models'
 import { v3MissingModels } from './clips/engines/v3/models'
+import { v4MissingModels } from './clips/engines/v4/models'
+import { v4Provenance } from './clips/engines/v4/provenance'
 import { installAvRuntime, installRuntime, runtimeStatus } from './clips/engines/v3/runtime'
 import { addOverride, addRecheck, listRechecks, addReview, clipIndex, blindPresentation, createComparison, getComparison, listComparisons } from './clips/compare'
 import type { EventMatchOverride } from '../../shared/compare'
@@ -20,7 +22,7 @@ import type { ContentType, FrameChoice } from '../../shared/videoKind'
 const ACTIVE = ['queued', 'running', 'paused']
 
 /** Fehlende Pflichtvoraussetzungen der Engine (leer = bereit). */
-export const missingModelsFor = (engine: SelectionEngineId): Promise<Array<{ id: string; name: string; sizeBytes: number }>> => (engine === 'multimodal-v2' ? v2MissingModels() : engine === 'adaptive-v3' ? v3MissingModels() : Promise.resolve([]))
+export const missingModelsFor = (engine: SelectionEngineId): Promise<Array<{ id: string; name: string; sizeBytes: number }>> => (engine === 'multimodal-v2' ? v2MissingModels() : engine === 'adaptive-v3' ? v3MissingModels() : engine === 'engine4' ? v4MissingModels() : Promise.resolve([]))
 
 export const hasActiveJob = (jobs: JobQueue, hash: string): boolean => jobs.list().some((j) => j.hash === hash && ACTIVE.includes(j.state))
 
@@ -45,12 +47,13 @@ export function registerEngineControlIpc(jobs: JobQueue): void {
   ipcMain.handle('shortme:v3RuntimeStatus', () => runtimeStatus())
   ipcMain.handle('shortme:compareCreate', (_e, hash: string, runIds: string[]) => createComparison(hash, runIds))
   ipcMain.handle('shortme:compareRechecks', (_e, hash: string, id: string) => listRechecks(hash, id))
-  ipcMain.handle('shortme:compareRecheck', (_e, hash: string, id: string, clipId: string, engine: 'multimodal-v2' | 'legacy') => addRecheck(hash, id, clipId, engine))
+  ipcMain.handle('shortme:compareRecheck', (_e, hash: string, id: string, clipId: string, engine: 'multimodal-v2' | 'legacy' | 'engine4') => addRecheck(hash, id, clipId, engine))
+  ipcMain.handle('shortme:v4Provenance', (_e, hash: string, runId: string, clipId: string) => v4Provenance(hash, runId, clipId))
   ipcMain.handle('shortme:compareList', (_e, hash: string) => listComparisons(hash))
   ipcMain.handle('shortme:compareGet', async (_e, hash: string, id: string) => { const c = await getComparison(hash, id); return c ? { c, clips: await clipIndex(hash, c), sourcePath: (await loadMeta(hash))?.sourcePath ?? null } : null })
   ipcMain.handle('shortme:compareOverride', (_e, hash: string, id: string, o: Omit<EventMatchOverride, 'createdAt'>) => addOverride(hash, id, o))
   ipcMain.handle('shortme:compareBlind', async (_e, hash: string, id: string, matchId: string) => { const c = await getComparison(hash, id); return c ? blindPresentation(c, matchId) : [] })
-  ipcMain.handle('shortme:compareReview', (_e, hash: string, id: string, r: { matchId: string; choice: 'a' | 'b' | 'c' | 'tie' | 'all-weak'; reasonTags: string[] }) => addReview(hash, id, { ...r, reviewerSessionId: 'local' }))
+  ipcMain.handle('shortme:compareReview', (_e, hash: string, id: string, r: { matchId: string; choice: 'a' | 'b' | 'c' | 'd' | 'tie' | 'all-weak'; reasonTags: string[] }) => addReview(hash, id, { ...r, reviewerSessionId: 'local' }))
   /** Python-Laufzeit von Engine 3 installieren/reparieren (Modell-Manager-Aktion); Fortschrittszeilen gehen als Ereignis an alle Fenster. */
   let installing: Promise<unknown> | null = null
   ipcMain.handle('shortme:v3RuntimeInstall', async () => {

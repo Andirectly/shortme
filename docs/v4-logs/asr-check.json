@@ -1,0 +1,80 @@
+[
+ {
+  "hash": "0bd25d0107887a96850802d929fed11c",
+  "lang": "de",
+  "words": 1613,
+  "durationSec": 657,
+  "model": "parakeet-v3",
+  "firstInvalidWord": -1,
+  "sentences": 123,
+  "agreements": [
+   {
+    "window": [
+     30,
+     60
+    ],
+    "parakeetWords": 87,
+    "qwenWords": 89,
+    "agreement": 0.91
+   },
+   {
+    "window": [
+     294,
+     324
+    ],
+    "parakeetWords": 80,
+    "qwenWords": 81,
+    "agreement": 0.988
+   },
+   {
+    "window": [
+     513,
+     543
+    ],
+    "parakeetWords": 80,
+    "qwenWords": 81,
+    "agreement": 0.988
+   }
+  ],
+  "meanAgreement": 0.962
+ },
+ {
+  "hash": "e9c2cc32f86e8708f257452b29a999c3",
+  "lang": "en",
+  "words": 2281,
+  "durationSec": 739,
+  "model": "parakeet-v3",
+  "firstInvalidWord": -1,
+  "sentences": 297,
+  "agreements": [
+   {
+    "window": [
+     105,
+     135
+    ],
+    "parakeetWords": 109,
+    "qwenWords": 105,
+    "agreement": 0.89
+   },
+   {
+    "window": [
+     366,
+     396
+    ],
+    "parakeetWords": 105,
+    "qwenWords": 99,
+    "agreement": 0.914
+   },
+   {
+    "window": [
+     568,
+     598
+    ],
+    "parakeetWords": 111,
+    "qwenWords": 109,
+    "agreement": 0.856
+   }
+  ],
+  "meanAgreement": 0.887
+ }
+]

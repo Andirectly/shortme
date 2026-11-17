@@ -30,7 +30,7 @@ import { overlapsSilence } from '../../twitch/silence'
 import { detectAudioEvents, loadEvents, saveEvents, yamnetAvailable, type AudioEvent } from './audioEvents'
 import { loadTopics, saveTopics, type TopicMap } from './topics'
 import type { PlanInput } from '../../../shared/layoutPlan'
-import { displayedRunId, LEGACY_RUN_ID, newRunId, V2_ENGINE_VERSION, V3_ENGINE_VERSION, isV3Profile, type RunInfo, type SelectionEngineId, type V3Profile } from '../../../shared/engine'
+import { displayedRunId, LEGACY_RUN_ID, newRunId, V2_ENGINE_VERSION, V3_ENGINE_VERSION, V4_ENGINE_VERSION, hasProfiles, isV3Profile, type RunInfo, type SelectionEngineId, type V3Profile } from '../../../shared/engine'
 import { clipsPathFor, loadState, patchRun, registerRun, showRun } from './engines/state'
 import { analysisFingerprint } from './engines/control'
 import { engineRevisions, runSelection } from './engines'
@@ -87,7 +87,7 @@ export interface ClipsFile {
   query: string
   createdAt: string
   /** `llm`/`texttiling`: bisherige Engine; `v2`: neue Engine (eigene Datenverträge, siehe `engine`/`runId`). */
-  mode: 'llm' | 'texttiling' | 'v2' | 'v3'
+  mode: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4'
   engine?: SelectionEngineId
   runId?: string
   clips: ShortmeClip[]
@@ -184,13 +184,13 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   // Engine und Lauf stehen ab hier fest. Legacy schreibt wie bisher nach clips.json, die neue Engine in ihren eigenen Lauf-Ordner.
   const engine: SelectionEngineId = opts.engine ?? 'legacy'
   const v3Profile: V3Profile = isV3Profile(opts.profile) ? opts.profile : 'balanced'
-  const runId = engine === 'legacy' ? LEGACY_RUN_ID : newRunId(Math.random, Date.now, engine === 'adaptive-v3' ? 'v3' : 'v2')
+  const runId = engine === 'legacy' ? LEGACY_RUN_ID : newRunId(Math.random, Date.now, engine === 'engine4' ? 'v4' : engine === 'adaptive-v3' ? 'v3' : 'v2')
   const clipsPath = clipsPathFor(meta.hash, runId)
   if (engine !== 'legacy') {
     const run: RunInfo = {
-      runId, engineId: engine, engineVersion: engine === 'adaptive-v3' ? V3_ENGINE_VERSION : V2_ENGINE_VERSION, schema: 1, createdAt: new Date().toISOString(), status: 'running',
+      runId, engineId: engine, engineVersion: engine === 'engine4' ? V4_ENGINE_VERSION : engine === 'adaptive-v3' ? V3_ENGINE_VERSION : V2_ENGINE_VERSION, schema: 1, createdAt: new Date().toISOString(), status: 'running',
       fingerprint: analysisFingerprint({ hash: meta.hash, engine, transcriptVersion: t.version, wordCount: t.words.length, asrModel: t.model, query: opts.query, contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, revisions: engineRevisions(engine, v3Profile) }),
-      options: { query: opts.query ?? '', contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, minSec: 15, maxSec: 75, ...(engine === 'adaptive-v3' ? { profile: v3Profile } : {}) }, models: {}, modalities: {}
+      options: { query: opts.query ?? '', contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, minSec: 15, maxSec: 75, ...(hasProfiles(engine) ? { profile: v3Profile } : {}) }, models: {}, modalities: {}
     }
     await registerRun(meta.hash, run)
   }

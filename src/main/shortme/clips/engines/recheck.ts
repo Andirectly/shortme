@@ -17,7 +17,8 @@ export interface ClipRecheck {
   recheckId: string
   clipId: string
   fromRunId: string
-  byEngine: 'multimodal-v2' | 'legacy'
+  byEngine: 'multimodal-v2' | 'legacy' | 'engine4'
+  outputSha256?: string
   at: string
   status: 'done' | 'unavailable' | 'failed'
   note: string
@@ -35,6 +36,29 @@ export async function recheckClip(hash: string, clip: ShortmeClip, fromRunId: st
   const meta = await loadMeta(hash)
   const t = await loadTranscript(hash)
   if (!meta) return { ...base, status: 'failed', note: 'Projekt nicht gefunden' }
+  if (byEngine === 'engine4') {
+    // Engine 4: den Clip so rendern, wie er ist (seine Stücke, Untertitel, Ausschnitt), und am fertigen Ergebnis mit Bild+Ton prüfen – keine Entdeckung
+    if (!t) return { ...base, status: 'failed', note: 'Transkript fehlt' }
+    try {
+      const dir = projectFile(hash, `analysis/rechecks/${base.recheckId}`)
+      const { Tracer } = await import('./v4/trace')
+      const { renderVariant, judgeRendered } = await import('./v4/finalize')
+      const { withAv } = await import('./v3/avWorker')
+      const { ensureSignals } = await import('../analysis')
+      const signals = await ensureSignals(meta)
+      const tracer = new Tracer(dir, base.recheckId, meta.hash)
+      const r = await withAv(base.recheckId, async (s) => {
+        const rendered = await renderVariant(meta, t, signals, [], { ...clip }, `${dir}/output`, signal)
+        return judgeRendered(s, rendered, { variantId: clip.id, summary: clip.v2?.summary || clip.title, wav: projectFile(hash, 'audio.wav'), hasAudio: meta.hasAudio !== false, edges: [], tracer, round: 0, signal })
+      })
+      const j = r.judgement
+      if (!j) return { ...base, status: 'failed', note: `Endprüfung ungültig: ${r.error ?? '?'}` }
+      return { ...base, status: 'done', note: 'Neubewertung des fertigen Clips durch Engine 4 (gerenderte Datei, Bild+Ton + Messungen). Keine Entdeckung.', qualityLabel: j.decision, reasons: j.criteria.map((c) => `${c.id}: ${c.state}`).join(', '), uncertain: j.criteria.filter((c) => c.state === 'unknown').map((c) => `${c.id}: ${c.reason}`), outputSha256: j.outputSha256, observations: j.criteria.map((c) => `${c.id}/${c.state}: ${c.reason}`.slice(0, 300)) }
+    } catch (e) {
+      if (signal?.aborted) throw e
+      return { ...base, status: 'failed', note: `Engine-4-Recheck fehlgeschlagen: ${e instanceof Error ? e.message.slice(0, 200) : String(e)}` }
+    }
+  }
   try {
     const sentences = splitSentences(t?.words ?? [])
     const ev: HighlightEvent = { id: 'rc', start: clip.start, end: clip.end, anchor: (clip.start + clip.end) / 2, kind: clip.v2?.kind && clip.v2.kind !== 'sonstiges' ? (clip.v2.kind as HighlightEvent['kind']) : 'sonstiges', summary: clip.v2?.summary || clip.title, foundBy: ['text'], evidenceIds: [], requiredModalities: [], missingContext: [] }

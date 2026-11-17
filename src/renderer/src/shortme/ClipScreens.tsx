@@ -10,6 +10,7 @@ import { ProjectGrid } from './ProjectGrid'
 import { Button, Pill, Score } from './ui'
 import { useSprings } from './motion'
 import { EngineBadge, EngineBar } from './EngineSwitch'
+import { V4ProvenancePanel } from './V4Provenance'
 import { estimateStages, fmtEta, fractionOf, remainingSec, spans, totalSec } from '@shared/estimate'
 import { getSpeed, saveSpeed } from './speed'
 
@@ -92,7 +93,10 @@ function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: b
   const deleteClip = useProject((s) => s.deleteClip)
   const [hover, setHover] = useState(false)
   const [pop, setPop] = useState(false)
+  const [prov, setProv] = useState(false)
   return (
+    <>
+    {prov && c.v4RunId && <V4ProvenancePanel runId={c.v4RunId} clipId={c.id} onClose={() => setProv(false)} />}
     <motion.div className="sm-card" style={{ position: 'relative', overflow: 'visible', contentVisibility: 'auto', containIntrinsicSize: '260px 520px', outline: selected ? '2px solid var(--accent)' : 'none', ...(c.pending ? { opacity: 0.45, pointerEvents: 'none', filter: 'grayscale(0.8)' } : {}) }} whileTap={reduced ? undefined : { scale: 0.97 }} transition={base} onHoverStart={() => { setHover(true); setHoveredClip(c.id) }} onHoverEnd={() => { setHover(false); setPop(false); setHoveredClip(null) }}>
       <div onClick={onOpen} style={{ aspectRatio: '9/16', borderRadius: 'var(--r-card) var(--r-card) 0 0', overflow: 'hidden', position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover', transform: hover && !reduced ? 'scale(1.08)' : 'scale(1)', transition: 'transform 2.4s linear' }} />
@@ -104,7 +108,7 @@ function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: b
       <div style={{ padding: '10px 12px 12px', display: 'grid', gap: 4 }}>
         <h3 style={{ fontSize: 14, lineHeight: 1.25 }}>{c.title}</h3>
         <div style={{ position: 'absolute', right: 10, bottom: 10, display: 'flex', gap: 4, alignItems: 'flex-start' }}><RatingBar clipId={c.id} chips="popover" /><button aria-label="Clip löschen" title="Clip löschen" onClick={(e) => { e.stopPropagation(); void deleteClip(c.id) }} style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--edge)', background: 'rgba(0,0,0,0.35)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><Trash2 size={14} /></button></div>
-        <small>{c.duration} s{c.notes ? ' · Neue Engine' : ''} {c.faceRatio < 0.6 && <span title={`Gesichtsquote ${Math.round(c.faceRatio * 100)} %`} style={{ color: 'var(--warn)', marginLeft: 6 }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> wenig Gesicht</span>}</small>
+        <small>{c.duration} s{c.v4RunId ? ' · Engine 4' : c.notes ? ' · Neue Engine' : ''} {c.faceRatio < 0.6 && <span title={`Gesichtsquote ${Math.round(c.faceRatio * 100)} %`} style={{ color: 'var(--warn)', marginLeft: 6 }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> wenig Gesicht</span>}</small>
       </div>
       <AnimatePresence>
         {pop && (
@@ -117,10 +121,12 @@ function ClipCard({ c, selected, onSelect, onOpen, pct }: { c: Clip; selected: b
             ))}
             {c.notes?.map((n, i) => <small key={i} style={{ color: 'var(--text-2)' }}>{n}</small>)}
             <small style={{ color: 'var(--text-1)' }}>{c.reason}</small>
+            {c.v4RunId && <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setProv(true); setPop(false) }}>Herkunft (Engine 4)</Button>}
           </motion.div>
         )}
       </AnimatePresence>
     </motion.div>
+    </>
   )
 }
 

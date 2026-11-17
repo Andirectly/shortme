@@ -1,0 +1,667 @@
+{
+  "schemaVersion": 1,
+  "engineId": "engine4",
+  "canonicalName": "Shortme Engine V4 – Adaptive Event Intelligence",
+  "requirements": [
+    {
+      "id": "V4-001",
+      "stage": "S0",
+      "level": "core",
+      "title": "Repo-Baseline, vorhandene Engines/Editor/DB und Windows-Tests vollständig inventarisieren",
+      "acceptance": "Inventar mit realen Datei-/Modulpfaden, git SHA und tatsächlich ausgeführten Baseline-Checks",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-002",
+      "stage": "S0",
+      "level": "core",
+      "title": "V1/V2/V3 unverändert halten und Rollback-/Feature-Gate vorsehen",
+      "acceptance": "Regression aller drei Engines, keine destruktiven DB-Migrationen und abschaltbare V4",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-003",
+      "stage": "S0",
+      "level": "core",
+      "title": "Bestehende Engine-IDs und echte Source-/Clip-TimeMap aus Repo ermitteln",
+      "acceptance": "Architekturdokument bindet sich an reale Dispatcher-, Job-, Export-, Cache- und TimeMap-Pfade",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-004",
+      "stage": "S1",
+      "level": "core",
+      "title": "Vierte echte Engine Option Engine 4 hinzufügen",
+      "acceptance": "Import/Analyse-Auswahl 1/2/3/4 in UI und Persistenz; vierter Pfad läuft anderen Code",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-005",
+      "stage": "S1",
+      "level": "core",
+      "title": "Eigenständigen V4-Dispatcher/Orchestrator und Python-Worker integrieren",
+      "acceptance": "V4-Worker führt Stages mit echten Medien aus; V3 wird nicht umetikettiert",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-006",
+      "stage": "S1",
+      "level": "core",
+      "title": "V4 Run-Manifest unveränderlich versionieren",
+      "acceptance": "source SHA, model checkpoints, profile, code commit, seeds, prompts, query-bank version je Run",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-007",
+      "stage": "S1",
+      "level": "core",
+      "title": "Engine-Run- und Ergebnis-Isolation, Altprojektmigration",
+      "acceptance": "V4-Resultate speichern separat; ältere Run-IDs und User-Edits bleiben lesbar",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-008",
+      "stage": "S1",
+      "level": "core",
+      "title": "Status- und Crash-sichere asynchrone Jobverwaltung",
+      "acceptance": "queued/running/partial/failed/cancelled/completed, resume, timeout, process-tree cancel, atomare Writes",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-009",
+      "stage": "S2",
+      "level": "core",
+      "title": "Video/Audio mit ffprobe und echter PTS-Timebase lesen",
+      "acceptance": "VFR, variable Audiooffsets, Audio-only-/Video-only-Fehlerpfade und Streams validiert",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-010",
+      "stage": "S2",
+      "level": "core",
+      "title": "Ganze lange Originalquelle grob abdecken",
+      "acceptance": "Per-lane Coverage über Anfang/Mitte/letzte 10 % für 1–6h, keine erste-Stunde-Abkürzung",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-011",
+      "stage": "S2",
+      "level": "core",
+      "title": "Cheap-audio Feature-Pass real ausführen",
+      "acceptance": "Lautheit, Peaks, VAD/Stille, Sprecherwechsel oder äquivalente Audio-Events; nonverbal möglich",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-012",
+      "stage": "S2",
+      "level": "core",
+      "title": "ASR deutsch/englisch real ausführen und Wortzeiten verifizieren",
+      "acceptance": "Lokales ASR; Alignment/Satz-IDs; rap/overlap/unsupported unknown; keine erfundenen Worte",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-013",
+      "stage": "S2",
+      "level": "core",
+      "title": "Video-Shots, Bewegung, Screen-/Reaction-Cues real extrahieren",
+      "acceptance": "Szenenwechsel, Schlüsselframes, Bildänderungen, visuelle Action-Fenster mit Belegen",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-014",
+      "stage": "S2",
+      "level": "core",
+      "title": "Qwen3-VL-Embedding-2B für tatsächliches Video-Retrieval einsetzen",
+      "acceptance": "Lokale Video-Window-Embeddings + semantische Retrieval-Queries aus Frames, nicht Transkript-only",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-015",
+      "stage": "S2",
+      "level": "core",
+      "title": "Lokalen visuellen und Audio-/Video-Judge implementieren",
+      "acceptance": "Beobachtung decodierter Frames und Audio desselben Zeitfensters; echte Modelloutputs",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-016",
+      "stage": "S2",
+      "level": "core",
+      "title": "Offline, Modell-/Gewichts-/Dependency-Lizenzprüfung",
+      "acceptance": "Keine Cloud-KI/Upload/Telemetrie im Lauf; lizenzgeprüfte, gepinnte lokale Modelle; keine unsicheren Downloads",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-017",
+      "stage": "S3",
+      "level": "core",
+      "title": "Unabhängige sprachliche Kandidatenlane",
+      "acceptance": "Sprachliche Standalone-/Konflikt-/Revelation-Cues; echte SourceSpan+Evidence",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-018",
+      "stage": "S3",
+      "level": "core",
+      "title": "Unabhängige auditive Kandidatenlane",
+      "acceptance": "Lachen, Jubel, Musikwechsel, Schrei, ungewöhnliche Audio-Events ohne Transkript-Anker",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-019",
+      "stage": "S3",
+      "level": "core",
+      "title": "Unabhängige visuelle Kandidatenlane",
+      "acceptance": "Visuell-only Ereignisse und Spielaktionen unabhängig von ASR finden",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-020",
+      "stage": "S3",
+      "level": "core",
+      "title": "Multimodale Query-Bank und adaptive Query-Expansion",
+      "acceptance": "Kategorie-freie Queries + projektspezifische Query-Revisions; keine Pflichtliste an Genres",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-021",
+      "stage": "S3",
+      "level": "core",
+      "title": "Lane-Fusion mit reservierten Budgets und Diversity",
+      "acceptance": "RRF/äquivalente Fusion, keine Dominanz durch eine Modalität, event-aware Dedup mit Evidenz",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-022",
+      "stage": "S3",
+      "level": "core",
+      "title": "Quellen-/Seed-Provenienz und Confidence korrekt darstellen",
+      "acceptance": "Evidence-IDs für jeden Seed, kalibrierte Unsicherheit, fehlende Modelldaten nie Nullscore",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-023",
+      "stage": "S4",
+      "level": "core",
+      "title": "Bounded Active Investigator implementieren",
+      "acceptance": "Planner stellt messbar Nachfragen/Window-Queries, prüft Kontext und hält Budget strikt ein",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-024",
+      "stage": "S4",
+      "level": "core",
+      "title": "Beleggestützten EventGraph modellieren",
+      "acceptance": "setup/trigger/action/reaction/payoff als beobachtete SourceSpans, unknown möglich",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-025",
+      "stage": "S4",
+      "level": "core",
+      "title": "Auditive/visuelle Ereignisse ohne Worte nachvollziehbar verifizieren",
+      "acceptance": "Visual-only Gaming-Fail und nonverbal audio-only in realen Medien nachvollzogen",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-026",
+      "stage": "S4",
+      "level": "core",
+      "title": "Behauptungen nur mit Beleg-IDs und PTS zuordnen",
+      "acceptance": "Keine erfundene Kausalität/Start-End-Timestamps, Verifier gegen Media/Evidence",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-027",
+      "stage": "S4",
+      "level": "core",
+      "title": "Query-/Inspector-Schritte reproduzierbar protokollieren",
+      "acceptance": "Frage, Tool, Window, Antwort, Modellrevision, Beleg/Unsicherheit und Budget danach",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-028",
+      "stage": "S5",
+      "level": "core",
+      "title": "Jevcut-inspiriertes Cut-Point-Lattice aus echten Medienedges",
+      "acceptance": "Sentence, pause, speaker, shot, action, music phrase, source edges, mit Evidence und ID",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-029",
+      "stage": "S5",
+      "level": "core",
+      "title": "Start-/Endauswahl nur aus Cut-Edge-IDs",
+      "acceptance": "Local judge wählt diskrete Kandidaten und Standalone/Payoff Gates; kein LLM absolute Sekunden",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-030",
+      "stage": "S5",
+      "level": "core",
+      "title": "Mehrere relevante Schnittvarianten pro Ereignis konstruieren",
+      "acceptance": "Mindestens 2 falls sinnvoll, Hook-First vs Context-Safe, unterschiedliche echte Start/Ends",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-031",
+      "stage": "S5",
+      "level": "core",
+      "title": "Original-Source-TimeMap für Segment-/Gap-Edits beibehalten",
+      "acceptance": "Keine Drift, richtige Audioframes/Caption-Wörter/Projektzeit nach KeepPieces",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-032",
+      "stage": "S5",
+      "level": "core",
+      "title": "Unvollständige Referenten, Payoffs, Reaktionen und Kontext erkennen",
+      "acceptance": "Standalone-Fehler priorisieren; kein harter Trimschnitt nur nach fixer Duration",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-033",
+      "stage": "S6",
+      "level": "core",
+      "title": "Tatsächliches Vorschau-/Ausgabevideo mit Bild UND Ton rendern",
+      "acceptance": "FFmpeg/Bestandsrenderer erzeugt echte Datei mit Video-/Audio-Paketen und validiertem Duration/Hash",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-034",
+      "stage": "S6",
+      "level": "core",
+      "title": "Final-Artifact-Judge prüft das tatsächlich gerenderte Ergebnis",
+      "acceptance": "Hook, Standalone, Payoff, audio-/visual-seam, no-dead-air, caption-sync, crop-safety je Evidence",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-035",
+      "stage": "S6",
+      "level": "core",
+      "title": "Automatische begrenzte Repair-Schleife durchlaufen",
+      "acceptance": "0–2 Revisionen mit erkannten Gründen, neue Cuts neu rendern, neu prüfen, kein Score-Faking",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-036",
+      "stage": "S6",
+      "level": "core",
+      "title": "Unklare oder schlechte Clips zurückhalten",
+      "acceptance": "accept/needs-review/reject nachvollziehbar; Quality-Gates darf man nicht überspringen",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-037",
+      "stage": "S6",
+      "level": "core",
+      "title": "Globales Ranking und Vielfalt der finalen Clips",
+      "acceptance": "Mischung aus Quellzeiten/Genres/Dauer, Near-Duplicate-Merge, Qualität vor Menge",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-038",
+      "stage": "S6",
+      "level": "core",
+      "title": "Captions und 9:16-Reframe im Bestandseditor synchron halten",
+      "acceptance": "Wortzeiten, Safe Zones, Crop, Undo/Redo, Export- und Preview-Regression",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-039",
+      "stage": "S7",
+      "level": "core",
+      "title": "Vollständige V4-Run-/Evidence-/Investigation-UI",
+      "acceptance": "Quelle, warum gefunden, Belege/Unsicherheit, Suche/Graph, Schnitte, Vorher/Nachher",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-040",
+      "stage": "S7",
+      "level": "core",
+      "title": "V1/V2/V3/V4 auf identischer Originalquelle vergleichen",
+      "acceptance": "Vier Engines optional an/aus, synchroner Source-Seek, Clips/Run-Matching, keine Run-Vermischung",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-041",
+      "stage": "S7",
+      "level": "core",
+      "title": "Full-source-Reanalyse von Clip-Recheck trennen",
+      "acceptance": "Original neu analysieren und Clip erneut bewerten sind verschiedene persistierte Jobtypen",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-042",
+      "stage": "S7",
+      "level": "core",
+      "title": "Clip im Editor editierbar und exportierbar machen",
+      "acceptance": "Echte erzeugte Clips öffnbar, Cut-Handles und Timeline-Edits/Export funktionieren",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-043",
+      "stage": "S8",
+      "level": "core",
+      "title": "Stufen-/Featurecache bei Änderungen korrekt invalidieren",
+      "acceptance": "Hash abhängig von Source/Modell/Prompt/Options, nicht über Modellraum hinweg wiederverwendet",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-044",
+      "stage": "S8",
+      "level": "core",
+      "title": "Ressourcenprofile und reale GPU-/CPU-Fehler behandeln",
+      "acceptance": "Fast/Balanced/Deep, 12/16/32 GB wo vorhanden, OOM-/Timeout-/NoGPU-Verhalten klar markiert",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-045",
+      "stage": "S8",
+      "level": "core",
+      "title": "Windows-App-Packaging inkl. Python Sidecar nachweisen",
+      "acceptance": "Sauberer Erststart auf Windows, absolut keine globalen Python-Pakete nötig",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-046",
+      "stage": "S8",
+      "level": "core",
+      "title": "Fehler- und Regressionstests einschließlich Cancel/Resume",
+      "acceptance": "Korruptes Medienfile, VFR, silent, no speech, LLM invalid JSON, out-of-bounds, crash",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-047",
+      "stage": "S8",
+      "level": "core",
+      "title": "Supply-Chain/IPC-Sicherheitsprüfungen",
+      "acceptance": "Keine shell=True, Path-Allowlist, JSON validation, keine Secrets/Transkript-Instructions als Steuerbefehle",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-048",
+      "stage": "S9",
+      "level": "core",
+      "title": "Reale E2E-Pipeline mit autorisiertem Quellvideo durchlaufen",
+      "acceptance": "Nachweis Source->ASR/Audio/Video Lanes->Eventgraph->Cut->rendered mp4->judge->UI/Export",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-049",
+      "stage": "S9",
+      "level": "core",
+      "title": "Gleiche Quelle auf V1–V4 vergleichbar ausführen",
+      "acceptance": "Gleiche Versions-Snapshots/Medien, separate Runs, Reanalyse kein Clip-Cheating",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run",
+        "real_media"
+      ]
+    },
+    {
+      "id": "V4-050",
+      "stage": "S9",
+      "level": "quality",
+      "title": "Mindestens 20 diverse echte Originalvideos für Evaluation erfassen",
+      "acceptance": "Podcast, Twitch, Gaming, rap, no-speech und negative Fälle; Source-Hashes und Labels",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-051",
+      "stage": "S9",
+      "level": "quality",
+      "title": "Blind-Review mit unabhängigen Menschen organisieren und dokumentieren",
+      "acceptance": "Mindestens 2 Rater, Quellclip/Standalone/Payoff-Note, keine sichtbare Engine",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-052",
+      "stage": "S9",
+      "level": "quality",
+      "title": "Cut-/Recall-/Standalone- und Manual-Edit-Metriken ermitteln",
+      "acceptance": "Reproduzierbare Metriken mit CIs je Genre, keine 94%-viral-Mockwerte",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-053",
+      "stage": "S9",
+      "level": "quality",
+      "title": "Ablation von Video/Audio/Planner/Cut/Repair nachweisen",
+      "acceptance": "Keine Qualitätsbehauptung ohne echte Baseline, Signale der einzelnen Stufen isoliert",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    },
+    {
+      "id": "V4-054",
+      "stage": "S9",
+      "level": "core",
+      "title": "V4-Abnahmebericht mit technischen und Quality-Gates",
+      "acceptance": "exakte Befehle/Exit-Codes/Artefakt-Hashes/Status, Engineering!=Quality und Blocker ehrlich",
+      "required_proof": [
+        "source_code",
+        "test",
+        "test_run"
+      ]
+    }
+  ]
+}

@@ -37,7 +37,7 @@ export function SyncPlayers({ src, members, union }: { src: string; members: Syn
   }, [t, playing, members])
   return (
     <div style={{ display: 'grid', gap: 8 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${members.length}, minmax(0, 1fr))`, gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
         {members.map((m, i) => {
           const st = memberState(m, t)
           return (

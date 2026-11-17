@@ -2,15 +2,21 @@
 // Zustand je Projekt: <Projekt>/analysis/state.json; Ergebnisse der neuen Engine je Lauf: <Projekt>/analysis/runs/<runId>/.
 // Das bisherige Ergebnis (clips.json im Projektordner) gilt als Lauf `legacy` und wird von der neuen Engine nie angefasst.
 
-export type SelectionEngineId = 'legacy' | 'multimodal-v2' | 'adaptive-v3'
-export const ENGINE_IDS: SelectionEngineId[] = ['legacy', 'multimodal-v2', 'adaptive-v3']
-export const ENGINE_LABEL: Record<SelectionEngineId, string> = { legacy: 'Engine 1 – Original', 'multimodal-v2': 'Engine 2 – Multimodal', 'adaptive-v3': 'Engine 3 – Adaptive AI' }
+export type SelectionEngineId = 'legacy' | 'multimodal-v2' | 'adaptive-v3' | 'engine4'
+export const ENGINE_IDS: SelectionEngineId[] = ['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4']
+export const ENGINE_LABEL: Record<SelectionEngineId, string> = { legacy: 'Engine 1 – Original', 'multimodal-v2': 'Engine 2 – Multimodal', 'adaptive-v3': 'Engine 3 – Adaptive AI', engine4: 'Engine 4' }
 /** Kurzbeschreibung für den Erstellen-Dialog. */
 export const ENGINE_BLURB: Record<SelectionEngineId, string> = {
   legacy: 'Liest das Transkript und die Ton-Markierungen (am schnellsten, keine zusätzlichen Modelle).',
   'multimodal-v2': 'Prüft Bild und Ton mit lokalen Modellen (Qwen3-VL, Voxtral) und vergleicht fertig geschnittene Varianten.',
-  'adaptive-v3': 'Durchsucht das ganze Video semantisch (Bild-Embeddings), dazu Ton und Text, und prüft die Treffer wie Engine 2.'
+  'adaptive-v3': 'Durchsucht das ganze Video semantisch (Bild-Embeddings), dazu Ton und Text, und prüft die Treffer wie Engine 2.',
+  engine4: 'Eigene Pipeline: vier unabhängige Suchwege, Nachuntersuchung mit Bild+Ton, Schnitte nur an gemessenen Kanten, prüft den fertig gerenderten Clip und repariert ihn gezielt.'
 }
+/** Engine 4: Manifest (Spezifikation 03). Pipeline-Version 4.0, eigener Dispatcher. */
+export const V4_ENGINE_VERSION = '4.0'
+export const ENGINE4_MANIFEST = { id: 'engine4', displayName: 'Engine 4', pipeline: 'adaptive-event-intelligence', pipelineVersion: '4.0', protocolVersion: 1, supportedProfiles: ['fast', 'balanced', 'deep'] } as const
+/** Engines mit Analyseprofil (Schnell/Ausgewogen/Gründlich). */
+export const hasProfiles = (e: SelectionEngineId): boolean => e === 'adaptive-v3' || e === 'engine4'
 /** Analyseprofile der Engine 3 (keine eigene Engine): Tiefe der Suche. */
 export type V3Profile = 'fast' | 'balanced' | 'deep'
 export const V3_PROFILES: V3Profile[] = ['fast', 'balanced', 'deep']
@@ -57,10 +63,10 @@ export interface AnalysisState {
   runs: RunInfo[]
 }
 
-export const emptyAnalysisState = (): AnalysisState => ({ version: 1, selected: 'legacy', shown: LEGACY_RUN_ID, view: { legacy: LEGACY_RUN_ID, 'multimodal-v2': null, 'adaptive-v3': null }, runs: [] })
+export const emptyAnalysisState = (): AnalysisState => ({ version: 1, selected: 'legacy', shown: LEGACY_RUN_ID, view: { legacy: LEGACY_RUN_ID, 'multimodal-v2': null, 'adaptive-v3': null, engine4: null }, runs: [] })
 
 const RUN_STATUS: RunStatus[] = ['running', 'done', 'incomplete', 'failed', 'stopped']
-const isEngine = (x: unknown): x is SelectionEngineId => x === 'legacy' || x === 'multimodal-v2' || x === 'adaptive-v3'
+const isEngine = (x: unknown): x is SelectionEngineId => x === 'legacy' || x === 'multimodal-v2' || x === 'adaptive-v3' || x === 'engine4'
 export const isSafeRunId = (x: unknown): x is string => typeof x === 'string' && /^[a-z0-9][a-z0-9-]{0,40}$/.test(x)
 
 /** Gespeicherte Datei prüfen (unbekannte Engine, kaputte Läufe → verworfen). Fehlt etwas, gilt Legacy. */
@@ -98,7 +104,7 @@ export function findReusableRun(s: AnalysisState, engine: SelectionEngineId, fin
 }
 
 /** Kollisionsfreie, sichere Lauf-ID (nur a–z, 0–9, Bindestrich; nie vom Modell erzeugt). */
-export function newRunId(rand: () => number = Math.random, now: () => number = Date.now, prefix: 'v2' | 'v3' = 'v2'): string {
+export function newRunId(rand: () => number = Math.random, now: () => number = Date.now, prefix: 'v2' | 'v3' | 'v4' = 'v2'): string {
   const r = Array.from({ length: 5 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(rand() * 36)]).join('')
   return `${prefix}-${now().toString(36)}-${r}`
 }

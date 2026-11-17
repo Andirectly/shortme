@@ -27,7 +27,7 @@ async function runsOf(hash: string, runIds: string[]): Promise<CmpRun[]> {
 
 export async function createComparison(hash: string, runIds: string[]): Promise<EngineComparison> {
   const ids = [...new Set(runIds)]
-  if (ids.length < 2 || ids.length > 3) throw new Error('Bitte zwei oder drei Läufe wählen.')
+  if (ids.length < 2 || ids.length > 4) throw new Error('Bitte zwei bis vier Läufe wählen.')
   const st = await loadState(hash)
   const runs = await runsOf(hash, ids)
   const infos = ids.map((id) => st.runs.find((r) => r.runId === id))
@@ -78,7 +78,7 @@ export const blindPresentation = (c: EngineComparison, matchId: string): string[
 export async function addReview(hash: string, id: string, r: Pick<BlindReview, 'matchId' | 'choice' | 'reasonTags' | 'reviewerSessionId'>): Promise<EngineComparison> {
   const c = await getComparison(hash, id)
   if (!c) throw new Error('Vergleich nicht gefunden')
-  if (!['a', 'b', 'c', 'tie', 'all-weak'].includes(r.choice)) throw new Error('Ungültige Wahl')
+  if (!['a', 'b', 'c', 'd', 'tie', 'all-weak'].includes(r.choice)) throw new Error('Ungültige Wahl')
   const order = blindPresentation(c, r.matchId)
   if (!order.length) throw new Error('Match nicht gefunden')
   c.reviews = c.reviews.filter((x) => x.matchId !== r.matchId)
@@ -100,7 +100,7 @@ const recheckFile = (hash: string, id: string): string => file(hash, id).replace
 export async function listRechecks(hash: string, id: string): Promise<ClipRecheck[]> {
   try { return JSON.parse(await readFile(recheckFile(hash, id), 'utf8')) as ClipRecheck[] } catch { return [] }
 }
-export async function addRecheck(hash: string, id: string, clipId: string, byEngine: 'multimodal-v2' | 'legacy'): Promise<ClipRecheck[]> {
+export async function addRecheck(hash: string, id: string, clipId: string, byEngine: 'multimodal-v2' | 'legacy' | 'engine4'): Promise<ClipRecheck[]> {
   const c = await getComparison(hash, id)
   if (!c) throw new Error('Vergleich nicht gefunden')
   const found = await findClip(hash, clipId)

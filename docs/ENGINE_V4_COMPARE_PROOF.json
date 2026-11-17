@@ -1,0 +1,49 @@
+{
+  "comparisonId": "cmp-8802da35fe",
+  "kind": "full-source-discovery",
+  "runIds": [
+    "legacy",
+    "v2-mwjufp0e-fddd6",
+    "v3-mwjuhvl7-iota9",
+    "v4-mwjv82xk-2z62m"
+  ],
+  "sourceMediaId": "f6b279f9806ef5b9bc5e5eaadbe5afcc",
+  "warnings": [],
+  "matches": [
+    {
+      "kind": "engine-exclusive",
+      "runs": [
+        "v4-mwjv82xk-2z62m"
+      ],
+      "anchor": 8
+    },
+    {
+      "kind": "ambiguous",
+      "runs": [
+        "v3-mwjuhvl7-iota9",
+        "v4-mwjv82xk-2z62m",
+        "legacy"
+      ],
+      "anchor": 33
+    },
+    {
+      "kind": "ambiguous",
+      "runs": [
+        "legacy",
+        "v2-mwjufp0e-fddd6",
+        "v4-mwjv82xk-2z62m"
+      ],
+      "anchor": 34
+    }
+  ],
+  "recheck": {
+    "kind": "clip-recheck",
+    "byEngine": "engine4",
+    "clipId": "v2-mwjufp0e-fddd6-c1",
+    "status": "done",
+    "decision": "acceptable",
+    "outputSha256": "f890b4cb65570d46713f9105dde00dc6dd293e9ff2d3b58aba182821f52b645f",
+    "note": "Neubewertung des fertigen Clips durch Engine 4 (gerenderte Datei, Bild+Ton + Messungen). Keine Entdeckung."
+  },
+  "matchesUnchangedByRecheck": true
+}

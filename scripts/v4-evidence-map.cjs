@@ -1,0 +1,66 @@
+// Zuordnung ID → Code, Tests, Befehl, Höchststatus (ehrlich; „passed“ wird zusätzlich vom Werkzeug an Exit 0 und Run-Proof gebunden)
+const fs = require('fs')
+const V4 = 'src/main/shortme/clips/engines/v4/'
+const UNIT = 'npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts'
+const E2E = (ids) => `npx tsx --tsconfig tsconfig.node.json scripts/v4-e2e-verify.ts ${ids}`
+const UT = ['tests/engineV4Core.test.ts', 'tests/engineV4Registry.test.ts', 'tests/engineV4Stages.test.ts', 'tests/engineV4Cache.test.ts']
+const RUN = process.argv[2] || null
+const m = (impl, tests, cmd, maxStatus = 'passed', notes = '', real = false) => ({ implementationFiles: impl, testFiles: tests, testCommand: cmd, maxStatus, notes, ...(real ? { realMediaRunId: RUN } : {}) })
+const map = {
+  'V4-001': m(['src/main/shortme/clips/engines/index.ts', 'src/shared/engine.ts'], UT, UNIT, 'passed', 'Inventar: docs/ENGINE_V4_BASELINE.md (Pfade, SHA, Baseline-Logs docs/v4-logs/baseline-*)'),
+  'V4-002': m([V4 + 'models.ts', 'src/main/shortme/clips/engines/index.ts'], ['tests/engineV4Registry.test.ts'], 'npx vitest run', 'passed', 'volle Regression aller Tests; abschaltbar über SHORTME_ENGINE4=off oder <Daten>/engine4.disabled'),
+  'V4-003': m(['src/main/shortme/clips/engines/index.ts', 'src/main/shortme/render/timeline.ts'], ['tests/engineV4Registry.test.ts', 'tests/engineV4Stages.test.ts'], UNIT, 'passed', 'docs/ENGINE_V4_ARCHITECTURE.md'),
+  'V4-004': m(['src/shared/engine.ts', 'src/renderer/src/shortme/EngineSwitch.tsx', 'src/renderer/src/shortme/StartScreen.tsx'], ['tests/engineV4Registry.test.ts'], UNIT, 'passed', 'Schalter im echten Fenster: Engine 1/2/3/4 sichtbar, Engine-4-Lauf angezeigt'),
+  'V4-005': m([V4 + 'index.ts', 'resources/python/worker.py', 'src/main/shortme/clips/engines/v3/avWorker.ts'], ['tests/engineV4Registry.test.ts'], UNIT, 'passed', 'echte Läufe: siehe Run-Proof'),
+  'V4-006': m([V4 + 'index.ts', V4 + 'revisions.ts'], ['tests/engineV4Registry.test.ts'], UNIT),
+  'V4-007': m(['src/shared/engine.ts', 'src/main/shortme/clips/engines/state.ts'], ['tests/engineV4Registry.test.ts'], UNIT),
+  'V4-008': m([V4 + 'index.ts', V4 + 'checkpoint.ts', 'src/main/shortme/jobs.ts'], ['scripts/v4-cancel-check.ts', 'tests/engineV4Cache.test.ts'], 'npx tsx --tsconfig tsconfig.node.json scripts/v4-cancel-check.ts ' + (process.argv[3] || 'f6b279f9806ef5b9bc5e5eaadbe5afcc') + ' 45', 'passed', 'echter Abbruch mitten im Lauf; Checkpoints für Investigator/Cut-Judge; VRAM-Freigabe am Ende'),
+  'V4-009': m([V4 + 'media.ts'], ['tests/engineV4Registry.test.ts'], UNIT),
+  'V4-010': m([V4 + 'lanes.ts', V4 + 'core.ts'], ['tests/engineV4Core.test.ts', 'scripts/v4-e2e-verify.ts'], E2E('V4-010'), 'passed', 'Proof-Lauf (60 s) und Langlauf 1,8 h (docs/ENGINE_V4_LONG_RUN.json): alle Zehntel je Lane geprüft'),
+  'V4-011': m([V4 + 'lanes.ts'], ['tests/engineV4Stages.test.ts'], UNIT),
+  'V4-012': m(['src/main/shortme/transcription.ts', V4 + 'lanes.ts', 'scripts/v4-asr-check.ts'], ['scripts/v4-asr-check.ts', 'tests/engineV4Stages.test.ts'], 'npx tsx --tsconfig tsconfig.node.json scripts/v4-asr-check.ts ' + (process.argv[4] || '') + ' ' + (process.argv[5] || ''), 'passed', 'Parakeet-Wortzeiten geprüft, Gegenprobe Qwen3-ASR DE/EN (docs/v4-logs/asr-check.json), Gesang/Musik → unknown/partial'),
+  'V4-013': m([V4 + 'cut.ts', 'src/main/shortme/clips/engines/v2/visualIndex.ts'], ['tests/engineV4Stages.test.ts'], UNIT),
+  'V4-014': m([V4 + 'lanes.ts', 'src/main/shortme/clips/engines/v3/embedIndex.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-014'), 'passed', '', true),
+  'V4-015': m([V4 + 'investigate.ts', V4 + 'finalize.ts', 'resources/python/worker.py'], ['scripts/v4-e2e-verify.ts'], E2E('V4-015'), 'passed', '', true),
+  'V4-016': m(['resources/python/worker.py', 'src/main/engines/catalog.ts'], ['tests/engineV4Stages.test.ts'], UNIT, 'passed', 'Lizenzen: docs/ENGINE_V4_MODELS.md, docs/ENGINE_V3_LICENSES.md'),
+  'V4-017': m([V4 + 'lanes.ts'], UT, UNIT),
+  'V4-018': m([V4 + 'lanes.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-018'), 'passed', '', true),
+  'V4-019': m([V4 + 'lanes.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-019'), 'passed', '', true),
+  'V4-020': m([V4 + 'lanes.ts'], ['tests/engineV4Stages.test.ts'], UNIT),
+  'V4-021': m([V4 + 'core.ts'], ['tests/engineV4Core.test.ts'], UNIT),
+  'V4-022': m([V4 + 'core.ts', V4 + 'lanes.ts'], UT, UNIT),
+  'V4-023': m([V4 + 'investigate.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-023'), 'passed', '', true),
+  'V4-024': m([V4 + 'core.ts'], ['tests/engineV4Core.test.ts'], UNIT),
+  'V4-025': m([V4 + 'investigate.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-025'), 'passed', 'Gaming-Stream (docs/ENGINE_V4_GAMING_RUN.json): wortloses Ereignis mit beobachteter Handlung/Reaktion'),
+  'V4-026': m([V4 + 'core.ts'], ['tests/engineV4Core.test.ts'], UNIT),
+  'V4-027': m([V4 + 'investigate.ts', V4 + 'trace.ts'], UT, UNIT),
+  'V4-028': m([V4 + 'core.ts', V4 + 'cut.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-028'), 'passed', '', true),
+  'V4-029': m([V4 + 'core.ts', V4 + 'cut.ts'], ['tests/engineV4Core.test.ts'], UNIT),
+  'V4-030': m([V4 + 'cut.ts'], ['tests/engineV4Stages.test.ts'], UNIT),
+  'V4-031': m(['src/main/shortme/render/timeline.ts', V4 + 'finalize.ts'], ['tests/engineV4Stages.test.ts'], UNIT),
+  'V4-032': m([V4 + 'finalize.ts', V4 + 'core.ts'], ['tests/engineV4Core.test.ts'], UNIT),
+  'V4-033': m([V4 + 'finalize.ts', 'src/main/shortme/render/exporter.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-033'), 'passed', '', true),
+  'V4-034': m([V4 + 'finalize.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-034'), 'passed', '', true),
+  'V4-035': m([V4 + 'finalize.ts', 'scripts/v4-repair-check.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-035'), 'passed', 'Reparaturprobe: scripts/v4-repair-check.ts', true),
+  'V4-036': m([V4 + 'core.ts'], ['tests/engineV4Core.test.ts'], UNIT),
+  'V4-037': m([V4 + 'core.ts'], ['tests/engineV4Core.test.ts'], UNIT),
+  'V4-038': m(['src/main/shortme/render/exporter.ts', V4 + 'finalize.ts', 'src/shared/edits.ts'], ['tests/edits.test.ts', 'tests/editHistory.test.ts', 'tests/shortmeCaptions.test.ts', 'tests/shortmePreview.test.ts', 'tests/timeline.test.ts'], 'npx vitest run tests/edits.test.ts tests/editHistory.test.ts tests/shortmeCaptions.test.ts tests/shortmePreview.test.ts tests/timeline.test.ts tests/engineV4Stages.test.ts', 'passed', 'V4 rendert über denselben Exporter/TimeMap; Editor-Regression; V4-Clip im echten Editor mit Untertiteln und 9:16-Ausschnitt geöffnet und exportiert'),
+  'V4-039': m(['src/renderer/src/shortme/V4Provenance.tsx', V4 + 'provenance.ts'], UT, UNIT, 'passed', 'im echten Fenster geöffnet (Screenshot .tmp/v4-provenance.png, per CDP)'),
+  'V4-040': m(['src/shared/compare.ts', 'src/main/shortme/clips/compare.ts', 'src/renderer/src/shortme/CompareScreen.tsx'], ['scripts/v4-e2e-verify.ts', 'tests/engineCompare.test.ts'], E2E('V4-040'), 'passed', 'Vergleich der vier echten Läufe derselben Quelle: docs/ENGINE_V4_COMPARE_PROOF.json', true),
+  'V4-041': m(['src/main/shortme/clips/compare.ts', 'src/main/shortme/clips/engines/recheck.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-041'), 'passed', 'echter Engine-4-Recheck eines Engine-2-Clips, getrennt gespeichert'),
+  'V4-042': m(['src/renderer/src/shortme/EditorScreen.tsx', 'src/main/shortme/render/exporter.ts'], UT, UNIT, 'passed', 'im echten Fenster: V4-Clip im Editor geöffnet und exportiert (1080x1920, Bild+Ton, 15,4 s; per CDP), siehe ENGINE_V4_RELEASE_REPORT'),
+  'V4-043': m([V4 + 'media.ts', V4 + 'checkpoint.ts', 'src/main/shortme/clips/engines/v3/embedIndex.ts'], ['tests/engineV4Cache.test.ts'], UNIT),
+  'V4-044': m([V4 + 'revisions.ts', V4 + 'media.ts'], ['tests/engineV4Registry.test.ts'], UNIT, 'blocked', '16/12-GB-GPU nicht vorhanden (nur RTX 5090 gemessen); OOM führt zu klarer Fehlermeldung'),
+  'V4-045': m(['package.json', 'src/main/shortme/clips/engines/v3/runtime.ts'], UT, UNIT, 'blocked', 'sauberer Windows-Erststart auf frischem Rechner nicht möglich (nur Entwicklungsrechner)'),
+  'V4-046': m([V4 + 'media.ts', V4 + 'core.ts', 'src/main/shortme/render/graph.ts', 'resources/python/worker.py'], ['scripts/v4-e2e-verify.ts', 'tests/engineV4Stages.test.ts', 'tests/engineV4Registry.test.ts'], E2E('V4-046'), 'passed', 'echter Lauf ohne Ton/Sprache (docs/ENGINE_V4_SILENT_RUN.json); Unit: kaputte Datei, ungültiges JSON, außerhalb der Quelle; Abbruch: V4-008'),
+  'V4-047': m(['resources/python/worker.py', 'src/main/shortme/clips/engines/v3/pyWorker.ts'], ['tests/engineV4Stages.test.ts'], UNIT),
+  'V4-048': m([V4 + 'index.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-048'), 'passed', 'Lauf mit Bild+Ton über die ganze Kette', true),
+  'V4-049': m(['src/main/shortme/clips/compare.ts', 'src/main/shortme/clips/analysis.ts'], ['scripts/v4-e2e-verify.ts'], E2E('V4-049'), 'passed', 'vier getrennte Vollquellen-Läufe derselben Datei', true),
+  'V4-050': m(['tests/engineV4Core.test.ts'], ['tests/engineV4Core.test.ts'], '', 'blocked', 'braucht ≥ 20 autorisierte, gelabelte Originalvideos (externer Input)'),
+  'V4-051': m(['tests/engineV4Core.test.ts'], ['tests/engineV4Core.test.ts'], '', 'blocked', 'braucht 2 unabhängige Blind-Reviewer (externer Input)'),
+  'V4-052': m(['tests/engineV4Core.test.ts'], ['tests/engineV4Core.test.ts'], '', 'blocked', 'Metriken erst mit Goldlabels/Reviews'),
+  'V4-053': m(['tests/engineV4Core.test.ts'], ['tests/engineV4Core.test.ts'], '', 'blocked', 'Ablation erst mit Goldlabels'),
+  'V4-054': m(['scripts/v4-evidence.mjs', 'scripts/v4-status.mjs'], ['tests/engineV4Core.test.ts'], UNIT, 'passed', 'docs/ENGINE_V4_RELEASE_REPORT.md'),
+}
+fs.writeFileSync('docs/v4-evidence-map.json', JSON.stringify(map, null, 1))
+console.log(Object.keys(map).length, 'IDs')

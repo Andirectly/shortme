@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { BUILTIN_PRESETS, type StylePreset } from '../../../shared/preset'
 import { basename, dirname, join } from 'node:path'
@@ -110,12 +111,15 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
   // libass: gebündelte + eigene Schriften in einem Ordner (ohne Electron, z. B. in Skripten: nur gebündelte)
   const fontsDirForRender = await renderFontsDir().catch(() => fontsDir())
 
+  // Quelle ohne Tonspur: kein Lautheitsfilter, keine Tonkette, Ausgabe nur mit Bild (keine erfundene Stille)
+  const hasAudio = meta.hasAudio !== false
   report(0.02, 'Lautheit messen …')
-  const stats = await measureLoudness(meta.sourcePath, clip.start, clip.end - clip.start, opts.signal)
+  const stats = hasAudio ? await measureLoudness(meta.sourcePath, clip.start, clip.end - clip.start, opts.signal) : null
 
   const name = safeFileName(clip.title)
   const finalPath = uniquePath(opts.outDir, name)
-  const work = join(opts.outDir, `.${name}.work`)
+  // neutraler Arbeitsordner: mit dem Titel im Namen überschritten ASS-/Filterpfade die Windows-Pfadgrenze (ffmpeg EINVAL)
+  const work = join(opts.outDir, `.export-${randomUUID().slice(0, 8)}.work`)
   await mkdir(work, { recursive: true })
   try {
     const capWords = opts.caption?.highlight === false ? plan.words.map((w) => ({ ...w, tag: undefined })) : plan.words
@@ -126,7 +130,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
     const enc = await resolveEncoder(opts.encoder ?? 'auto')
     const quality = opts.quality ?? 'standard'
     const src = { width: meta.width, height: meta.height }
-    const audioFilter = loudnormFilter(stats)
+    const audioFilter = stats ? loudnormFilter(stats) : undefined
 
     /** Ein FFmpeg-Lauf: Stücke → Zusammenschnitt (+ optional eingebrannte ASS-Datei). */
     const render = async (dest: string, assText: string | null, q: typeof quality): Promise<void> => {
@@ -136,7 +140,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
         await writeFile(assPath, assText, 'utf8')
         post = `ass='${filterPath(assPath)}':fontsdir='${filterPath(fontsDirForRender)}'`
       }
-      const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, videoPost: post, overlay: title ? { x: title.x, y: title.y } : undefined })
+      const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, audio: hasAudio, videoPost: post, overlay: title ? { x: title.x, y: title.y } : undefined })
       const scriptPath = join(work, `${basename(dest)}.graph.txt`)
       await writeFile(scriptPath, filter, 'utf8')
       await runWithGraphFile((bin, args) => runBinary(bin, args, { signal: opts.signal }), enc.bin, [
@@ -144,8 +148,8 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
         '-ss', clip.start.toFixed(3), '-t', (clip.end - clip.start).toFixed(3), '-i', meta.sourcePath,
         ...(title ? ['-framerate', String(title.fps), '-i', title.pattern] : [])
       ], scriptPath, [
-        '-map', '[v]', '-map', '[a]',
-        ...encoderArgs(enc.kind, q), '-r', '30', ...audioArgs(q), '-ar', '48000',
+        '-map', '[v]', ...(hasAudio ? ['-map', '[a]'] : []),
+        ...encoderArgs(enc.kind, q), '-r', '30', ...(hasAudio ? [...audioArgs(q), '-ar', '48000'] : ['-an']),
         '-movflags', '+faststart', '-t', plan.duration.toFixed(3), dest
       ])
     }

@@ -51,17 +51,20 @@ export interface GraphOptions {
   overlay?: { x: number; y: number }
   /** Dauer nach dem Kürzen (für die Ausblendung). */
   duration: number
+  /** false: Quelle ohne Tonspur → nur `[v]` (keine erfundene Stille). Standard: true. */
+  audio?: boolean
 }
 
 /** Kompletter filter_complex: Stücke zuschneiden/skalieren, aneinanderhängen, Audio normalisieren. Ausgänge `[v]` und `[a]`. */
 export function buildFilterGraph(pieces: Piece[], o: GraphOptions): string {
   const parts: string[] = []
-  pieces.forEach((p, k) => { parts.push(videoChain(p, k, o.src, o.base)); parts.push(audioChain(p, k, o.base)) })
+  const audio = o.audio !== false
+  pieces.forEach((p, k) => { parts.push(videoChain(p, k, o.src, o.base)); if (audio) parts.push(audioChain(p, k, o.base)) })
   const n = pieces.length
-  const labels = pieces.map((_, k) => `[v${k}][a${k}]`).join('')
-  const post = [o.audioFilter, o.fadeOutSec ? `afade=t=out:st=${Math.max(0, o.duration - o.fadeOutSec).toFixed(3)}:d=${o.fadeOutSec}` : ''].filter(Boolean).join(',')
+  const labels = pieces.map((_, k) => (audio ? `[v${k}][a${k}]` : `[v${k}]`)).join('')
+  const post = audio ? [o.audioFilter, o.fadeOutSec ? `afade=t=out:st=${Math.max(0, o.duration - o.fadeOutSec).toFixed(3)}:d=${o.fadeOutSec}` : ''].filter(Boolean).join(',') : ''
   const vOut = o.overlay || o.videoPost ? 'vc' : 'v'
-  parts.push(`${labels}concat=n=${n}:v=1:a=1[${vOut}][${post ? 'ac' : 'a'}]`)
+  parts.push(audio ? `${labels}concat=n=${n}:v=1:a=1[${vOut}][${post ? 'ac' : 'a'}]` : `${labels}concat=n=${n}:v=1:a=0[${vOut}]`)
   let cur = 'vc'
   if (o.overlay) { parts.push(`[${cur}][1:v]overlay=${o.overlay.x}:${o.overlay.y}:eof_action=pass:format=auto[${o.videoPost ? 'vo' : 'v'}]`); cur = 'vo' }
   if (o.videoPost) parts.push(`[${cur}]${o.videoPost}[v]`)
