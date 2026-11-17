@@ -28,6 +28,7 @@ WORKER_VERSION = "1.0.0"
 EMBED_MODELS = {"qwen3-vl-embedding-2b"}
 TEMPORAL_MODELS = {"lighthouse-cg-detr-clip"}
 AV_MODELS = {"minicpm-o-4_5"}
+AV_MIN_VRAM_BYTES = int(float(os.environ.get("SHORTME_AV_MIN_VRAM_GB", "20")) * 2**30)
 SUPPORTED_MODELS = EMBED_MODELS | TEMPORAL_MODELS | AV_MODELS
 
 _state = {"embedder": None, "temporal": None, "av": None, "tokenizer": None, "model_id": None, "cancel": set(), "busy": False}
@@ -204,6 +205,10 @@ def _load_av(model_id: str, path: str) -> dict:
     import torch
     from transformers import AutoModel, AutoTokenizer  # type: ignore
 
+    # bf16-Gewichte belegen 18,1 GB (gemessen); kleinere GPUs lagern unter Windows still in den RAM aus (stundenlang) → klar abbrechen
+    total = torch.cuda.mem_get_info()[1]
+    if total < AV_MIN_VRAM_BYTES:
+        raise WorkerError("insufficient-vram", f"MiniCPM-o braucht mindestens {AV_MIN_VRAM_BYTES / 2**30:.0f} GB Grafikspeicher, diese GPU hat {total / 2**30:.1f} GB", False)
     t0 = time.time()
     torch.cuda.reset_peak_memory_stats()
     model = AutoModel.from_pretrained(path, trust_remote_code=True, attn_implementation="sdpa", torch_dtype=torch.bfloat16, init_vision=True, init_audio=True, init_tts=False, local_files_only=True)

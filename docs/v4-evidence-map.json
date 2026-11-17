@@ -555,7 +555,7 @@
   ],
   "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
   "maxStatus": "blocked",
-  "notes": "16/12-GB-GPU nicht vorhanden (nur RTX 5090 gemessen); OOM führt zu klarer Fehlermeldung"
+  "notes": "16/12-GB-GPU nicht vorhanden (nur RTX 5090 gemessen); OOM je Aufruf = Fehlercode oom; zu wenig VRAM für MiniCPM-o (< 20 GB) bricht vor dem Laden klar ab (insufficient-vram, echt geprüft mit SHORTME_AV_MIN_VRAM_GB=64, Lauf v4-mwkgxvux-all4p → failed mit Meldung)"
  },
  "V4-045": {
   "implementationFiles": [

@@ -109,5 +109,12 @@ describe('V4 Endauswahl (V4-036/037)', () => {
     ], 5)
     expect(r.map((x) => x.id)).toEqual(['a'])
     expect(rankFinal([{ id: 'c', span: { start: 0, end: 30 }, decision: 'reject', passes: 1, eventId: 'e' }], 5)).toEqual([])
+    // halber Clip gemeinsam (IoU nur 0,34) → doppelt, nicht vielfältig
+    const d = rankFinal([
+      { id: 'x', span: { start: 671, end: 722 }, decision: 'acceptable', passes: 9, eventId: 'e1' },
+      { id: 'y', span: { start: 695.5, end: 749.5 }, decision: 'acceptable', passes: 9, eventId: 'e2' },
+      { id: 'z', span: { start: 715, end: 760 }, decision: 'acceptable', passes: 8, eventId: 'e3' }
+    ], 5)
+    expect(d.map((x) => x.id)).toEqual(['x', 'z'])
   })
 })

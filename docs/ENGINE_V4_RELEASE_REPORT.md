@@ -13,6 +13,7 @@ Zahlen je Anforderung: `docs/ENGINE_V4_STATUS.md` (erzeugt von `scripts/v4-statu
 | Dinner Song, 60 s, Bild+Ton (Gesang/Rede) | `v4-mwjv82xk-2z62m` (**Run-Proof**) | 1343 s | 3 Clips | `docs/ENGINE_V4_RUN_PROOF.json`; Ausgabe 16,6 s Bild+Ton; 35+ Modellaufrufe mit Spuren; Folgefenster in 2 Gruppen |
 | Tech-Podcast, 1,8 h (6448 s) | `v4-mwjw7lxw-ialtf` | 2684 s (44,7 min) | 6 Clips von 140 s bis 5205 s | `docs/ENGINE_V4_LONG_RUN.json`; jedes Zehntel in allen Lanes geprüft; echte Reparaturen (payoff → spätere Kante, dead-air → Stille entfernt); 2 Clips verworfen (`reject`) |
 | Minecraft-Stream, 293 s | `v4-mwjxy2b8-bk8u0` | 1440 s | 5 Clips | `docs/ENGINE_V4_GAMING_RUN.json`; wortloses Spielereignis mit beobachteter Handlung/Reaktion |
+| YouTube „Discounter vs. Original“, 888 s, deutsch, **in der installierten App 0.34.0** (Import per Link) | `v4-mwkfvx0y-mb259` | 1523 s | 6 Clips (26–54 s) | 66/67 Modellaufrufe gültig, alle Zehntel geprüft; fand Überlappung 26 s zwischen zwei Clips → `rankFinal` misst Überlappung jetzt am kürzeren Clip (behoben in 0.34.1) |
 | Dinner Song ohne Tonspur (abgeleitet, `-an`), Profil Schnell | siehe `docs/ENGINE_V4_SILENT_RUN.json` | – | – | Ton-Lane übersprungen, keine Sprach-Seeds, Bildanalyse ohne Ton, `audio-seam: not-applicable` |
 
 ## Proben (Skripte, echte Medien, Exit-Codes in docs/v4-logs/)
@@ -35,4 +36,4 @@ Siehe `docs/ENGINE_V4_BENCHMARKS.md`. 1,8 h Material: 44,7 min gesamt (Keyframes
 - 16/12-GB-Profile nicht gemessen (nur 5090); sauberer Windows-Erststart nicht geprüft.
 - Kein Qualitätsnachweis (siehe oben); Prompts/Budgets sind Startwerte.
 - Zielzeit „3 h in 30–45 min“: 1,8 h brauchten 44,7 min → 3 h liegen voraussichtlich darüber (nicht gemessen); größter Posten AV-Phase und Keyframe-Scan.
-- Die Engine-4-Läufe liegen in einem Test-Datenordner (Kopie echter Projekte); in der installierten App wurde Engine 4 noch nicht als Endnutzer-Lauf gestartet.
+- Zu wenig Grafikspeicher für MiniCPM-o (< 20 GB) bricht jetzt vor dem Laden mit klarer Meldung ab (geprüft per `SHORTME_AV_MIN_VRAM_GB=64`); echte 12/16-GB-Läufe fehlen weiterhin.

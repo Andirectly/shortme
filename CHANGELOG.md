@@ -6,6 +6,14 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.34.1] - 2026-11-17
+
+### Fixed
+
+- Engine 4: Clips mit großem gemeinsamem Abschnitt kommen nicht mehr beide in die Auswahl.
+- Engine 4: Grafikkarten mit zu wenig Speicher für MiniCPM-o brechen sofort mit klarer Meldung ab, statt stundenlang in den Arbeitsspeicher auszulagern.
+- Herkunftsansicht zeigt bei Reparaturen den Schnitt vorher und nachher.
+
 ## [0.34.0] - 2026-11-17
 
 ### Added

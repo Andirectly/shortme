@@ -280,7 +280,8 @@ export function rankFinal(items: Finalist[], wanted: number): Finalist[] {
   const out: Finalist[] = []
   for (const c of ok) {
     if (out.length >= wanted) break
-    if (out.some((o) => o.eventId === c.eventId || iou(o.span, c.span) > 0.5)) continue
+    // Überlappung relativ zum kürzeren Clip: IoU ließ 26 s gemeinsamen Inhalt bei 51/54-s-Clips durch (echter Lauf v4-mwkfvx0y)
+    if (out.some((o) => o.eventId === c.eventId || overlapRatio(o.span, c.span) > 0.3)) continue
     out.push(c)
   }
   return out.sort((a, b) => a.span.start - b.span.start)

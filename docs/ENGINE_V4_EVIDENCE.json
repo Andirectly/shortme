@@ -16,7 +16,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": "Inventar: docs/ENGINE_V4_BASELINE.md (Pfade, SHA, Baseline-Logs docs/v4-logs/baseline-*)"
     },
@@ -49,7 +49,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": "docs/ENGINE_V4_ARCHITECTURE.md"
     },
@@ -66,7 +66,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": "Schalter im echten Fenster: Engine 1/2/3/4 sichtbar, Engine-4-Lauf angezeigt"
     },
@@ -83,7 +83,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": "echte Läufe: siehe Run-Proof"
     },
@@ -99,7 +99,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -115,7 +115,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -148,7 +148,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -180,7 +180,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -214,7 +214,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -263,7 +263,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": "Lizenzen: docs/ENGINE_V4_MODELS.md, docs/ENGINE_V3_LICENSES.md"
     },
@@ -281,7 +281,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -326,7 +326,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -341,7 +341,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -360,7 +360,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -390,7 +390,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -420,7 +420,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -439,7 +439,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -471,7 +471,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -486,7 +486,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -502,7 +502,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -518,7 +518,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -580,7 +580,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -595,7 +595,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -635,7 +635,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": "im echten Fenster geöffnet (Screenshot .tmp/v4-provenance.png, per CDP)"
     },
@@ -688,7 +688,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": "im echten Fenster: V4-Clip im Editor geöffnet und exportiert (1080x1920, Bild+Ton, 15,4 s; per CDP), siehe ENGINE_V4_RELEASE_REPORT"
     },
@@ -705,7 +705,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -721,9 +721,9 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
-      "notes": "16/12-GB-GPU nicht vorhanden (nur RTX 5090 gemessen); OOM führt zu klarer Fehlermeldung"
+      "notes": "16/12-GB-GPU nicht vorhanden (nur RTX 5090 gemessen); OOM je Aufruf = Fehlercode oom; zu wenig VRAM für MiniCPM-o (< 20 GB) bricht vor dem Laden klar ab (insufficient-vram, echt geprüft mit SHORTME_AV_MIN_VRAM_GB=64, Lauf v4-mwkgxvux-all4p → failed mit Meldung)"
     },
     "V4-045": {
       "status": "blocked",
@@ -740,7 +740,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": "sauberer Windows-Erststart auf frischem Rechner nicht möglich (nur Entwicklungsrechner)"
     },
@@ -776,7 +776,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": ""
     },
@@ -883,7 +883,7 @@
       "testCommand": "npx vitest run tests/engineV4Core.test.ts tests/engineV4Registry.test.ts tests/engineV4Stages.test.ts tests/engineV4Cache.test.ts tests/engineCompare.test.ts",
       "testExitCode": 0,
       "testLog": "docs/v4-logs/npx_vitest_run_tests_engineV4Core_test_ts_tests_engineV4Registry_test_ts_tests_e.log",
-      "testLogSha256": "2495cf342a0706d95741c1de9f24ce92de55ec0f69292e50a9f11090822e3825",
+      "testLogSha256": "8db7bb0751c290cb4800086413213167ac4a3d6177e9a21f273914fc09ec205c",
       "realMediaRunId": null,
       "notes": "docs/ENGINE_V4_RELEASE_REPORT.md"
     }

@@ -1,6 +1,6 @@
 # Engine 4 – Traceability (54 IDs)
 
-Erzeugt von `scripts/v4-status.mjs` aus `requirements/v4_requirements.json` + `docs/ENGINE_V4_EVIDENCE.json` (Git 306c0af534).
+Erzeugt von `scripts/v4-status.mjs` aus `requirements/v4_requirements.json` + `docs/ENGINE_V4_EVIDENCE.json` (Git 61cb677498).
 
 | ID | Stage | Level | Titel | Status | Implementierung | Tests | Real-Run | Hinweis |
 |---|---|---|---|---|---|---|---|---|
@@ -47,7 +47,7 @@ Erzeugt von `scripts/v4-status.mjs` aus `requirements/v4_requirements.json` + `d
 | V4-041 | S7 | core | Full-source-Reanalyse von Clip-Recheck trennen | passed | src/main/shortme/clips/compare.ts<br>src/main/shortme/clips/engines/recheck.ts | scripts/v4-e2e-verify.ts | – | echter Engine-4-Recheck eines Engine-2-Clips, getrennt gespeichert |
 | V4-042 | S7 | core | Clip im Editor editierbar und exportierbar machen | passed | src/renderer/src/shortme/EditorScreen.tsx<br>src/main/shortme/render/exporter.ts | tests/engineV4Core.test.ts<br>tests/engineV4Registry.test.ts<br>tests/engineV4Stages.test.ts<br>tests/engineV4Cache.test.ts | – | im echten Fenster: V4-Clip im Editor geöffnet und exportiert (1080x1920, Bild+Ton, 15,4 s; per CDP), siehe ENGINE_V4_RELEASE_REPORT |
 | V4-043 | S8 | core | Stufen-/Featurecache bei Änderungen korrekt invalidieren | passed | src/main/shortme/clips/engines/v4/media.ts<br>src/main/shortme/clips/engines/v4/checkpoint.ts<br>src/main/shortme/clips/engines/v3/embedIndex.ts | tests/engineV4Cache.test.ts | – |  |
-| V4-044 | S8 | core | Ressourcenprofile und reale GPU-/CPU-Fehler behandeln | blocked | src/main/shortme/clips/engines/v4/revisions.ts<br>src/main/shortme/clips/engines/v4/media.ts | tests/engineV4Registry.test.ts | – | 16/12-GB-GPU nicht vorhanden (nur RTX 5090 gemessen); OOM führt zu klarer Fehlermeldung |
+| V4-044 | S8 | core | Ressourcenprofile und reale GPU-/CPU-Fehler behandeln | blocked | src/main/shortme/clips/engines/v4/revisions.ts<br>src/main/shortme/clips/engines/v4/media.ts | tests/engineV4Registry.test.ts | – | 16/12-GB-GPU nicht vorhanden (nur RTX 5090 gemessen); OOM je Aufruf = Fehlercode oom; zu wenig VRAM für MiniCPM-o (< 20 GB) bricht vor dem Laden klar ab (insufficient-vram, echt geprüft mit SHORTME_AV_MIN_VRAM_GB=64, Lauf v4-mwkgxvux-all4p → failed mit Meldung) |
 | V4-045 | S8 | core | Windows-App-Packaging inkl. Python Sidecar nachweisen | blocked | package.json<br>src/main/shortme/clips/engines/v3/runtime.ts | tests/engineV4Core.test.ts<br>tests/engineV4Registry.test.ts<br>tests/engineV4Stages.test.ts<br>tests/engineV4Cache.test.ts | – | sauberer Windows-Erststart auf frischem Rechner nicht möglich (nur Entwicklungsrechner) |
 | V4-046 | S8 | core | Fehler- und Regressionstests einschließlich Cancel/Resume | passed | src/main/shortme/clips/engines/v4/media.ts<br>src/main/shortme/clips/engines/v4/core.ts<br>src/main/shortme/render/graph.ts<br>resources/python/worker.py | scripts/v4-e2e-verify.ts<br>tests/engineV4Stages.test.ts<br>tests/engineV4Registry.test.ts | – | echter Lauf ohne Ton/Sprache (docs/ENGINE_V4_SILENT_RUN.json); Unit: kaputte Datei, ungültiges JSON, außerhalb der Quelle; Abbruch: V4-008 |
 | V4-047 | S8 | core | Supply-Chain/IPC-Sicherheitsprüfungen | passed | resources/python/worker.py<br>src/main/shortme/clips/engines/v3/pyWorker.ts | tests/engineV4Stages.test.ts | – |  |

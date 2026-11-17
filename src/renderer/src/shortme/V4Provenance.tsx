@@ -58,7 +58,7 @@ export function V4ProvenancePanel({ runId, clipId, onClose }: { runId: string; c
                 </div>
               ))}
             </section>
-            <section><b>Reparaturen</b>{p.repairs?.length ? p.repairs.map((r, i) => <small key={i} style={{ display: 'block' }}>Runde {r.round}: {r.failure} → {r.op} ({r.reason})</small>) : <small> keine</small>}</section>
+            <section><b>Reparaturen</b>{p.repairs?.length ? p.repairs.map((r, i) => <small key={i} style={{ display: 'block' }}>Runde {r.round}: {r.failure} → {r.op} ({r.reason}) · vorher {r.from} · nachher {r.to}</small>) : <small> keine</small>}</section>
             <section><b>Abdeckung (Zehntel der Quelle geprüft)</b>
               {Object.entries(p.deciles ?? {}).map(([lane, d]) => <small key={lane} style={{ display: 'block' }}>{lane}: {d.map((x) => (x ? '■' : '□')).join('')}</small>)}
             </section>
