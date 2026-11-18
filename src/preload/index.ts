@@ -300,6 +300,7 @@ const api = {
     },
     fontCss: (family: string): Promise<string> => ipcRenderer.invoke('shortme:fontCss', family),
     deleteProject: (hash: string): Promise<boolean> => ipcRenderer.invoke('shortme:deleteProject', hash),
+    deleteProjects: (hashes: string[]): Promise<{ deleted: number; skipped: number }> => ipcRenderer.invoke('shortme:deleteProjects', hashes),
     persons: (hash: string): Promise<ShortmePersons | null> => ipcRenderer.invoke('shortme:persons', hash),
     personsSave: (hash: string, patch: PersonsPatch): Promise<ShortmePersons | null> => ipcRenderer.invoke('shortme:personsSave', hash, patch),
     clips: (hash: string): Promise<ShortmeClips | null> => ipcRenderer.invoke('shortme:clips', hash),

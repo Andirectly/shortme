@@ -6,6 +6,12 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.37.0] - 2026-11-18
+
+### Added
+
+- Projekte: „Auswählen“ markiert mehrere Projekte per Klick (Schnellauswahl „Alle“ und „Letzte 30 Tage“) und löscht sie auf einmal – wahlweise mit den eigenen Originaldateien. Projekte, die gerade verarbeitet werden, bleiben erhalten.
+
 ## [0.36.1] - 2026-11-18
 
 ### Fixed

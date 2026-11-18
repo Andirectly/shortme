@@ -202,7 +202,7 @@ export function ProjectsScreen(): React.JSX.Element {
   return (
     <div className="sm-wrap" style={{ display: 'grid', gap: 18, paddingTop: 12 }}>
       <h1>Projekte</h1>
-      <ProjectGrid />
+      <ProjectGrid selectable />
     </div>
   )
 }

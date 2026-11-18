@@ -269,6 +269,31 @@ ${meta.sourcePath}` }
     if (inDl || r.response === 1) await rm(meta.sourcePath, { force: true }).catch(() => undefined)
     return true
   })
+  /** Mehrere Projekte auf einmal löschen (Auswahl in „Projekte“): ein Dialog für alle, laufende Projekte werden übersprungen. */
+  ipcMain.handle('shortme:deleteProjects', async (e, hashes: string[]) => {
+    const metas = (await Promise.all([...new Set(hashes)].map((h) => loadMeta(h)))).filter((m): m is NonNullable<typeof m> => !!m)
+    const busy = metas.filter((m) => hasActiveJob(jobs, m.hash))
+    const todo = metas.filter((m) => !busy.includes(m))
+    if (!todo.length) return { deleted: 0, skipped: busy.length }
+    const dl = resolve(dataRoot(), 'downloads').toLowerCase()
+    const own = todo.filter((m) => !resolve(m.sourcePath).toLowerCase().startsWith(dl))
+    const buttons = own.length ? ['Projekte löschen', 'Projekte + Originaldateien löschen', 'Abbrechen'] : ['Löschen', 'Abbrechen']
+    const cancel = buttons.length - 1
+    const detail = [
+      'Clips, Bearbeitungen und Analyse werden entfernt; per Link geladene Videos werden ebenfalls gelöscht.',
+      own.length ? `„Projekte + Originaldateien löschen“ entfernt zusätzlich ${own.length} eigene Videodatei${own.length === 1 ? '' : 'en'} dauerhaft von der Festplatte (nicht im Papierkorb).` : '',
+      busy.length ? `${busy.length} Projekt${busy.length === 1 ? '' : 'e'} wird gerade verarbeitet und bleibt erhalten.` : ''
+    ].filter(Boolean).join('\n')
+    const box = { type: 'warning' as const, buttons, defaultId: cancel, cancelId: cancel, title: 'Projekte löschen', message: `${todo.length} Projekt${todo.length === 1 ? '' : 'e'} löschen?`, detail }
+    const win = BrowserWindow.fromWebContents(e.sender)
+    const r = win ? await dialog.showMessageBox(win, box) : await dialog.showMessageBox(box)
+    if (r.response === cancel) return { deleted: 0, skipped: busy.length }
+    for (const m of todo) {
+      await discardProject(m.hash)
+      if (resolve(m.sourcePath).toLowerCase().startsWith(dl) || (own.length && r.response === 1)) await rm(m.sourcePath, { force: true }).catch(() => undefined)
+    }
+    return { deleted: todo.length, skipped: busy.length }
+  })
   ipcMain.handle('shortme:projects', async () => {
     const out: Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null; source: string; isUrl: boolean }> = []
     for (const d of await readdir(projectsRoot()).catch(() => [] as string[])) {
