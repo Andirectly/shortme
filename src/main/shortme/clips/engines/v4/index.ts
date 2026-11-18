@@ -183,15 +183,20 @@ export async function selectV4(req: SelectionRequest): Promise<SelectionOutcome>
       await save('variants.json', variantsAll)
       // S6 Render + Endprüfung + Reparatur
       let fi = 0
+      const renderOf = (f: (typeof finalistsPool)[number], v: Variant, cut: CutCandidate, trims: Array<{ start: number; end: number }>, round: number): Promise<Rendered> =>
+        renderVariant(meta, t, req.input.signals, req.input.cuts, clipFor(`${req.runId}-${v.id}-r${round}`, cut, t, trims, { title: f.group.seeds[0]?.summary?.slice(0, 60) || 'Clip', runId: req.runId }), previewDir(runDir, v.id, round), signal)
+      // Erster Prüf-Render des nächsten Clips läuft (FFmpeg/Gesichter), während MiniCPM-o den aktuellen bewertet
+      const prefetch = (i: number): Promise<Rendered> | null => { const f = finalistsPool[i]; if (!f) return null; const p = renderOf(f, f.variants[0], f.variants[0].cut, [], 0); p.catch(() => undefined); return p }
+      let ahead = prefetch(0)
       for (const f of finalistsPool) {
         report('compare', fi / Math.max(1, finalistsPool.length), `Clip rendern und prüfen (${fi + 1}/${finalistsPool.length}) …`)
-        fi++
+        const first = ahead
+        ahead = prefetch(++fi)
         let v = f.variants[0], cut: CutCandidate = v.cut, trims: Array<{ start: number; end: number }> = []
         let best: { rendered: Rendered; round: JudgeRound } | null = null
         for (let round = 0; round <= P.repairs; round++) {
           try {
-            const clip = clipFor(`${req.runId}-${v.id}-r${round}`, cut, t, trims, { title: f.group.seeds[0]?.summary?.slice(0, 60) || 'Clip', runId: req.runId })
-            const rendered = await renderVariant(meta, t, req.input.signals, req.input.cuts, clip, previewDir(runDir, v.id, round), signal)
+            const rendered = round === 0 && first ? await first : await renderOf(f, v, cut, trims, round)
             const jr = await judgeRendered(s, rendered, { variantId: v.id, summary: f.group.seeds.map((x) => x.summary).filter(Boolean)[0] ?? '', wav, hasAudio, edges, tracer, round, signal })
             rounds.push(jr)
             if (!best || (jr.judgement && (!best.round.judgement || rankOf(jr.judgement.decision) < rankOf(best.round.judgement.decision)))) best = { rendered, round: jr }

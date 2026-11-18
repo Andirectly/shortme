@@ -1,0 +1,116 @@
+{
+ "sources": [
+  {
+   "sha256": "ba84aa3be2d685f52952feed36a31c46eea1a75aac1f20b6fd3c5fb3122c37d5",
+   "creator": "WVFRM Podcast",
+   "session": "What Was the Best Smartphone Camera of 2026?",
+   "events": [
+    {
+     "id": "iYbVB93uXK0-1",
+     "start": 2636.4,
+     "end": 2640.5,
+     "peak": 2638.45,
+     "allowedStart": [
+      2631.4,
+      2638.4
+     ],
+     "allowedEnd": [
+      2638.5,
+      2645.5
+     ]
+    },
+    {
+     "id": "iYbVB93uXK0-2",
+     "start": 2290.9,
+     "end": 2295.7,
+     "peak": 2293.3,
+     "allowedStart": [
+      2285.9,
+      2292.9
+     ],
+     "allowedEnd": [
+      2293.7,
+      2300.7
+     ]
+    },
+    {
+     "id": "iYbVB93uXK0-3",
+     "start": 2298.3,
+     "end": 2307.5,
+     "peak": 2302.9,
+     "allowedStart": [
+      2293.3,
+      2300.3
+     ],
+     "allowedEnd": [
+      2305.5,
+      2312.5
+     ]
+    },
+    {
+     "id": "iYbVB93uXK0-4",
+     "start": 2326.3,
+     "end": 2331,
+     "peak": 2328.65,
+     "allowedStart": [
+      2321.3,
+      2328.3
+     ],
+     "allowedEnd": [
+      2329,
+      2336
+     ]
+    },
+    {
+     "id": "iYbVB93uXK0-5",
+     "start": 2388,
+     "end": 2392.7,
+     "peak": 2390.35,
+     "allowedStart": [
+      2383,
+      2390
+     ],
+     "allowedEnd": [
+      2390.7,
+      2397.7
+     ]
+    }
+   ]
+  },
+  {
+   "sha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "creator": "DAVE",
+   "session": "Wir haben einen Container in 7 Tagen zu Werkstatt umgebaut! 🚧 - F17",
+   "events": [
+    {
+     "id": "q-ZNSMXPBmg-1",
+     "start": 296.2,
+     "end": 323.2,
+     "peak": 309.7,
+     "allowedStart": [
+      291.2,
+      298.2
+     ],
+     "allowedEnd": [
+      321.2,
+      328.2
+     ]
+    },
+    {
+     "id": "h6mVvEU6Jks-1",
+     "start": 225.6,
+     "end": 246.4,
+     "peak": 236,
+     "allowedStart": [
+      220.6,
+      227.6
+     ],
+     "allowedEnd": [
+      244.4,
+      251.4
+     ]
+    }
+   ]
+  }
+ ]
+}

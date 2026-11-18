@@ -147,7 +147,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
         '-hide_banner', '-nostats', '-y',
         '-ss', clip.start.toFixed(3), '-t', (clip.end - clip.start).toFixed(3), '-i', meta.sourcePath,
         ...(title ? ['-framerate', String(title.fps), '-i', title.pattern] : [])
-      ], scriptPath, [
+      ], filter, scriptPath, [
         '-map', '[v]', ...(hasAudio ? ['-map', '[a]'] : []),
         ...encoderArgs(enc.kind, q), '-r', '30', ...(hasAudio ? [...audioArgs(q), '-ar', '48000'] : ['-an']),
         '-movflags', '+faststart', '-t', plan.duration.toFixed(3), dest

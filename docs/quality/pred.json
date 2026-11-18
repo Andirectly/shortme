@@ -1,0 +1,103 @@
+{
+ "clips": [
+  {
+   "engineId": "engine1",
+   "sourceSha256": "ba84aa3be2d685f52952feed36a31c46eea1a75aac1f20b6fd3c5fb3122c37d5",
+   "runKind": "full-source-analysis",
+   "eventId": "clip-5571",
+   "start": 557.062,
+   "end": 620.678,
+   "rank": 1
+  },
+  {
+   "engineId": "engine4",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "v4-mwko4f2f-j05a6-c3",
+   "start": 277.36,
+   "end": 313.19,
+   "rank": 1
+  },
+  {
+   "engineId": "engine4",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "v4-mwko4f2f-j05a6-c7",
+   "start": 1499.702,
+   "end": 1537.92,
+   "rank": 2
+  },
+  {
+   "engineId": "engine4",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "v4-mwko4f2f-j05a6-c5",
+   "start": 1194.982,
+   "end": 1255.838,
+   "rank": 3
+  },
+  {
+   "engineId": "engine4",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "v4-mwko4f2f-j05a6-c8",
+   "start": 2470.55,
+   "end": 2502.102,
+   "rank": 4
+  },
+  {
+   "engineId": "engine4",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "v4-mwko4f2f-j05a6-c2",
+   "start": 239.79,
+   "end": 267.651,
+   "rank": 5
+  },
+  {
+   "engineId": "engine4",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "v4-mwko4f2f-j05a6-c4",
+   "start": 485.28,
+   "end": 559.2,
+   "rank": 6
+  },
+  {
+   "engineId": "engine4",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "v4-mwko4f2f-j05a6-c1",
+   "start": 75.67,
+   "end": 94.177,
+   "rank": 7
+  },
+  {
+   "engineId": "engine4",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "v4-mwko4f2f-j05a6-c6",
+   "start": 1433.28,
+   "end": 1457.606,
+   "rank": 8
+  },
+  {
+   "engineId": "engine1",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "clip-12093",
+   "start": 1209.334,
+   "end": 1260.07,
+   "rank": 1
+  },
+  {
+   "engineId": "engine1",
+   "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "runKind": "full-source-analysis",
+   "eventId": "clip-7262",
+   "start": 726.246,
+   "end": 767.654,
+   "rank": 2
+  }
+ ]
+}

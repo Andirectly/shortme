@@ -6,6 +6,20 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.36.0] - 2026-11-18
+
+### Fixed
+
+- Export: Auf Rechnern mit älterem FFmpeg (z. B. eigenes GPU-FFmpeg) brach der Export mit „Unrecognized option '/filter_complex'“ ab. Der Filtergraph geht jetzt direkt an FFmpeg, das versteht jede Version.
+
+### Changed
+
+- Engine 4 rendert schneller: Der nächste Prüf-Clip wird schon gerendert, während der aktuelle bewertet wird, und der Bildausschnitt wird nicht mehr zweimal berechnet.
+
+### Added
+
+- Werkzeuge für die Qualitätsmessung gegen echte Creator-Shorts (`scripts/quality-eval.mjs`, `scripts/quality-batch.cjs`).
+
 ## [0.35.0] - 2026-11-17
 
 ### Added

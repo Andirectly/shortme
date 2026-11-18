@@ -1,0 +1,193 @@
+{
+ "k": 10,
+ "notes": "Temporal gold-event matching is NOT human clip usability precision. No blind reviewer preference or publishable-clip quality is calculated here.",
+ "results": {
+  "engine1": {
+   "numberSources": 2,
+   "goldEvents": 7,
+   "predictedClips": 3,
+   "matchedEvents": 0,
+   "microRecallAtK": 0,
+   "microTemporalMatchPrecisionProxyAtK": 0,
+   "bothBoundaryAtMatched": null,
+   "perSource": [
+    {
+     "goldEvents": 5,
+     "predictedClips": 1,
+     "matchedEvents": 0,
+     "bothBoundariesAcceptable": 0,
+     "recallAtK": 0,
+     "temporalMatchPrecisionProxyAtK": 0,
+     "bothBoundaryAtMatched": null,
+     "sourceSha256": "ba84aa3be2d685f52952feed36a31c46eea1a75aac1f20b6fd3c5fb3122c37d5",
+     "creator": "WVFRM Podcast",
+     "session": "What Was the Best Smartphone Camera of 2026?"
+    },
+    {
+     "goldEvents": 2,
+     "predictedClips": 2,
+     "matchedEvents": 0,
+     "bothBoundariesAcceptable": 0,
+     "recallAtK": 0,
+     "temporalMatchPrecisionProxyAtK": 0,
+     "bothBoundaryAtMatched": null,
+     "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+     "creator": "DAVE",
+     "session": "Wir haben einen Container in 7 Tagen zu Werkstatt umgebaut! 🚧 - F17"
+    }
+   ],
+   "sourcesWithRun": 2,
+   "recallCI95": [
+    0,
+    0
+   ],
+   "recallOnSourcesWithRun": 0
+  },
+  "engine2": {
+   "numberSources": 2,
+   "goldEvents": 7,
+   "predictedClips": 0,
+   "matchedEvents": 0,
+   "microRecallAtK": 0,
+   "microTemporalMatchPrecisionProxyAtK": null,
+   "bothBoundaryAtMatched": null,
+   "perSource": [
+    {
+     "goldEvents": 5,
+     "predictedClips": 0,
+     "matchedEvents": 0,
+     "bothBoundariesAcceptable": 0,
+     "recallAtK": 0,
+     "temporalMatchPrecisionProxyAtK": null,
+     "bothBoundaryAtMatched": null,
+     "sourceSha256": "ba84aa3be2d685f52952feed36a31c46eea1a75aac1f20b6fd3c5fb3122c37d5",
+     "creator": "WVFRM Podcast",
+     "session": "What Was the Best Smartphone Camera of 2026?"
+    },
+    {
+     "goldEvents": 2,
+     "predictedClips": 0,
+     "matchedEvents": 0,
+     "bothBoundariesAcceptable": 0,
+     "recallAtK": 0,
+     "temporalMatchPrecisionProxyAtK": null,
+     "bothBoundaryAtMatched": null,
+     "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+     "creator": "DAVE",
+     "session": "Wir haben einen Container in 7 Tagen zu Werkstatt umgebaut! 🚧 - F17"
+    }
+   ],
+   "sourcesWithRun": 0,
+   "recallCI95": null,
+   "recallOnSourcesWithRun": null
+  },
+  "engine3": {
+   "numberSources": 2,
+   "goldEvents": 7,
+   "predictedClips": 0,
+   "matchedEvents": 0,
+   "microRecallAtK": 0,
+   "microTemporalMatchPrecisionProxyAtK": null,
+   "bothBoundaryAtMatched": null,
+   "perSource": [
+    {
+     "goldEvents": 5,
+     "predictedClips": 0,
+     "matchedEvents": 0,
+     "bothBoundariesAcceptable": 0,
+     "recallAtK": 0,
+     "temporalMatchPrecisionProxyAtK": null,
+     "bothBoundaryAtMatched": null,
+     "sourceSha256": "ba84aa3be2d685f52952feed36a31c46eea1a75aac1f20b6fd3c5fb3122c37d5",
+     "creator": "WVFRM Podcast",
+     "session": "What Was the Best Smartphone Camera of 2026?"
+    },
+    {
+     "goldEvents": 2,
+     "predictedClips": 0,
+     "matchedEvents": 0,
+     "bothBoundariesAcceptable": 0,
+     "recallAtK": 0,
+     "temporalMatchPrecisionProxyAtK": null,
+     "bothBoundaryAtMatched": null,
+     "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+     "creator": "DAVE",
+     "session": "Wir haben einen Container in 7 Tagen zu Werkstatt umgebaut! 🚧 - F17"
+    }
+   ],
+   "sourcesWithRun": 0,
+   "recallCI95": null,
+   "recallOnSourcesWithRun": null
+  },
+  "engine4": {
+   "numberSources": 2,
+   "goldEvents": 7,
+   "predictedClips": 8,
+   "matchedEvents": 1,
+   "microRecallAtK": 0.14285714285714285,
+   "microTemporalMatchPrecisionProxyAtK": 0.125,
+   "bothBoundaryAtMatched": 0,
+   "perSource": [
+    {
+     "goldEvents": 5,
+     "predictedClips": 0,
+     "matchedEvents": 0,
+     "bothBoundariesAcceptable": 0,
+     "recallAtK": 0,
+     "temporalMatchPrecisionProxyAtK": null,
+     "bothBoundaryAtMatched": null,
+     "sourceSha256": "ba84aa3be2d685f52952feed36a31c46eea1a75aac1f20b6fd3c5fb3122c37d5",
+     "creator": "WVFRM Podcast",
+     "session": "What Was the Best Smartphone Camera of 2026?"
+    },
+    {
+     "goldEvents": 2,
+     "predictedClips": 8,
+     "matchedEvents": 1,
+     "bothBoundariesAcceptable": 0,
+     "recallAtK": 0.5,
+     "temporalMatchPrecisionProxyAtK": 0.125,
+     "bothBoundaryAtMatched": 0,
+     "sourceSha256": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+     "creator": "DAVE",
+     "session": "Wir haben einen Container in 7 Tagen zu Werkstatt umgebaut! 🚧 - F17"
+    }
+   ],
+   "sourcesWithRun": 1,
+   "recallCI95": [
+    0.5,
+    0.5
+   ],
+   "recallOnSourcesWithRun": 0.5
+  }
+ },
+ "band": {
+  "startBefore": 5,
+  "startAfter": 2,
+  "endBefore": 2,
+  "endAfter": 5
+ },
+ "inventory": [
+  {
+   "hash": "12b742dd20b0476ed5baf04848aa9030",
+   "title": "What Was the Best Smartphone Camera of 2026?",
+   "durationSec": 6448,
+   "shorts": 1,
+   "sha": "ba84aa3be2d685f52952feed36a31c46eea1a75aac1f20b6fd3c5fb3122c37d5",
+   "engines": {
+    "engine1": "legacy (1)"
+   }
+  },
+  {
+   "hash": "94bc5e8254b57f3baf1eaa4524586af7",
+   "title": "Wir haben einen Container in 7 Tagen zu Werkstatt umgebaut! 🚧 - F17",
+   "durationSec": 2816,
+   "shorts": 2,
+   "sha": "ce6e01ce42ad9d9d4f26b151b0bf4a3d16051f5435ceee9a3bc0f5c889b9c8ba",
+   "engines": {
+    "engine4": "v4-mwko4f2f-j05a6 (8)",
+    "engine1": "legacy (2)"
+   }
+  }
+ ]
+}

@@ -10,12 +10,25 @@ export interface ClipLayout { shots: ShortmeShot[]; faceRatio: number; penalty: 
   /** Gesichts-Embeddings je Track (für die Personen-Zuordnung über das ganze Video). */
   identities: Array<{ track: number; emb: Float32Array; crop?: Buffer; sec: number }> }
 
+// Engine 4 rechnet den Bildausschnitt schon beim Prüf-Render; die Layout-Stufe am Ende fragt dieselben Clips noch einmal an (gemessen 115 s je Lauf).
+// shortcut: nur im Speicher und ohne Modell im Schlüssel – wer im Testlab das Gesichtsmodell wechselt, bekommt bis zu 24 alte Analysen; bei Bedarf Modell-ID in den Schlüssel.
+const asdCache = new Map<string, Promise<AsdAnalysis | null>>()
+export function cachedASD(video: string, start: number, end: number, signal?: AbortSignal): Promise<AsdAnalysis | null> {
+  const key = `${video}|${start.toFixed(2)}|${end.toFixed(2)}`
+  const hit = asdCache.get(key)
+  if (hit) return hit
+  const p = analyzeClipASD(video, start, end, signal).catch((e) => { asdCache.delete(key); if (signal?.aborted) throw e; return null })
+  asdCache.set(key, p)
+  if (asdCache.size > 24) asdCache.delete(asdCache.keys().next().value!)
+  return p
+}
+
 /** LR-ASD-Analyse (Gesichter, Tracks, Sprecher-Werte) → Plan-Eingabe auf 5-Hz-Raster, relativ zum Clipbeginn. */
 export async function layoutForClip(meta: ProjectMeta, clip: Pick<ShortmeClip, 'start' | 'end'>, shotCuts: number[], signal?: AbortSignal, pre?: AsdAnalysis | null, plan?: Partial<PlanOptions>): Promise<ClipLayout> {
   const dur = clip.end - clip.start
   const ticks = Math.max(1, Math.round(dur * 5))
   const dt = 1 / 5
-  const analysis = pre !== undefined ? pre : await analyzeClipASD(meta.sourcePath, clip.start, clip.end, signal).catch((e) => { if (signal?.aborted) throw e; return null })
+  const analysis = pre !== undefined ? pre : await cachedASD(meta.sourcePath, clip.start, clip.end, signal)
   const tracks: PlanTrack[] = []
   const cuts = new Set<number>()
   for (const c of shotCuts) if (c > clip.start + 0.3 && c < clip.end - 0.3) cuts.add(Math.round((c - clip.start) * 5))
