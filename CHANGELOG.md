@@ -6,6 +6,12 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.40.1] - 2026-11-18
+
+### Fixed
+
+- Editor: Zeitanzeige zählt ab Clipbeginn (nicht ab dem Puffer davor); der Abspielkopf startet am Clipbeginn, auch wenn das Quellvideo fehlt.
+
 ## [0.40.0] - 2026-11-18
 
 ### Added

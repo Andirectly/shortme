@@ -170,6 +170,8 @@ export function EditorScreen(): React.JSX.Element {
   const tRef = useRef(0)
   const trimRef = useRef(trim)
   trimRef.current = trim
+  // Abspielkopf beim Öffnen auf den Clipbeginn (die Zeitleiste beginnt beim Puffer davor; ohne Video käme sonst kein Startwert)
+  useEffect(() => { if (loaded) setT(trimRef.current[0]) }, [clipId, loaded])
   type ShotView = { shot: Pick<ShortmeShot, 'layout' | 'cx' | 'cx2' | 'stream'>; zoom: number }
   const [shotNow, setShotNow] = useState<ShotView | null>(null)
   /** Facecam-Layout während des Ziehens (Vorschau), bis der neue Plan da ist. */
@@ -230,8 +232,11 @@ export function EditorScreen(): React.JSX.Element {
         const rel = abs - origStart
         if (rel >= trimRef.current[1] - 0.02) { v.pause(); setPlaying(false) }
       }
-      tRef.current = abs - origStart
-      if (now - last > 66 || v.paused) { last = now; setT(tRef.current) }
+      // ohne geladenes Video (Quelle fehlt) bleibt die Zeit, wo sie ist – sonst springt der Kopf an den Pufferbeginn
+      if (v.readyState > 0) {
+        tRef.current = abs - origStart
+        if (now - last > 66 || v.paused) { last = now; setT(tRef.current) }
+      }
       if (v.paused) draw() // im Stand (Springen, Ziehen, Stiländerung) zeichnet die Schleife; beim Abspielen der Bild-Rückruf
       raf = requestAnimationFrame(tick)
     }
@@ -535,7 +540,7 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         <Button variant="ghost" aria-label="5 Sekunden vor" onClick={() => onSeek(t + 5)}><SkipForward size={15} /></Button>
         <Button variant="ghost" aria-label={muted ? 'Ton an' : 'Ton aus'} onClick={onMute}>{muted ? <VolumeX size={15} /> : <Volume2 size={15} />}</Button>
         <input className="sm-range" type="range" aria-label="Lautstärke (nur Vorschau)" title="Lautstärke nur im Editor, nicht im Export" min={0} max={100} value={Math.round(volume * 100)} onChange={(e) => onVolume(Number(e.target.value) / 100)} style={{ width: 80 }} />
-        <small style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-1)', minWidth: 130 }}>{fmt(t)} / {fmt(trim[1] - trim[0])}</small>
+        <small style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-1)', minWidth: 130 }}>{fmt(Math.max(0, t - trim[0]))} / {fmt(trim[1] - trim[0])}</small>
         <small>Export nach Kürzen: <b style={{ color: 'var(--text-1)' }}>{outDuration.toFixed(1)} s</b></small>
         <div style={{ flex: 1 }} />
         {mark === null
