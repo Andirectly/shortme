@@ -16,11 +16,11 @@ export interface ReleaseAsset {
 export function macInstaller(assets: ReleaseAsset[], version: string, arch: string): ReleaseAsset | null {
   if (!/^\d+\.\d+\.\d+$/.test(version) || !['arm64', 'x64'].includes(arch)) return null
   const names = arch === 'arm64'
-    ? [`Cutawan-${version}-arm64.dmg`, `Cutawan-${version}-universal.dmg`]
-    : [`Cutawan-${version}-x64.dmg`, `Cutawan-${version}.dmg`, `Cutawan-${version}-universal.dmg`]
+    ? [`Shortme-${version}-arm64.dmg`, `Shortme-${version}-universal.dmg`]
+    : [`Shortme-${version}-x64.dmg`, `Shortme-${version}.dmg`, `Shortme-${version}-universal.dmg`]
   return assets.find((a) => names.includes(a.name) &&
     Number.isSafeInteger(a.size) && a.size > 0 && /^sha256:[a-f0-9]{64}$/.test(a.digest ?? '') &&
-    a.browser_download_url === `https://github.com/JeremySNR/cutawan/releases/download/v${version}/${a.name}`
+    a.browser_download_url === `https://github.com/Andirectly/shortme/releases/download/v${version}/${a.name}`
   ) ?? null
 }
 
@@ -43,9 +43,9 @@ export async function downloadMacInstaller(
   signal: AbortSignal
 ): Promise<string> {
   // Enforce the boundary here too, even if a caller bypasses macInstaller.
-  if (!/^Cutawan-[\d.]+(?:-(?:arm64|x64|universal))?\.dmg$/.test(asset.name) ||
+  if (!/^Shortme-[\d.]+(?:-(?:arm64|x64|universal))?\.dmg$/.test(asset.name) ||
       !/^sha256:[a-f0-9]{64}$/.test(asset.digest ?? '') ||
-      !/^https:\/\/github\.com\/JeremySNR\/cutawan\/releases\/download\/v\d+\.\d+\.\d+\//.test(asset.browser_download_url) ||
+      !/^https:\/\/github\.com\/Andirectly\/shortme\/releases\/download\/v\d+\.\d+\.\d+\//.test(asset.browser_download_url) ||
       !asset.browser_download_url.endsWith(`/${asset.name}`) ||
       !Number.isSafeInteger(asset.size) || asset.size <= 0) throw new Error('Invalid installer metadata.')
   signal.throwIfAborted()

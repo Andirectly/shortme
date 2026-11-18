@@ -6,6 +6,26 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.41.0] - 2026-11-18
+
+### Added
+
+- Mac-Version (Apple Silicon): Shortme läuft jetzt auch auf dem Mac – gleiche App, gleiche Projekte, LLM über Metal.
+- Mac: Streamlink richtet sich beim Einrichten von selbst ein (ohne Homebrew).
+- Fehlende Modelle lädt die App beim Start still nach; nach Netzabbruch geht der Download weiter.
+- Twitch: Für jedes VOD wählbar – ganzes VOD oder nur ein Zeitbereich (vorher nur bei VODs über 1 Stunde).
+
+### Changed
+
+- Versionsnummer steht jetzt oben neben „Shortme“.
+- Editor nutzt die Breite besser (weniger Rand rechts).
+- Qwen3-8B (kleinere Rechner) wählt Clips aus dem ganzen Video statt nur aus dem Anfang.
+
+### Fixed
+
+- Editor: Knöpfe „Satz verlängern“, „Satz kürzen“ usw. brechen bei kleinem Fenster nicht mehr um.
+- Editor: dünnere Trimm-Griffe; Scroll-Balken bleiben in den runden Ecken; „Exportieren“ wird oben nicht mehr abgeschnitten.
+
 ## [0.40.1] - 2026-11-18
 
 ### Fixed

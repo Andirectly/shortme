@@ -7,9 +7,9 @@ import { downloadMacInstaller, macInstaller, verifyInstaller, type ReleaseAsset 
 
 const bytes = Buffer.from('test installer contents')
 function asset(arch = 'arm64'): ReleaseAsset {
-  const name = `Cutawan-1.2.3-${arch}.dmg`
+  const name = `Shortme-1.2.3-${arch}.dmg`
   return { name, size: bytes.length, digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
-    browser_download_url: `https://github.com/JeremySNR/cutawan/releases/download/v1.2.3/${name}` }
+    browser_download_url: `https://github.com/Andirectly/shortme/releases/download/v1.2.3/${name}` }
 }
 const directories: string[] = []
 async function directory(): Promise<string> {
