@@ -2,26 +2,50 @@
 // GitHub-Releases in <Daten>/bin geladen (Logik-Vorlage Live-Archivierung: Zibbp/ganymede, nur nachgelesen).
 import { spawn } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { dataRoot } from '../engines/paths'
 import { downloadFile, extractArchive } from '../engines/download'
+import { ensureUv, runtimeRoot, uvExe } from '../shortme/clips/engines/v3/runtime'
 
 export type ToolId = 'streamlink' | 'twitchdownloader'
 type Progress = (fraction: number, message: string) => void
 
 interface ToolSpec { repo: string; asset: RegExp; exe: string; label: string; license: string }
 
+const MAC = process.platform === 'darwin'
+
 export const TOOLS: Record<ToolId, ToolSpec> = {
   // Portable Windows-Builds (enthalten Python-Laufzeit), nicht das Quellarchiv des Hauptprojekts
   streamlink: { repo: 'streamlink/windows-builds', asset: /^streamlink-.*-x86_64\.zip$/, exe: 'streamlink.exe', label: 'Streamlink', license: 'BSD-2-Clause' },
-  twitchdownloader: { repo: 'lay295/TwitchDownloader', asset: /^TwitchDownloaderCLI-.*-Windows-x64\.zip$/, exe: 'TwitchDownloaderCLI.exe', label: 'TwitchDownloaderCLI', license: 'MIT' }
+  twitchdownloader: MAC
+    ? { repo: 'lay295/TwitchDownloader', asset: /^TwitchDownloaderCLI-.*-MacOSArm64\.zip$/, exe: 'TwitchDownloaderCLI', label: 'TwitchDownloaderCLI', license: 'MIT' }
+    : { repo: 'lay295/TwitchDownloader', asset: /^TwitchDownloaderCLI-.*-Windows-x64\.zip$/, exe: 'TwitchDownloaderCLI.exe', label: 'TwitchDownloaderCLI', license: 'MIT' }
+}
+
+// Streamlink hat für macOS kein portables Release → per gemanagtem uv mit eigenem Python nach <Daten>/bin/streamlink (fest gepinnte Version)
+const STREAMLINK_VERSION = '8.6.3'
+const macStreamlink = (): string[] => [join(toolDir('streamlink'), 'bin', 'streamlink'), '/opt/homebrew/bin/streamlink', '/usr/local/bin/streamlink']
+
+export async function installMacStreamlink(onProgress: Progress): Promise<string> {
+  onProgress(0.1, 'Streamlink wird geladen (einmalig) …')
+  await ensureUv(() => undefined)
+  const dir = toolDir('streamlink')
+  await rm(dir, { recursive: true, force: true })
+  const env = { ...process.env, UV_TOOL_DIR: join(dir, 'tools'), UV_TOOL_BIN_DIR: join(dir, 'bin'), UV_PYTHON_INSTALL_DIR: join(runtimeRoot(), 'python'), UV_PYTHON_DOWNLOADS: 'automatic', UV_NO_PROGRESS: '1' }
+  await runTool(uvExe(), ['tool', 'install', '--managed-python', '--python', '3.12', `streamlink==${STREAMLINK_VERSION}`], { env, timeoutMs: 15 * 60_000 })
+  await writeFile(join(dir, 'VERSION.txt'), `${STREAMLINK_VERSION}\n`)
+  const bin = toolPath('streamlink')
+  if (!bin) throw new Error('Streamlink: nach der Installation nicht gefunden')
+  onProgress(1, 'Streamlink bereit')
+  return bin
 }
 
 const toolDir = (id: ToolId): string => join(dataRoot(), 'bin', id)
 
 /** Pfad der ausführbaren Datei (sucht bis zu zwei Ebenen tief, da Archive oft einen Unterordner enthalten). */
 export function toolPath(id: ToolId): string | null {
+  if (MAC && id === 'streamlink') return macStreamlink().find((p) => existsSync(p)) ?? null
   const root = toolDir(id)
   const exe = TOOLS[id].exe
   if (!existsSync(root)) return null
@@ -38,9 +62,9 @@ export function toolPath(id: ToolId): string | null {
   return walk(root, 3)
 }
 
-export function runTool(bin: string, args: string[], opts: { timeoutMs?: number; anyExit?: boolean; onLine?: (l: string) => void; signal?: AbortSignal } = {}): Promise<string> {
+export function runTool(bin: string, args: string[], opts: { timeoutMs?: number; anyExit?: boolean; onLine?: (l: string) => void; signal?: AbortSignal; env?: NodeJS.ProcessEnv } = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    const p = spawn(bin, args, { windowsHide: true, signal: opts.signal })
+    const p = spawn(bin, args, { windowsHide: true, signal: opts.signal, env: opts.env })
     let out = ''
     let err = ''
     let buf = ''
@@ -61,6 +85,7 @@ export async function ensureTool(id: ToolId, onProgress: Progress = () => undefi
   const have = toolPath(id)
   if (have) return have
   const spec = TOOLS[id]
+  if (MAC && id === 'streamlink') return installMacStreamlink(onProgress)
   onProgress(0, `${spec.label} wird geladen (einmalig) …`)
   const rel = await fetch(`https://api.github.com/repos/${spec.repo}/releases/latest`, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Shortme' } })
   if (!rel.ok) throw new Error(`${spec.label}: Release nicht abrufbar (HTTP ${rel.status})`)
@@ -78,6 +103,7 @@ export async function ensureTool(id: ToolId, onProgress: Progress = () => undefi
   await writeFile(join(dir, 'VERSION.txt'), `${json.tag_name}\n`)
   const bin = toolPath(id)
   if (!bin) throw new Error(`${spec.label}: ${spec.exe} nach dem Entpacken nicht gefunden`)
+  if (process.platform !== 'win32') await chmod(bin, 0o755)
   return bin
 }
 

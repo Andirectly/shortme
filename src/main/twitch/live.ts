@@ -54,6 +54,7 @@ let cached = { bytes: 0, count: 0 }
 
 function killTree(p: ChildProcess | null): void {
   if (!p?.pid) return
+  if (process.platform !== 'win32') { p.kill(); return }
   try { execFile('taskkill', ['/PID', String(p.pid), '/T', '/F'], { windowsHide: true }, () => undefined) } catch { p.kill() }
 }
 

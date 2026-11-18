@@ -1,7 +1,7 @@
 // Dispatcher: genau eine Auswahl-Engine je Analyselauf, beim Jobstart festgelegt. Legacy ruft den bisherigen Algorithmus unverändert auf,
 // die neue Engine (`v2/`) hat eigene Orchestrierung, Prompts und Datenverträge. Extraktion, Layout und Render bleiben gemeinsam.
 import type { ShortmeClip } from '@shared/shortme'
-import { assets, withLlm } from '../../../engines'
+import { assets, hardware, withLlm } from '../../../engines'
 import { selectClips, type CandTrace, type SelectInput, type SelectOptions } from '../select'
 import type { ModalityStatus, RunInfo, SelectionEngineId, V3Profile } from '../../../../shared/engine'
 import { v2Revisions } from './v2/revisions'
@@ -36,7 +36,9 @@ export interface SelectionRequest {
 /** Legacy: bisheriges Verfahren (LLM-Auswahl, bei fehlendem/fehlerhaftem Modell TextTiling). Ergebnis und Ablauf unverändert. */
 async function selectLegacy(req: SelectionRequest): Promise<SelectionOutcome> {
   let trace: CandTrace[] = []
-  const options = { ...req.options, trace: (rows: CandTrace[]) => { trace = rows } }
+  // Qwen3-8B (16-GB-Macs, kleine GPUs) wählte bei ~3000 Wörtern je Fenster nur Stellen aus dem ersten Drittel → kürzere Fenster
+  const small = (await hardware()).recommendedLlm === 'qwen3-8b'
+  const options = { ...req.options, ...(small ? { windowWords: 1200 } : {}), trace: (rows: CandTrace[]) => { trace = rows } }
   const llmReady = !req.noLlm && (await assets.isInstalled('llama-server'))
   if (!llmReady) return { clips: await selectClips(req.input, { ...options, baseUrl: null }), mode: 'texttiling', trace }
   try {

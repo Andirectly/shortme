@@ -5,7 +5,7 @@ const GH_SHERPA = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-m
 const GH_LLAMA = 'https://github.com/ggml-org/llama.cpp/releases/download/b11711'
 
 /** Hashes aus den Anbieter-Metadaten (HF x-linked-etag, GitHub digest) am 2026-10-17. */
-export const CATALOG: AssetSpec[] = [
+const ALL: AssetSpec[] = [
   {
     id: 'parakeet-v3',
     name: 'Parakeet TDT 0.6B v3 (int8)',
@@ -263,8 +263,33 @@ export const CATALOG: AssetSpec[] = [
     expect: ['node-v22.23.3-win-x64/node.exe'],
     platform: 'win32',
     recommendedFromVramMb: 0
+  },
+  {
+    id: 'llama-server',
+    name: 'llama.cpp (Metal)',
+    kind: 'engine',
+    note: 'llama-server für die lokale Clip-Auswahl (Apple Silicon, Metal)',
+    files: [{ url: `${GH_LLAMA}/llama-b11711-bin-macos-arm64.tar.gz`, name: 'llama.tar.gz', size: 12251264, sha256: 'dc1f09829c2f5c7d6e23966548ac1569a442337cbb210df1fabdcf33f3c3181f' }],
+    extract: true,
+    expect: ['llama-b11711/llama-server', 'llama-b11711/libggml-metal.dylib'],
+    platform: 'darwin',
+    recommendedFromVramMb: 0
+  },
+  {
+    id: 'node-runtime',
+    name: 'Node.js 22 (ASR-Laufzeit)',
+    kind: 'engine',
+    note: 'Eigene Node-Laufzeit für sherpa-onnx (läuft nicht im Electron-Prozess: "External buffers are not allowed")',
+    files: [{ url: 'https://nodejs.org/dist/v22.23.3/node-v22.23.3-darwin-arm64.tar.gz', name: 'node.tar.gz', size: 49963763, sha256: '23b25245dcfb9af7262f8ff142e9e2e0af025368117329e7a7458a51e5922f53' }],
+    extract: true,
+    expect: ['node-v22.23.3-darwin-arm64/bin/node'],
+    platform: 'darwin',
+    recommendedFromVramMb: 0
   }
 ]
+
+// Engine-Binärdateien gibt es je Plattform einmal (gleiche id) → nur die passende anbieten
+export const CATALOG: AssetSpec[] = ALL.filter((s) => !s.platform || s.platform === process.platform)
 
 export const byId = (id: string): AssetSpec => {
   const s = CATALOG.find((c) => c.id === id)

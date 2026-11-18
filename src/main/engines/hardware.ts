@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { statfs } from 'node:fs/promises'
+import { cpus, totalmem } from 'node:os'
 import type { HardwareInfo } from '@shared/engines'
 
 export interface GpuRow { name: string; totalMb: number; freeMb: number; driver: string }
@@ -44,6 +45,11 @@ export async function detectHardware(dataDir: string): Promise<HardwareInfo> {
     gpu = parseNvidiaSmi(await run('nvidia-smi', ['--query-gpu=name,memory.total,memory.free,driver_version', '--format=csv,noheader,nounits']))
   } catch {
     gpu = null
+  }
+  // Apple Silicon: kein eigener VRAM, Metal darf standardmäßig ca. 2/3 des Unified Memory belegen
+  if (!gpu && process.platform === 'darwin' && process.arch === 'arm64') {
+    const mb = Math.round((totalmem() / 1024 ** 2) * 2 / 3)
+    gpu = { name: cpus()[0]?.model ?? 'Apple Silicon', totalMb: mb, freeMb: mb, driver: 'Metal' }
   }
   const vram = gpu?.totalMb ?? 0
   return {

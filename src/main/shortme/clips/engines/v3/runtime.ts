@@ -11,15 +11,16 @@ import { dataRoot } from '../../../../engines/paths'
 import { writeFileAtomic } from '../../../atomic'
 
 export const UV_VERSION = '0.13.1'
-/** SHA-256 der Release-Datei uv-x86_64-pc-windows-msvc.zip (Release 0.13.1, aus der .sha256-Datei des Releases übernommen). */
-export const UV_ZIP_SHA256 = '3b2661a463a5baea7f5076ea2b25ab71d77f36a6c0d809e5350651792f80a672'
-const UV_URL = `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-pc-windows-msvc.zip`
+const WIN = process.platform === 'win32'
+/** SHA-256 der Release-Datei (Release 0.13.1, aus der .sha256-Datei des Releases übernommen): Windows-zip bzw. macOS-arm64-tar.gz. */
+export const UV_ZIP_SHA256 = WIN ? '3b2661a463a5baea7f5076ea2b25ab71d77f36a6c0d809e5350651792f80a672' : 'cfe454573412ff7380d15fc7dae5997ab53ffce72fce0a78e91ddbc84001acd2'
+const UV_URL = `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${WIN ? 'uv-x86_64-pc-windows-msvc.zip' : 'uv-aarch64-apple-darwin.tar.gz'}`
 const TORCH_INDEX = 'https://download.pytorch.org/whl/cu128'
 
 export const runtimeRoot = (): string => join(dataRoot(), 'runtime')
 export const venvDir = (): string => join(runtimeRoot(), 'py312-v3')
 export const pythonExe = (): string => join(venvDir(), 'Scripts', 'python.exe')
-const uvExe = (): string => join(runtimeRoot(), 'uv', 'uv.exe')
+export const uvExe = (): string => join(runtimeRoot(), 'uv', WIN ? 'uv.exe' : 'uv')
 const markerFile = (): string => join(venvDir(), 'shortme-runtime.json')
 
 /** Ordner mit worker.py, requirements.lock.txt und vendor/ (Entwicklung: Repo, Paket: resources). */
@@ -57,7 +58,7 @@ function run(cmd: string, args: string[], onLine: (l: string) => void, signal?: 
 }
 
 /** uv herunterladen (nur die fest gebundene Version, Prüfsumme muss stimmen) und entpacken. */
-async function ensureUv(onLine: (l: string) => void, signal?: AbortSignal): Promise<void> {
+export async function ensureUv(onLine: (l: string) => void, signal?: AbortSignal): Promise<void> {
   if (existsSync(uvExe())) return
   onLine(`uv ${UV_VERSION} laden …`)
   const res = await fetch(UV_URL, { signal })
@@ -68,10 +69,10 @@ async function ensureUv(onLine: (l: string) => void, signal?: AbortSignal): Prom
   await mkdir(dir, { recursive: true })
   const zip = join(dir, 'uv.zip')
   await writeFile(zip, buf)
-  await run(join(process.env.SystemRoot ?? 'C:/Windows', 'System32', 'tar.exe'), ['-xf', zip, '-C', dir], onLine, signal) // Windows-bsdtar (kann zip); nicht das tar aus dem PATH (Git/MSYS)
+  if (WIN) await run(join(process.env.SystemRoot ?? 'C:/Windows', 'System32', 'tar.exe'), ['-xf', zip, '-C', dir], onLine, signal) // Windows-bsdtar (kann zip); nicht das tar aus dem PATH (Git/MSYS)
+  else await run('/usr/bin/tar', ['-xzf', zip, '-C', dir, '--strip-components', '1'], onLine, signal) // macOS: uv-aarch64-apple-darwin/uv
   await rm(zip, { force: true })
-  // das Archiv enthält uv.exe direkt oder in einem Unterordner
-  if (!existsSync(uvExe())) throw new Error('uv.exe nach dem Entpacken nicht gefunden')
+  if (!existsSync(uvExe())) throw new Error('uv nach dem Entpacken nicht gefunden')
 }
 
 /** Laufzeit installieren oder reparieren. Fortschritt als Textzeilen (uv-Ausgabe). */

@@ -136,8 +136,10 @@ describe('Dateinamen und Pfade', () => {
     expect(safeFileName('Ende mit Punkt.')).toBe('Ende mit Punkt')
   })
   it('nummeriert bei vorhandenen Dateien', () => {
-    const have = new Set(['C:\\o\\Clip.mp4', 'C:\\o\\Clip (2).mp4'])
-    expect(uniquePath('C:\\o', 'Clip', '.mp4', (p) => have.has(p)).replace(/\\/g, '/')).toBe('C:/o/Clip (3).mp4')
+    // Pfade normalisiert vergleichen: join nutzt je Plattform \ oder /
+    const n = (p: string): string => p.replace(/\\/g, '/')
+    const have = new Set(['/o/Clip.mp4', '/o/Clip (2).mp4'])
+    expect(n(uniquePath('/o', 'Clip', '.mp4', (p) => have.has(n(p))))).toBe('/o/Clip (3).mp4')
   })
   it('Filterpfad: Laufwerksdoppelpunkt escapen', () => {
     expect(filterPath('C:\\Users\\a b\\x.ass')).toBe('C\\:/Users/a b/x.ass')

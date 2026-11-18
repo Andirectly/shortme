@@ -47,6 +47,8 @@
 /* Titelleiste: Drag-Region, native Fensterknöpfe rechts (titleBarOverlay) */
 .sm-titlebar { position: absolute; top: 0; left: 0; right: 0; height: var(--titlebar-h); -webkit-app-region: drag; display: flex; align-items: center; padding: 0 16px; gap: 10px; z-index: 50; font-size: 12px; color: var(--text-2); }
 .sm-titlebar .sm-nodrag { -webkit-app-region: no-drag; }
+/* macOS: Platz für die Ampel-Knöpfe (trafficLightPosition in main/index.ts) */
+.sm-root[data-platform='darwin'] .sm-titlebar { padding-left: 92px; }
 .sm-logo { width: 18px; height: 18px; display: grid; place-items: center; color: #fff; }
 
 /* Glas */
@@ -73,7 +75,7 @@
 .sm-btn:focus-visible, .sm-nav-item:focus-visible, .sm-pill:focus-visible, .sm-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Pillen */
-.sm-pill { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--edge); background: rgba(255,255,255,0.05); font-size: 13px; color: var(--text-2); }
+.sm-pill { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--edge); background: rgba(255,255,255,0.05); font-size: 13px; color: var(--text-2); white-space: nowrap; flex-shrink: 0; }
 .sm-pill[aria-pressed='true'], .sm-pill[aria-checked='true'] { color: var(--text-1); background: rgba(255,255,255,0.14); border-color: var(--edge-highlight); }
 .sm-score { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: var(--r-pill); font-size: 12px; font-weight: 700; color: #fff; background: rgba(255,255,255,0.94); color: #000; box-shadow: var(--accent-glow); }
 .sm-tag { display: inline-flex; height: 22px; padding: 0 9px; align-items: center; border-radius: var(--r-pill); font-size: 11px; background: rgba(255,255,255,0.08); color: var(--text-2); }
@@ -81,7 +83,7 @@
 /* Seiten */
 .sm-page { position: absolute; top: var(--titlebar-h); bottom: 0; left: 84px; right: 0; overflow-y: auto; padding: 8px 36px 36px 8px; }
 .sm-page-wide { left: 84px; }
-.sm-scroll-mask { mask-image: linear-gradient(180deg, transparent 0, #000 24px); }
+.sm-scroll-mask { mask-image: linear-gradient(180deg, transparent 0, #000 14px); }
 
 /* Segment / Schalter / Slider */
 .sm-switch { width: 44px; height: 26px; border-radius: 13px; background: rgba(255,255,255,0.16); border: 0; padding: 3px; display: flex; }
@@ -105,7 +107,10 @@ textarea.sm-input { height: auto; padding: 10px 16px; border-radius: 18px; resiz
 .sm-wave { display: flex; align-items: center; gap: 2px; height: 56px; }
 .sm-wave i { flex: 1; background: rgba(255,255,255,0.28); border-radius: 1px; min-width: 1px; }
 
-::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+/* Leiste bleibt innerhalb runder Ecken */
+::-webkit-scrollbar-track:vertical { margin: 14px 0; }
+::-webkit-scrollbar-track:horizontal { margin: 0 14px; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
 
 /* Barrierefreiheit */
@@ -136,12 +141,13 @@ textarea.sm-input { height: auto; padding: 10px 16px; border-radius: 18px; resiz
 @keyframes sm-live-pulse { 0%, 100% { box-shadow: 0 0 0 1px rgba(255,90,95,0.55), 0 0 18px rgba(255,77,79,0.45); } 50% { box-shadow: 0 0 0 1px rgba(255,90,95,0.3), 0 0 8px rgba(255,77,79,0.2); } }
 @media (prefers-reduced-motion: reduce) { .sm-nav-item.sm-nav-live { animation: none; } }
 
-.sm-build { position: fixed; left: 14px; bottom: 8px; z-index: 45; font-size: 11px; color: var(--text-3); opacity: 0.8; pointer-events: none; user-select: text; }
+.sm-build { margin-left: 4px; font-size: 11px; color: var(--text-3); opacity: 0.8; pointer-events: none; user-select: text; }
 
 /* Seitenbreite: Inhalt nutzt das Fenster (bis 1760 px), danach zentriert; Spalten passen sich der Breite an */
 .sm-wrap { width: 100%; max-width: 2200px; margin: 0 auto; }
 .sm-cols { display: grid; gap: 16px; align-items: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }
-.sm-page { left: 0; padding: 8px 84px 36px 84px; }
+/* rechts kein Nav → kleiner Rand, Platz für Inhalt; oben Abstand ≥ Maske, sonst blendet die erste Zeile aus */
+.sm-page { left: 0; padding: 20px 24px 36px 84px; }
 
 /* Theme „Schwarz“: tiefes Schwarz, helle Kanten und weiße Akzente (statt transparentem Glas) */
 .sm-root[data-theme='black'] { --shell-bg: #000; --glass-panel: #0c0c0c; --glass-card: #080808; --glass-blur: none; --edge: rgba(255,255,255,0.16); --edge-highlight: rgba(255,255,255,0.22); --text-2: rgba(255,255,255,0.68); }

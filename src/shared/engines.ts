@@ -28,8 +28,8 @@ export interface AssetSpec {
   recommendedFromVramMb?: number
   /** Nur anbieten, wenn die Grafikkarte mindestens so viel VRAM hat (MB); sonst im Modell-Manager unsichtbar. */
   minVramMb?: number
-  /** Windows-only (Engine-Binärdateien). */
-  platform?: 'win32'
+  /** Nur auf dieser Plattform (Engine-Binärdateien). */
+  platform?: 'win32' | 'darwin'
 }
 
 export type AssetState = 'installed' | 'missing' | 'downloading' | 'paused' | 'verifying' | 'extracting' | 'error'

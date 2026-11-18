@@ -35,12 +35,13 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
   // Der Puffer läuft im Hintergrund weiter; der Status wird alle 3 s abgefragt (Badge am Live-Tab)
   useEffect(() => { void refreshLive(); const t = setInterval(() => void refreshLive(), 3000); return () => clearInterval(t) }, [refreshLive])
   return (
-    <div className="sm-root" data-theme={theme}>
+    <div className="sm-root" data-theme={theme} data-platform={window.cutawan?.platform}>
       {/* Festes Stimmungsbild nur in der Browser-Vorschau; in der App scheint der echte Desktop durch (Windows-Acrylic) */}
       {!window.cutawan && <div className="sm-ambient" style={{ backgroundImage: `url(${IMG.ambient})` }} />}
       <div className="sm-titlebar">
         <span className="sm-logo"><Logo size={16} /></span>
         <strong style={{ color: 'var(--text-1)', fontWeight: 600 }}>Shortme</strong>
+        <small className="sm-build" aria-label="Version">{__BUILD__}</small>
       </div>
       <nav className="sm-nav sm-glass" aria-label="Hauptnavigation">
         {NAV.filter((n) => n.id !== 'testlab' || testlab).map((n) => (
@@ -50,7 +51,6 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
           </button>
         ))}
       </nav>
-      <small className="sm-build" aria-label="Version">{__BUILD__}</small>
       <AnimatePresence mode="wait" initial={false}>
         <motion.main key={screen} className="sm-page sm-scroll-mask" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={base}>
           {children}

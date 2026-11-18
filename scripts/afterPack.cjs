@@ -1,6 +1,7 @@
-// electron-builder afterPack: Logo als Exe-Icon einbetten (signAndEditExecutable=false lässt das sonst aus – winCodeSign braucht Symlink-Rechte)
+// electron-builder afterPack: Windows → Logo als Exe-Icon einbetten (signAndEditExecutable=false lässt das sonst aus – winCodeSign braucht Symlink-Rechte); macOS → ad-hoc signieren
 const path = require('path')
 exports.default = async function afterPack(context) {
+  if (context.electronPlatformName === 'darwin') return (await import('./adhoc-sign-mac.mjs')).default(context)
   if (context.electronPlatformName !== 'win32') return
   const { rcedit } = require('rcedit')
   const exe = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.exe`)

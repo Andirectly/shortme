@@ -1,4 +1,4 @@
-// Optionaler Twitch-Token (auth-token-Cookie des eigenen Kontos): liegt in der Windows-Anmeldeinformationsverwaltung
+// Optionaler Twitch-Token (auth-token-Cookie des eigenen Kontos): liegt in der Windows-Anmeldeinformationsverwaltung bzw. im macOS-Schlüsselbund
 // (Ziel „Shortme/Twitch“), nie im Klartext in Dateien oder Projekt-JSON. Zugriff über PowerShell + advapi32 (kein natives Modul nötig).
 import { spawn } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -53,8 +53,29 @@ async function script(): Promise<string> {
   return scriptPath
 }
 
+/** macOS-Schlüsselbund über `security`; das Geheimnis geht per stdin (`security -i`), nie in die Prozessliste. */
+function runKeychain(mode: 'set' | 'get' | 'has' | 'del', stdin: string | undefined, target: string): Promise<string> {
+  const q = (v: string): string => `"${v.replace(/[\\"]/g, '\\$&')}"`
+  const args = mode === 'set' ? ['-i'] : mode === 'del' ? ['delete-generic-password', '-s', target, '-a', 'Shortme'] : ['find-generic-password', '-s', target, '-a', 'Shortme', '-w']
+  return new Promise((resolve, reject) => {
+    const p = spawn('/usr/bin/security', args)
+    let out = ''
+    let err = ''
+    p.stdout.on('data', (d: Buffer) => (out += d))
+    p.stderr.on('data', (d: Buffer) => (err += d))
+    p.on('error', reject)
+    p.on('close', (code) => {
+      if (code === 44) return resolve(mode === 'has' ? '0' : '') // Eintrag fehlt
+      if (code !== 0 || (mode === 'set' && err.trim())) return reject(new Error(`Schlüsselbund: ${err.trim().slice(0, 200)}`))
+      resolve(mode === 'has' ? (out.trim() ? '1' : '0') : mode === 'get' ? out.replace(/\n$/, '') : '')
+    })
+    p.stdin.end(mode === 'set' ? `add-generic-password -U -s ${q(target)} -a Shortme -w ${q((stdin ?? '').trim())}\n` : '')
+  })
+}
+
 async function run(mode: 'set' | 'get' | 'has' | 'del', stdin?: string, target = TARGET): Promise<string> {
-  if (process.platform !== 'win32') throw new Error('Token-Speicher nur unter Windows')
+  if (process.platform === 'darwin') return runKeychain(mode, stdin, target)
+  if (process.platform !== 'win32') throw new Error('Token-Speicher nur unter Windows und macOS')
   const file = await script()
   return new Promise((resolve, reject) => {
     const p = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', file, mode, target], { windowsHide: true })

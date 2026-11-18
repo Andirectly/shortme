@@ -33,6 +33,7 @@ export function StartScreen(): React.JSX.Element {
   const go = useStore((s) => s.go)
   const tw = useTwitchInspect(link)
   const [section, setSection] = useState<Section>(null)
+  useEffect(() => setSection(null), [link]) // neuer Link → wieder ganzes VOD
   const setChannelDraft = useTwitch((s) => s.setChannelDraft)
   useEffect(() => { useProject.getState().init() }, [])
   const open = async (path?: string): Promise<void> => {

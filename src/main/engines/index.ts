@@ -9,6 +9,7 @@ import { VramSequencer } from './vram'
 import { runSystemCheck } from './systemcheck'
 import { assetDir, dataRoot } from './paths'
 import { ensureYtDlp } from '../pipeline/ytdlp'
+import { ensureTool } from '../twitch/tools'
 
 export const assets = new AssetManager()
 export const llama = new LlamaServer()
@@ -95,13 +96,35 @@ export function registerEngineIpc(): void {
     return assets.importFolder(r.filePaths[0])
   })
   /** Assistent: alles Empfohlene (Reihenfolge: klein → groß), fortsetzbar. */
-  ipcMain.handle('engines:installRecommended', async () => {
-    const hw = await hardware()
-    const ids = ['silero-vad', 'transnetv2', 'yolov8n-pose', 'face-embed', 'yamnet', 'llama-server', 'node-runtime', 'speaker-segmentation', 'speaker-embedding', 'parakeet-v3', hw.recommendedLlm]
-    for (const id of ids) await assets.install(id).catch(() => undefined)
+  ipcMain.handle('engines:installRecommended', () => installRecommended())
+  // Einrichtung schon begonnen (mind. ein Modell da), aber unvollständig (Abbruch, App beendet) → beim Start still weiterladen
+  void (async () => {
+    const ids = await recommendedIds()
+    const have = await Promise.all(ids.map((id) => assets.isInstalled(id)))
+    if (have.some(Boolean) && !have.every(Boolean)) await installRecommended()
+  })().catch(() => undefined)
+}
+
+const recommendedIds = async (): Promise<string[]> =>
+  ['silero-vad', 'transnetv2', 'yolov8n-pose', 'face-embed', 'yamnet', 'llama-server', 'node-runtime', 'speaker-segmentation', 'speaker-embedding', 'parakeet-v3', (await hardware()).recommendedLlm]
+
+let installing: Promise<AssetStatus[]> | null = null
+/** Alles Empfohlene der Reihe nach installieren (fortsetzbar; ein Lauf zur Zeit). */
+function installRecommended(): Promise<AssetStatus[]> {
+  return (installing ??= (async () => {
+    for (const id of await recommendedIds()) {
+      // Netzabbrüche bei großen Modellen: bis zu 5 Versuche, der Download setzt an der .part-Datei fort
+      for (let i = 0; i < 5 && !(await assets.isInstalled(id)); i++) {
+        await assets.install(id).catch(() => undefined)
+        const st = (await assets.list()).find((x) => x.id === id)?.state
+        if (st === 'paused' || st === 'missing') break // vom Nutzer pausiert/abgebrochen → nicht erzwingen
+        if (st !== 'installed') await new Promise((r) => setTimeout(r, 5000))
+      }
+    }
     await ensureYtDlp(() => undefined).catch(() => undefined)
+    if (process.platform === 'darwin') await ensureTool('streamlink').catch(() => undefined) // kein portables Mac-Release → gleich mit einrichten
     return assets.list()
-  })
+  })().finally(() => { installing = null }))
 }
 
 /** Kindprozesse sauber beenden; muss vor `app.quit()` fertig sein. */

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { runYtDlp, YtDlpError } from '../src/main/pipeline/ytdlp'
+import { nodeRuntimeExe } from '../src/main/engines/paths'
 
 describe('YouTube-Bot-Prüfung', () => {
   it('wird als deutscher Hinweis auf die Anmeldung gemeldet', async () => {
@@ -13,9 +14,9 @@ describe('YouTube-Bot-Prüfung', () => {
   })
   it('übergibt die gebündelte Node-Laufzeit als JS-Laufzeit, wenn sie installiert ist', async () => {
     const data = mkdtempSync(join(tmpdir(), 'sm-ytjs-'))
-    const exe = join(data, 'models', 'node-runtime', 'node-v22.23.3-win-x64', 'node.exe')
-    mkdirSync(dirname(exe), { recursive: true }); writeFileSync(exe, '')
     process.env.SHORTME_DATA = data
+    const exe = nodeRuntimeExe()
+    mkdirSync(dirname(exe), { recursive: true }); writeFileSync(exe, '')
     try {
       // node (als falsches yt-dlp) lehnt die vorangestellte Option ab (Exit 9); ohne sie liefe `-e 0` fehlerfrei durch
       const err = await runYtDlp(process.execPath, ['-e', '0']).catch((e: unknown) => e)

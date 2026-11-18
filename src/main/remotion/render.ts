@@ -58,9 +58,11 @@ type Renderer = typeof import('@remotion/renderer')
 let rendererMod: Renderer | null = null
 const renderer = (): Renderer => (rendererMod ??= req('@remotion/renderer') as Renderer)
 
+const COMPOSITOR = process.platform === 'win32' ? 'compositor-win32-x64-msvc' : `compositor-${process.platform}-${process.arch}`
+
 /** Compositor-Binaries außerhalb von app.asar (gepackt: app.asar.unpacked). */
 const binariesDirectory = (): string | null => {
-  const d = join(root(), 'node_modules', '@remotion', 'compositor-win32-x64-msvc')
+  const d = join(root(), 'node_modules', '@remotion', COMPOSITOR)
   return existsSync(d) ? d : null
 }
 
@@ -129,7 +131,7 @@ export function remotionFootprint(): { bytes: number; parts: Array<{ name: strin
   const dirs: Array<[string, string]> = [
     ['remotion', join(nm, 'remotion')],
     ['@remotion/renderer', join(nm, '@remotion', 'renderer')],
-    ['@remotion/compositor', join(nm, '@remotion', 'compositor-win32-x64-msvc')],
+    ['@remotion/compositor', join(nm, '@remotion', COMPOSITOR)],
     ['@remotion/streaming', join(nm, '@remotion', 'streaming')],
     ['@remotion/player', join(nm, '@remotion', 'player')],
     ['Bundle', app?.isPackaged ? join(process.resourcesPath, 'remotion-bundle') : join(dataRoot(), 'remotion-bundle')],

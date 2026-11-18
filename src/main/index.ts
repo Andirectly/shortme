@@ -213,9 +213,9 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 function applyAppIcon(): void {
-  const icon = appIconPath()
-  if (process.platform === 'darwin' && app.dock) {
-    app.dock.setIcon(icon)
+  // Gepackt bringt das Bundle das Squircle-Icon (.icns) selbst mit; nur in der Entwicklung das Mac-Icon setzen
+  if (process.platform === 'darwin' && app.dock && !app.isPackaged) {
+    app.dock.setIcon(join(app.getAppPath(), 'build/icon-mac.png'))
   }
 }
 
@@ -252,7 +252,7 @@ function createWindow(): void {
           vibrancy: 'under-window' as const,
           visualEffectState: 'active' as const,
           titleBarStyle: 'hiddenInset' as const,
-          trafficLightPosition: { x: 18, y: 20 }
+          trafficLightPosition: { x: 18, y: 15 } // mittig in der 44-px-Titelleiste (tokens.css --titlebar-h)
         }
       : process.platform === 'win32'
         ? {

@@ -88,7 +88,7 @@ export class LlamaServer {
   /** Modell des laufenden Servers (Diagnose). */
   get model(): string | null { return this.sig ? (JSON.parse(this.sig) as [string])[0] : null }
 
-  static exe(): string { return join(assetDir('llama-server'), process.platform === 'win32' ? 'llama-server.exe' : 'llama-server') }
+  static exe(): string { return process.platform === 'win32' ? join(assetDir('llama-server'), 'llama-server.exe') : join(assetDir('llama-server'), 'llama-b11711', 'llama-server') }
   /** Letzte Ausgabe des Servers (Diagnose). */
   get log(): string { return this.tail }
   get running(): boolean { return !!this.child && this.child.exitCode === null }

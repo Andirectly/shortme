@@ -1,8 +1,8 @@
 // Mini-CDP-Client für Abnahmetests im echten Electron-Fenster (Node ≥ 22, eingebautes WebSocket).
 //   node scripts/cdp.cjs <port> eval "<js-ausdruck>"         → Ergebnis als JSON
-//   node scripts/cdp.cjs <port> shot <datei.png>             → Screenshot
+//   node scripts/cdp.cjs <port> shot <datei.png> [BxH]       → Screenshot (optional mit emulierter Fenstergröße)
 const fs = require('fs')
-const [port, cmd, arg] = process.argv.slice(2)
+const [port, cmd, arg, size] = process.argv.slice(2)
 ;(async () => {
   const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json()
   const page = targets.find((t) => t.type === 'page' && !/captions\.html/.test(t.url)) ?? targets[0]
@@ -17,6 +17,7 @@ const [port, cmd, arg] = process.argv.slice(2)
     const r = await send('Runtime.evaluate', { expression: `(async()=>{${arg}})()`, awaitPromise: true, returnByValue: true })
     console.log(JSON.stringify(r.result.exceptionDetails ? { error: r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text } : r.result.result.value))
   } else if (cmd === 'shot') {
+    if (size) { const [width, height] = size.split('x').map(Number); await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 0, mobile: false }); await new Promise((r) => setTimeout(r, 600)) }
     const r = await send('Page.captureScreenshot', { format: 'png' })
     fs.writeFileSync(arg, Buffer.from(r.result.data, 'base64'))
     console.log('ok', arg)

@@ -397,7 +397,7 @@ export function EditorScreen(): React.JSX.Element {
                 : <div style={{ width: '100%', height: '100%', backgroundImage: `url(${IMG.source})`, backgroundSize: 'cover' }} />}
               {streamShot && source && <StreamFrames layout={streamShot} src={{ width: source.width, height: source.height }} onLive={(p) => setStreamLive((l) => ({ ...(l ?? {}), ...p }))} onCommit={commitStream} />}
               {rects.map((r, i) => <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${r.x * 100}%`, width: `${r.w * 100}%`, border: '2px solid var(--accent)', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none', boxShadow: 'var(--accent-glow)' }} />)}
-              {!streamShot && <span className="sm-tag" style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.55)' }}>Quelle · Person anklicken</span>}
+              {!streamShot && <span className="sm-tag" title="Quelle · Person anklicken" style={{ position: 'absolute', top: 8, left: 8, maxWidth: 'calc(100% - 16px)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', background: 'rgba(0,0,0,0.55)' }}>Quelle · Person anklicken</span>}
             </div>
           </div>
           <div style={{ position: 'relative', flex: 'none', height: '100%', maxHeight: '100%', aspectRatio: '9/16', borderRadius: 16, overflow: 'hidden', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px var(--edge-highlight)', containerType: 'size' }}>
@@ -534,7 +534,7 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
 
   return (
     <div className="sm-glass" style={{ padding: 14, display: 'grid', gridTemplateRows: 'auto 1fr auto', gap: 8, minHeight: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
         <Button variant="ghost" aria-label="5 Sekunden zurück" onClick={() => onSeek(t - 5)}><SkipBack size={15} /></Button>
         <Button variant="primary" aria-label={playing ? 'Pause' : 'Abspielen'} onClick={onToggle} style={{ width: 44, padding: 0 }}>{playing ? <Pause size={16} /> : <Play size={16} />}</Button>
         <Button variant="ghost" aria-label="5 Sekunden vor" onClick={() => onSeek(t + 5)}><SkipForward size={15} /></Button>
@@ -542,7 +542,8 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         <input className="sm-range" type="range" aria-label="Lautstärke (nur Vorschau)" title="Lautstärke nur im Editor, nicht im Export" min={0} max={100} value={Math.round(volume * 100)} onChange={(e) => onVolume(Number(e.target.value) / 100)} style={{ width: 80 }} />
         <small style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-1)', minWidth: 130 }}>{fmt(Math.max(0, t - trim[0]))} / {fmt(trim[1] - trim[0])}</small>
         <small>Export nach Kürzen: <b style={{ color: 'var(--text-1)' }}>{outDuration.toFixed(1)} s</b></small>
-        <div style={{ flex: 1 }} />
+        {/* eigene Gruppe: rutscht geschlossen in die nächste Zeile, statt einzeln umzubrechen */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginLeft: 'auto' }}>
         {mark === null
           ? <Pill onClick={() => setMark(t)}><Scissors size={13} /> Ab hier markieren</Pill>
           : <>
@@ -552,6 +553,7 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         <Pill onClick={onCheckEnd}><Rewind size={13} /> Ende prüfen</Pill>
         <Pill onClick={() => onTrim([trim[0], Math.min(duration, snap(trim[1] + 4))])}><Scissors size={13} /> Satz verlängern</Pill>
         <Pill onClick={() => onTrim([trim[0], Math.max(trim[0] + 1, snap(trim[1] - 4))])}><Scissors size={13} /> Satz kürzen</Pill>
+        </div>
       </div>
 
       <div ref={track} style={{ position: 'relative', minHeight: 0, touchAction: 'none', display: 'grid', gridTemplateRows: '52px 1fr 24px', gap: 4, cursor: 'pointer' }}
@@ -580,7 +582,7 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         {(['in', 'out'] as const).map((w) => (
           <motion.div key={w} role="slider" aria-label={w === 'in' ? 'Start' : 'Ende'} aria-valuenow={trim[w === 'in' ? 0 : 1]} tabIndex={0}
             animate={{ scale: grab === w ? 1.18 : 1, y: grab === w ? -3 : 0 }} transition={base}
-            onPointerDown={down(w)} style={{ position: 'absolute', top: -4, bottom: -4, left: `calc(${pct(trim[w === 'in' ? 0 : 1])} - 7px)`, width: 14, borderRadius: 7, background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.5)', cursor: 'ew-resize' }} />
+            onPointerDown={down(w)} style={{ position: 'absolute', top: -4, bottom: -4, left: `calc(${pct(trim[w === 'in' ? 0 : 1])} - 8px)`, width: 16, padding: '0 5px', borderRadius: 8, background: '#fff', backgroundClip: 'content-box', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.5))', cursor: 'ew-resize' }} />
         ))}
         <div style={{ position: 'absolute', top: -6, bottom: -6, left: pct(t), width: 2, background: '#fff', pointerEvents: 'none', boxShadow: '0 0 8px rgba(255,255,255,0.8)' }}>
           <span style={{ position: 'absolute', top: -2, left: -5, width: 12, height: 12, background: '#fff', borderRadius: '3px 3px 6px 6px' }} />

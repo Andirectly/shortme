@@ -35,6 +35,8 @@ export interface SelectOptions {
   topicsCache?: { load: (sentences: number) => Promise<TopicMap | null>; save: (m: TopicMap) => Promise<void> }
   query?: string
   wanted?: number
+  /** Wörter je Kandidaten-Fenster (Standard WINDOW_WORDS); kleine Modelle übersehen in langen Fenstern das Ende. */
+  windowWords?: number
   minSec?: number
   maxSec?: number
   /** Alle bewerteten Kandidaten (auch nicht gewählte) mit Schicksal – nur zum Sammeln von Lerndaten. */
@@ -262,7 +264,7 @@ export async function selectClips(input: SelectInput, opts: SelectOptions): Prom
   const topicCtx = (a: number, b: number): string => topicContext(tmap, sentences[a].start, sentences[b].end)
 
   // A: Kandidaten je Fenster (Satznummern)
-  const windows = buildWindows(sentences)
+  const windows = buildWindows(sentences, opts.windowWords)
   let cands: Cand[] = []
   const maxCands = candidateBudget(wanted)
   // ein Teil des Budgets geht an Stellen, die nur im Ton/Chat auffallen (Lachen, Applaus, Spitzen): im Transkript wirken Rap- oder Imitations-Einlagen oft flach

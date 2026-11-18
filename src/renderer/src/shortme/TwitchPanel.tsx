@@ -25,7 +25,7 @@ export type Section = [number, number] | null
 
 const MINUTES = [3, 5, 10]
 
-/** Twitch-Bereich unter dem Import-Feld: Zeitbereich (VOD > 1 h), „Letzte Minuten“ (Kanal live), Live-Puffer, Meldungen. */
+/** Twitch-Bereich unter dem Import-Feld: ganzes VOD oder Zeitbereich, „Letzte Minuten“ (Kanal live), Live-Puffer, Meldungen. */
 export function TwitchPanel({ info, error, loading, section, setSection, busy, onLast, onLiveBuffer }: {
   info: TwitchInfo | null; error: string; loading: boolean; section: Section; setSection: (s: Section) => void; busy: boolean
   onLast: (minutes: number) => void; onLiveBuffer: () => void
@@ -33,7 +33,7 @@ export function TwitchPanel({ info, error, loading, section, setSection, busy, o
   const [custom, setCustom] = useState('15')
   const [from, setFrom] = useState('0:00')
   const [to, setTo] = useState('1:00:00')
-  const long = !!info && info.state === 'vod' && info.durationSec > 3600
+  const vod = !!info && info.state === 'vod' && info.durationSec > 0
   const applyRange = (f: string, t: string): void => {
     const a = parseHms(f), b = parseHms(t)
     setFrom(f); setTo(t)
@@ -52,10 +52,10 @@ export function TwitchPanel({ info, error, loading, section, setSection, busy, o
       {error && <span style={{ color: 'var(--warn)', fontSize: 14 }}>{error}</span>}
       {info?.message && <span style={{ fontSize: 14, color: 'var(--text-2)' }}>{info.message}</span>}
 
-      {long && (
+      {vod && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Pill role="radio" pressed={!section} onClick={() => setSection(null)}>Ganzes VOD</Pill>
-          <Pill role="radio" pressed={!!section} onClick={() => applyRange(from, to)}><Scissors size={13} /> Zeitbereich</Pill>
+          <Pill role="radio" pressed={!!section} onClick={() => applyRange(from, parseHms(to) > info.durationSec ? fmtHms(info.durationSec) : to)}><Scissors size={13} /> Zeitbereich</Pill>
           {section && (
             <>
               <input className="sm-input" style={{ width: 96 }} aria-label="Von" value={from} onChange={(e) => applyRange(e.target.value, to)} />
