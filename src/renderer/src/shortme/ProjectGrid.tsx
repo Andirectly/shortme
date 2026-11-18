@@ -29,7 +29,7 @@ export function ProjectGrid({ limit }: { limit?: number }): React.JSX.Element {
   useEffect(() => { void loadProjects() }, [loadProjects, hasApi])
 
   const cards = hasApi
-    ? projects.map((p) => ({ hash: p.hash, key: p.hash, source: p.source, isUrl: p.isUrl, title: p.title, dur: fmt(p.durationSec), clips: p.clips, date: ago(p.created), img: p.poster, open: async () => { if (await openProject(p.hash)) go('clips') } }))
+    ? projects.map((p) => ({ hash: p.hash, key: p.hash, source: p.source, isUrl: p.isUrl, title: p.title, dur: fmt(p.durationSec), clips: p.clips, date: ago(p.created), img: p.poster, open: async () => { const to = await openProject(p.hash); if (to) go(to) } }))
     : PROJECTS.map((p) => ({ hash: '', key: p.id, source: '', isUrl: false, title: p.name, dur: p.duration, clips: p.clips, date: p.date, img: p.thumb, open: async () => go('clips') }))
   const shown = limit ? cards.slice(0, limit) : cards
 

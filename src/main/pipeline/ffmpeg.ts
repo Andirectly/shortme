@@ -26,6 +26,14 @@ export interface BinaryOutput {
   stderr: string
 }
 
+/** Die eigentlichen Fehlerzeilen aus FFmpegs Ausgabe (stehen am Ende, nach seitenlangen Stream-Infos) – kommen zuerst in die Meldung,
+ *  sonst sieht man in der gekürzten Anzeige nur „Duration … Stream …“. */
+export function ffmpegErrorLines(stderr: string): string {
+  const lines = stderr.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  const hits = lines.filter((l) => /error|invalid|unrecognized|not found|no such|failed|cannot|unable|could not|does not|unknown|mismatch/i.test(l) && !/^\s*(Stream|Duration|Metadata|Input|Output)\b/.test(l))
+  return [...new Set(hits)].slice(-4).join(' | ') || lines.slice(-2).join(' | ')
+}
+
 /** Like runBinary, but also returns stderr — where ffmpeg filters print their reports. */
 export function runBinaryFull(bin: string, args: string[], opts: RunOptions = {}): Promise<BinaryOutput> {
   return new Promise((resolve, reject) => {
@@ -52,7 +60,7 @@ export function runBinaryFull(bin: string, args: string[], opts: RunOptions = {}
     child.on('error', reject)
     child.on('close', (code) => {
       if (code === 0) resolve({ stdout, stderr })
-      else reject(new Error(`${bin.split(/[\\/]/).pop()} exited with code ${code}:\n${stderr.slice(-2000)}`))
+      else reject(new Error(`${bin.split(/[\\/]/).pop()} exited with code ${code}: ${ffmpegErrorLines(stderr)}\n${stderr.slice(-2000)}`))
     })
   })
 }

@@ -6,6 +6,15 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.36.1] - 2026-11-18
+
+### Fixed
+
+- Export: Scheitert das Einblenden des Titels, wird der Clip ohne Titel exportiert statt gar nicht; die Meldung am Ende nennt den Grund.
+- Export: Fortschritt läuft während des Renderns weiter (stand vorher lange bei 10 %); FFmpeg wartet nicht mehr auf Tastatureingaben.
+- Fehlermeldungen von FFmpeg zeigen die eigentliche Fehlerzeile statt der Stream-Infos.
+- Projekte: Ein Projekt, das gerade verarbeitet wird, öffnet beim Anklicken die Fortschrittsanzeige (vorher passierte nichts).
+
 ## [0.36.0] - 2026-11-18
 
 ### Fixed

@@ -74,7 +74,7 @@ export function LiveScreen(): React.JSX.Element {
           : (
             <div style={{ display: 'grid', gap: 8 }}>
               {saves.map((s) => (
-                <button key={s.hash + s.at} className="sm-card" onClick={() => void openProject(s.hash).then((ok) => ok && go('clips'))} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 14px', textAlign: 'left' }}>
+                <button key={s.hash + s.at} className="sm-card" onClick={() => void openProject(s.hash).then((to) => to && go(to))} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 14px', textAlign: 'left' }}>
                   <span style={{ flex: 1, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</span>
                   <small>{fmtHms(s.seconds)} · {new Date(s.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</small>
                 </button>

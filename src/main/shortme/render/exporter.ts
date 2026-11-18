@@ -54,7 +54,7 @@ export interface ExportOptions {
   onProgress?: (fraction: number, message: string) => void
 }
 
-export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number; captionEngine: 'tscaps' | 'ass' | 'remotion' | 'none' }
+export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number; captionEngine: 'tscaps' | 'ass' | 'remotion' | 'none'; /** Titel musste weggelassen werden (Grund). */ titleDropped?: string }
 
 /** Reine Planung eines Clips: Pausenschnitte, Zeitachse, Stücke, Wörter auf der gekürzten Zeitleiste. */
 export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = [], wordEdits: Record<number, string> = {}) {
@@ -126,14 +126,16 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
     const hook = opts.hook ? { text: opts.hookText ?? clip.hookText, seconds: opts.hookSeconds ?? style.title.seconds } : null
     // Titel (TikTok-Stil): Overlay-Bildfolge aus demselben Layout wie die Editor-Vorschau (nur in der App, braucht Electron)
     const useRemotion = opts.renderer === 'remotion' && !!process.versions.electron && remotionAvailable() && opts.captions !== false
-    const title = hook && !useRemotion && process.versions.electron ? await renderTitleOverlay(hook.text, titleStyle, hook.seconds, join(work, 'title'), opts.signal).catch((e) => { console.error('Titel-Overlay fehlgeschlagen:', e); return null }) : null
+    let title = hook && !useRemotion && process.versions.electron ? await renderTitleOverlay(hook.text, titleStyle, hook.seconds, join(work, 'title'), opts.signal).catch((e) => { console.error('Titel-Overlay fehlgeschlagen:', e); return null }) : null
     const enc = await resolveEncoder(opts.encoder ?? 'auto')
     const quality = opts.quality ?? 'standard'
     const src = { width: meta.width, height: meta.height }
     const audioFilter = stats ? loudnormFilter(stats) : undefined
 
+    let titleDropped = ''
     /** Ein FFmpeg-Lauf: Stücke → Zusammenschnitt (+ optional eingebrannte ASS-Datei). */
-    const render = async (dest: string, assText: string | null, q: typeof quality): Promise<void> => {
+    /** `span` = Fortschrittsbereich dieses Laufs (FFmpeg meldet seine Position, sonst stünde die Anzeige minutenlang still). */
+    const render = async (dest: string, assText: string | null, q: typeof quality, span: [number, number] = [0.1, 1]): Promise<void> => {
       let post: string | undefined
       if (assText) {
         const assPath = join(work, `${basename(dest)}.ass`)
@@ -143,15 +145,26 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
       const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, audio: hasAudio, videoPost: post, overlay: title ? { x: title.x, y: title.y } : undefined })
       const scriptPath = join(work, `${basename(dest)}.graph.txt`)
       await writeFile(scriptPath, filter, 'utf8')
-      await runWithGraphFile((bin, args) => runBinary(bin, args, { signal: opts.signal }), enc.bin, [
-        '-hide_banner', '-nostats', '-y',
+      const onProgress = (t: number): void => report(span[0] + (span[1] - span[0]) * Math.min(1, t / Math.max(0.1, plan.duration)), 'Rendert …')
+      // -nostdin: unter Windows wartet FFmpeg sonst auf Tasteneingaben aus der offenen Pipe
+      const run = (): Promise<void> => runWithGraphFile((bin, args) => runBinary(bin, args, { signal: opts.signal, onProgress }), enc.bin, [
+        '-hide_banner', '-nostats', '-nostdin', '-y',
         '-ss', clip.start.toFixed(3), '-t', (clip.end - clip.start).toFixed(3), '-i', meta.sourcePath,
         ...(title ? ['-framerate', String(title.fps), '-i', title.pattern] : [])
       ], filter, scriptPath, [
         '-map', '[v]', ...(hasAudio ? ['-map', '[a]'] : []),
         ...encoderArgs(enc.kind, q), '-r', '30', ...(hasAudio ? [...audioArgs(q), '-ar', '48000'] : ['-an']),
-        '-movflags', '+faststart', '-t', plan.duration.toFixed(3), dest
+        '-movflags', '+faststart', '-t', plan.duration.toFixed(3), '-progress', 'pipe:1', dest
       ])
+      try { await run() } catch (e) {
+        // Titel-Bildfolge (Offscreen-Fenster) ist der rechnerabhängigste Teil: scheitert der Lauf mit Titel, einmal ohne Titel exportieren statt gar nicht
+        if (opts.signal?.aborted || !title) throw e
+        console.error('Export mit Titel fehlgeschlagen, ohne Titel erneut:', e)
+        title = null
+        titleDropped = (e instanceof Error ? e.message : String(e)).split(/\r?\n/)[0].slice(0, 300)
+        report(span[0], 'Titel ließ sich nicht einblenden – exportiere ohne Titel …')
+        return render(dest, assText, q, span)
+      }
     }
 
     const fullAss = buildAss(capWords, { width: OUT_W, height: OUT_H, style: capStyle })
@@ -163,7 +176,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
       try {
         // Remotion: Zwischenergebnis ohne Untertitel → Overlay-Bildfolge (Untertitel + Titel aus demselben Preset) → FFmpeg legt sie darüber
         const mid = join(work, 'mid.mp4')
-        await render(mid, null, 'high')
+        await render(mid, null, 'high', [0.1, 0.4])
         report(0.4, 'Untertitel (Remotion) …')
         const overlay = await renderRemotionOverlay({ preset: { ...style, caption: capStyle, title: titleStyle }, words: capWords, highlight: opts.caption?.highlight !== false, titleText: hook?.text ?? '', titleSeconds: hook?.seconds ?? 3, durationSec: plan.duration, workDir: join(work, 'remotion'), signal: opts.signal, onProgress: (f, m) => report(0.4 + f * 0.5, m) })
         report(0.92, 'Zusammenfügen …')
@@ -179,7 +192,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
       try {
         // 1) Zwischenergebnis in hoher Qualität (Hook als ASS, ohne Untertitel), 2) @tscaps/engine brennt die Untertitel ein
         const mid = join(work, 'mid.mp4')
-        await render(mid, null, 'high')
+        await render(mid, null, 'high', [0.1, 0.5])
         report(0.5, 'Untertitel …')
         await captionPass({ input: mid, output: tmp, words: capWords, style: capStyle, css: style.css, highlight: opts.caption?.highlight, width: OUT_W, height: OUT_H },
           { signal: opts.signal, onProgress: (f) => report(0.5 + f * 0.5, 'Untertitel …') })
@@ -197,7 +210,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
     let srtPath: string | undefined
     if (opts.srt) { srtPath = finalPath.replace(/\.mp4$/, '.srt'); await writeFile(srtPath, buildSrt(plan.words), 'utf8') }
     report(1, 'Fertig')
-    return { path: finalPath, durationSec: plan.duration, srtPath, ass: fullAss, wordsOut: plan.words, pieces: plan.pieces.length, captionEngine: used }
+    return { path: finalPath, durationSec: plan.duration, srtPath, ass: fullAss, wordsOut: plan.words, pieces: plan.pieces.length, captionEngine: used, ...(titleDropped ? { titleDropped } : {}) }
   } finally {
     await rm(work, { recursive: true, force: true })
   }

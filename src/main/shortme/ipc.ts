@@ -202,16 +202,18 @@ export function registerShortmeIpc(): void {
     const outDir = join(await exportRoot(), safeFileName(meta.title, 'Projekt'))
     return jobs.enqueue(hash, `Export: ${meta.title}`, async ({ signal, report }) => {
       const signals = await ensureSignals(meta)
+      const noTitle: string[] = []
       for (let i = 0; i < clips.length; i++) {
         // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
         const st = stateOf(baseState(clips[i], undefined, await loadStyle()), await loadEdits(hash, clips[i].id))
         const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
         const exp = await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, hook: st.hook.enabled, renderer: (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' : 'tscaps', seamCaption: st.caption.style.caption?.y === undefined, seamTitle: st.caption.style.title?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+        if (exp.titleDropped) noTitle.push(`${eff.title}: ${exp.titleDropped}`)
         await logCorrection(hash, clips[i].id, [{ kind: 'export', durationSec: +exp.durationSec.toFixed(1) }])
         await addExport({ hash, clipId: clips[i].id, title: eff.title, hookText: st.hook.text || eff.hookText, path: exp.path, durationSec: exp.durationSec })
       }
       void shell.openPath(outDir)
-      return `${clips.length === 1 ? 'Clip' : `${clips.length} Clips`} exportiert nach ${outDir}`
+      return `${clips.length === 1 ? 'Clip' : `${clips.length} Clips`} exportiert nach ${outDir}${noTitle.length ? ` – ohne Titel (Einblendung fehlgeschlagen: ${noTitle[0]})` : ''}`
     })
   })
   ipcMain.handle('shortme:exportDir', async () => ({ dir: await exportRoot(), isDefault: (await exportRoot()) === defaultExportRoot() }))

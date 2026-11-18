@@ -40,7 +40,8 @@ interface ProjectState {
   reanalyze: (hash: string) => Promise<boolean>
   /** Titel des geöffneten Projekts (Clip-Übersicht). */
   currentTitle: string | null
-  openProject: (hash: string) => Promise<boolean>
+  /** Öffnet ein Projekt: läuft dafür gerade ein Job → Fortschritt ('processing'), sonst die Clips ('clips'); null = nichts zu zeigen. */
+  openProject: (hash: string) => Promise<'clips' | 'processing' | null>
   init: () => void
   importPath: (path: string) => Promise<boolean>
   importUrl: (url: string) => Promise<boolean>
@@ -127,11 +128,14 @@ export const useProject = create<ProjectState>((set, get) => ({
   reanalyze: async (hash) => { const a = api(); if (!a) return false; set({ job: await a.reanalyze(hash), clipsFile: null, transcript: null }); return true },
   openProject: async (hash) => {
     const a = api()
-    if (!a) return false
-    await get().loadResults(hash)
+    if (!a) return null
     const p = get().projects.find((x) => x.hash === hash)
+    // noch in Arbeit (z. B. nach Tab-Wechsel wieder geöffnet): Fortschritt zeigen statt nichts zu tun
+    const live = (await a.jobs()).filter((j) => j.hash === hash && ['running', 'queued', 'paused'].includes(j.state)).pop()
+    if (live) { set({ job: live, currentTitle: p?.title ?? live.title }); return 'processing' }
+    await get().loadResults(hash)
     set({ currentTitle: p?.title ?? null })
-    return !!get().clipsFile
+    return get().clipsFile ? 'clips' : null
   },
   engine: { hash: null, state: null, pending: false, msg: '', missing: [], modelsChecked: false },
   startEngine: 'adaptive-v3',
