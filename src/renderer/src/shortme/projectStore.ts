@@ -42,7 +42,7 @@ interface ProjectState {
   /** Titel des geöffneten Projekts (Clip-Übersicht). */
   currentTitle: string | null
   /** Öffnet ein Projekt: läuft dafür gerade ein Job → Fortschritt ('processing'), sonst die Clips ('clips'); null = nichts zu zeigen. */
-  openProject: (hash: string) => Promise<'clips' | 'processing' | null>
+  openProject: (hash: string) => Promise<'clips' | 'processing' | 'start' | null>
   init: () => void
   importPath: (path: string) => Promise<boolean>
   importUrl: (url: string) => Promise<boolean>
@@ -137,6 +137,9 @@ export const useProject = create<ProjectState>((set, get) => ({
     if (live) { set({ job: live, currentTitle: p?.title ?? live.title }); return 'processing' }
     await get().loadResults(hash)
     set({ currentTitle: p?.title ?? null })
+    if (get().clipsFile?.clips.length) return 'clips'
+    // noch nicht analysiert (z. B. gesicherte Live-Aufnahme): wie nach einem Import den Start-Dialog zeigen
+    if (p && (p.isUrl ? await get().importUrl(p.source) : await get().importPath(p.source))) { useStore.getState().openSheet(true); return 'start' }
     return get().clipsFile ? 'clips' : null
   },
   engine: { hash: null, state: null, pending: false, msg: '', missing: [], modelsChecked: false },

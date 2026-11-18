@@ -79,6 +79,15 @@ export interface TwitchStatus {
 
 export interface LiveSegmentInfo { count: number; bytes: number; seconds: number }
 
+/** Prüfung eines Twitch-Kanals vor der Live-Aufnahme. 'unknown' = Prüfung nicht möglich (Netz), Aufnahme trotzdem erlaubt. */
+export interface ChannelCheck { channel: string; state: 'live' | 'offline' | 'missing' | 'invalid' | 'unknown'; displayName?: string; title?: string; error?: string }
+
+/** Kanalname aus Eingabe oder Link (twitch.tv/name); null = kein gültiger Name. */
+export function channelName(raw: string): string | null {
+  const name = raw.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.|m\.)?twitch\.tv\//, '').split(/[/?#]/)[0]
+  return /^\w{2,25}$/.test(name) ? name : null
+}
+
 export interface LiveStatus {
   running: boolean
   channel: string | null

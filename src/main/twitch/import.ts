@@ -2,7 +2,7 @@
 import { ensureYtDlp, runYtDlp } from '../pipeline/ytdlp'
 import { importUrl } from '../shortme/importer'
 import { loadMeta, saveMeta } from '../shortme/project'
-import { lastMinutesRange, parseTwitchUrl, type TwitchInfo, type TwitchMeta, type TwitchRef } from '../../shared/twitch'
+import { channelName, lastMinutesRange, parseTwitchUrl, type ChannelCheck, type TwitchInfo, type TwitchMeta, type TwitchRef } from '../../shared/twitch'
 import { readTwitchToken } from './token'
 import { loadTwitchSettings } from './settings'
 import { detectSilentRanges } from './silence'
@@ -28,6 +28,25 @@ export function twitchErrorMessage(raw: string, hasToken: boolean): string {
 async function authArgs(): Promise<string[]> {
   const t = await readTwitchToken()
   return t ? ['--add-header', `Authorization: OAuth ${t}`] : []
+}
+
+/** Gibt es den Kanal und sendet er gerade? yt-dlp: live → JSON mit is_live, offline → Fehler „not currently live“, unbekannt → `null`. */
+export async function checkChannel(raw: string): Promise<ChannelCheck> {
+  const channel = channelName(raw)
+  if (!channel) return { channel: raw.trim(), state: 'invalid' }
+  try {
+    const bin = await ensureYtDlp(() => undefined)
+    const out = (await runYtDlp(bin, ['-J', '--no-warnings', '--no-playlist', ...(await authArgs()), `https://www.twitch.tv/${channel}`])).trim()
+    if (!out || out === 'null') return { channel, state: 'missing' }
+    const j = JSON.parse(out) as YtJson & { description?: string }
+    if (!j.is_live) return { channel, state: 'offline', displayName: j.uploader ?? channel }
+    return { channel, state: 'live', displayName: j.uploader ?? channel, title: (j.description ?? j.title ?? '').slice(0, 140) }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (/not currently live/i.test(msg)) return { channel, state: 'offline' }
+    if (/does not exist|not found|HTTP Error 404/i.test(msg)) return { channel, state: 'missing' }
+    return { channel, state: 'unknown', error: msg.split(/\r?\n/).find((l) => /ERROR/.test(l))?.slice(0, 200) ?? msg.slice(0, 200) }
+  }
 }
 
 interface YtJson { id?: string; title?: string; duration?: number; uploader_id?: string; uploader?: string; is_live?: boolean; entries?: Array<{ id?: string; url?: string }> }

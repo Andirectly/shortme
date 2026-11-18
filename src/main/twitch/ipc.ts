@@ -8,7 +8,7 @@ import type { TwitchStatus } from '../../shared/twitch'
 import { toolVersion } from './tools'
 import { clearTwitchToken, hasTwitchToken, saveTwitchToken } from './token'
 import { loadTwitchSettings, saveTwitchSettings, type TwitchSettings } from './settings'
-import { importTwitch, inspectTwitch, type TwitchImportOptions } from './import'
+import { checkChannel, importTwitch, inspectTwitch, type TwitchImportOptions } from './import'
 import { cleanupLiveLeftovers, liveStatus, loadSaves, saveLive, startLive, stopLive } from './live'
 
 /** Transkription + Clip-Analyse für ein Twitch-Projekt (Inhaltstyp Stream/Gaming). */
@@ -46,14 +46,14 @@ export function registerTwitchIpc(): void {
   })
 
   ipcMain.handle('twitch:liveStart', async (_e, channel: string) => { const s = await startLive(channel); broadcast('twitch:live', s); return s })
-  // Stoppen sichert standardmäßig alles Aufgenommene als Projekt und analysiert es; `save=false` = verwerfen
-  ipcMain.handle('twitch:liveStop', async (_e, save = true) => { const s = await stopLive(save !== false); broadcast('twitch:live', s); if (s.saved) await analyze(s.saved.hash); return s })
+  // Stoppen sichert standardmäßig alles Aufgenommene als Projekt (ohne Analyse – die startet der Nutzer im Projekt); `save=false` = verwerfen
+  ipcMain.handle('twitch:liveStop', async (_e, save = true) => { const s = await stopLive(save !== false); broadcast('twitch:live', s); return s })
   ipcMain.handle('twitch:liveStatus', () => liveStatus())
+  ipcMain.handle('twitch:checkChannel', (_e, raw: string) => checkChannel(String(raw ?? '')))
   ipcMain.handle('twitch:liveSaves', () => loadSaves())
   ipcMain.handle('twitch:liveSave', async (_e, minutes: number) => {
-    const r = await saveLive(Math.max(1, Math.min(120, Math.round(minutes))))
-    await analyze(r.hash)
-    return r
+    // nur anlegen; Transkription/Engine wählt der Nutzer beim Öffnen des Projekts
+    return saveLive(Math.max(1, Math.min(120, Math.round(minutes))))
   })
 }
 

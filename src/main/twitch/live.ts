@@ -9,7 +9,8 @@ import { FFMPEG_PATH, runBinary } from '../pipeline/ffmpeg'
 import { importFile } from '../shortme/importer'
 import { loadMeta, saveMeta } from '../shortme/project'
 import { writeFileAtomic } from '../shortme/atomic'
-import type { LiveSave, LiveStatus, TwitchMeta } from '../../shared/twitch'
+import { channelName, type LiveSave, type LiveStatus, type TwitchMeta } from '../../shared/twitch'
+import { checkChannel } from './import'
 import { ensureTool } from './tools'
 import { readTwitchToken } from './token'
 import { loadTwitchSettings } from './settings'
@@ -95,8 +96,12 @@ async function launch(): Promise<void> {
 }
 
 export async function startLive(rawChannel: string): Promise<LiveStatus> {
-  const name = rawChannel.trim().toLowerCase().replace(/^https?:\/\/(www\.)?twitch\.tv\//, '').split(/[/?]/)[0]
-  if (!/^\w{2,25}$/.test(name)) throw new Error('Das ist kein gültiger Twitch-Kanal.')
+  const name = channelName(rawChannel)
+  if (!name) throw new Error('Das ist kein gültiger Twitch-Kanal.')
+  // nie „ins Leere“ aufnehmen: Kanal muss existieren und senden (ist die Prüfung selbst nicht möglich, z. B. Netz, wird es versucht)
+  const chk = await checkChannel(name)
+  if (chk.state === 'missing') throw new Error(`Den Twitch-Kanal „${name}“ gibt es nicht.`)
+  if (chk.state === 'offline') throw new Error(`„${chk.displayName ?? name}“ ist gerade nicht live.`)
   if (running) await stopLive()
   const settings = await loadTwitchSettings()
   bufferMinutes = settings.bufferMinutes

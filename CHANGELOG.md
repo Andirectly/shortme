@@ -6,6 +6,17 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.40.0] - 2026-11-18
+
+### Added
+
+- Live: Beim Eintippen prüft die App den Twitch-Kanal – gibt es ihn, ist er gerade live (mit Stream-Titel)? „Puffer starten“ geht nur bei einem Kanal, der sendet.
+
+### Changed
+
+- Live: Gesicherte Aufnahmen werden nur als Projekt angelegt, nicht sofort analysiert. Beim Öffnen des Projekts erscheint der Start-Dialog (Engine, Profil, Format) – „Clips finden“ startet Transkription und Analyse.
+- Projekte ohne Clips öffnen beim Anklicken den Start-Dialog (vorher passierte nichts).
+
 ## [0.39.0] - 2026-11-18
 
 ### Changed

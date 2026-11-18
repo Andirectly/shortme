@@ -27,7 +27,7 @@ import type { StylePreset } from '@shared/preset'
 import type { StyleDefaults } from '@shared/edits'
 import type { ContentType, FrameChoice, KindProfile } from '@shared/videoKind'
 import type { StreamLayout } from '@shared/streamLayout'
-import type { LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twitch'
+import type { ChannelCheck, LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twitch'
 import type { PlatformId, UploadOverview } from '@shared/upload'
 import type { WbOverview, WbProject, WbStatus, WorkItem } from '@shared/workbench'
 import type { LearnSettings } from '@shared/learn'
@@ -293,6 +293,7 @@ const api = {
       inspect: (url: string): Promise<TwitchInfo | null> => ipcRenderer.invoke('twitch:inspect', url),
       import: (url: string, opts: { section?: [number, number]; lastMinutes?: number; analyze?: boolean }): Promise<ShortmeImport> => ipcRenderer.invoke('twitch:import', url, opts),
       liveStart: (channel: string): Promise<LiveStatus> => ipcRenderer.invoke('twitch:liveStart', channel),
+      checkChannel: (channel: string): Promise<ChannelCheck> => ipcRenderer.invoke('twitch:checkChannel', channel),
       liveStop: (save = true): Promise<LiveStatus & { saved?: { hash: string; title: string; seconds: number } }> => ipcRenderer.invoke('twitch:liveStop', save),
       liveStatus: (): Promise<LiveStatus> => ipcRenderer.invoke('twitch:liveStatus'),
       liveSaves: (): Promise<LiveSave[]> => ipcRenderer.invoke('twitch:liveSaves'),
