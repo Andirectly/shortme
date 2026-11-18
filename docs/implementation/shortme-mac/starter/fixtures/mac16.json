@@ -1,0 +1,11 @@
+{
+  "apple_silicon": true,
+  "metal_supported": true,
+  "physical_memory_bytes": 17179869184,
+  "metal_recommended_working_set_bytes": 12884901888,
+  "metal_current_allocated_bytes": 0,
+  "low_power_mode": false,
+  "thermal_state": "nominal",
+  "memory_pressure": "normal",
+  "simulation_only": true
+}

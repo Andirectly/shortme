@@ -1,0 +1,17 @@
+{
+  "exampleOnly": true,
+  "modelId": null,
+  "repositoryUrl": null,
+  "revision": null,
+  "sha256": null,
+  "sourceCodeLicenseVerified": false,
+  "weightLicenseVerifiedForCommercialUse": false,
+  "downloadConsentReceived": false,
+  "backend": null,
+  "inputModalities": [],
+  "outputModalities": [],
+  "macOS16GiBMeasured": false,
+  "peakMemoryBytes": null,
+  "actualRuntimeSmokeLogPath": null,
+  "distributionApproval": "blocked_pending_review"
+}

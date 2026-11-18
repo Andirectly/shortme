@@ -1,0 +1,18 @@
+{
+  "exampleOnly": true,
+  "appBuildGitSha": null,
+  "device": {"arm64": null, "ramBytes": null, "metalGpu": null, "macOSVersion": null},
+  "originalMediaHash": null,
+  "realRunId": null,
+  "sourceDurationPts": null,
+  "tenDecileCoveragePath": null,
+  "speechAudioVisualCrossModalAllTested": false,
+  "qwen3VlEmbedding2BActualFrameRetrievalProof": null,
+  "modelPeakMemoryMeasurementsPath": null,
+  "memoryPressureResumeLogPath": null,
+  "renderedMp4Paths": [],
+  "renderedOutputAvJudgePaths": [],
+  "manualEditingPreserved": null,
+  "offlineMediaAnalysisProven": false,
+  "qualityReviewedByHumans": false
+}

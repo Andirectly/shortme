@@ -83,7 +83,7 @@ interface ProjectState {
   discard: () => Promise<void>
 }
 
-export interface ProjectCard { hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null; /** Link (Web-Import) oder Dateipfad. */ source: string; isUrl: boolean }
+export interface ProjectCard { hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null; /** Link (Web-Import) oder Dateipfad. */ source: string; isUrl: boolean; status?: 'none' | 'running' | 'done' }
 
 let unsub: Array<() => void> = []
 let lastRefresh = 0
@@ -227,6 +227,8 @@ export const useProject = create<ProjectState>((set, get) => ({
         set((s) => (s.job && s.job.id !== j.id && s.job.state === 'running' ? s : { job: j }))
         if (['done', 'error', 'stopped'].includes(j.state) || get().engine.hash !== j.hash || (j.state === 'queued' && get().job?.id !== j.id)) void get().loadEngine(j.hash)
         if (j.state === 'done') void get().loadResults(j.hash)
+        // Projektkarten: „Wird analysiert …“ / Clipzahl aktualisieren, wenn eine Analyse startet oder endet (nicht bei jedem Fortschritt)
+        if (!j.title.startsWith('Export') && j.state !== 'running') void get().loadProjects()
         // Clips erscheinen, sobald sie fertig sind: Übersicht öffnet sich beim ersten fertigen Clip
         else if (j.stage === 'layout' && j.state === 'running') {
           const now = Date.now()

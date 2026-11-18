@@ -186,11 +186,11 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   // Engine und Lauf stehen ab hier fest. Legacy schreibt wie bisher nach clips.json, die neue Engine in ihren eigenen Lauf-Ordner.
   const engine: SelectionEngineId = opts.engine ?? 'legacy'
   const v3Profile: V3Profile = isV3Profile(opts.profile) ? opts.profile : 'balanced'
-  const runId = engine === 'legacy' ? LEGACY_RUN_ID : newRunId(Math.random, Date.now, engine === 'engine4' ? 'v4' : engine === 'adaptive-v3' ? 'v3' : 'v2')
+  const runId = engine === 'legacy' ? LEGACY_RUN_ID : newRunId(Math.random, Date.now, engine === 'engine-mac' ? 'vm' : engine === 'engine4' ? 'v4' : engine === 'adaptive-v3' ? 'v3' : 'v2')
   const clipsPath = clipsPathFor(meta.hash, runId)
   if (engine !== 'legacy') {
     const run: RunInfo = {
-      runId, engineId: engine, engineVersion: engine === 'engine4' ? V4_ENGINE_VERSION : engine === 'adaptive-v3' ? V3_ENGINE_VERSION : V2_ENGINE_VERSION, schema: 1, createdAt: new Date().toISOString(), status: 'running',
+      runId, engineId: engine, engineVersion: engine === 'engine4' || engine === 'engine-mac' ? V4_ENGINE_VERSION : engine === 'adaptive-v3' ? V3_ENGINE_VERSION : V2_ENGINE_VERSION, schema: 1, createdAt: new Date().toISOString(), status: 'running',
       fingerprint: analysisFingerprint({ hash: meta.hash, engine, transcriptVersion: t.version, wordCount: t.words.length, asrModel: t.model, query: opts.query, contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, revisions: engineRevisions(engine, v3Profile) }),
       options: { query: opts.query ?? '', contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, minSec: 15, maxSec: 75, ...(hasProfiles(engine) ? { profile: v3Profile } : {}) }, models: {}, modalities: {}
     }

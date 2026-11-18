@@ -4,7 +4,6 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AvSession } from '../v3/avWorker'
-import { V3_AV_MODEL } from '../v3/revisions'
 import { buildGraph, validateInvestigator, type EventGraph, type GraphNode, type InvAnswer, type InvestigatorOp, type Seed, type SeedGroup, type Span, parseModelJson } from './core'
 import { cutAv } from './media'
 import type { Tracer } from './trace'
@@ -92,11 +91,11 @@ export async function investigateGroup(s: AvSession, g: SeedGroup, o: {
       }
     } catch (e) { if (o.signal?.aborted) throw e; err = String(e instanceof Error ? e.message : e).slice(0, 200) } finally { await rm(file, { force: true }).catch(() => undefined) }
     calls++
-    const call = await o.tracer.record({ role: 'av_verification', modelRevision: `${V3_AV_MODEL.id}@${V3_AV_MODEL.revision}`, promptRevision: V4_PROMPT_REVISION.investigator, realInputModalities: o.hasAudio ? ['video', 'audio'] : ['video'], actualMediaWindowIds: [w.id], windowId: w.id, success: !!ans, validatedOutput: !!ans, wallClockMs: Date.now() - t1, status: ans ? `next=${ans.next.op}` : `ungültig: ${err}`, input: { window: w, focus, seedIds: g.seeds.map((x) => x.id) }, rawOutput: raw, output: ans, ...(err && !ans ? { error: err } : {}) })
+    const call = await o.tracer.record({ role: 'av_verification', modelRevision: `${s.modelId}@${s.revision}`, promptRevision: V4_PROMPT_REVISION.investigator, realInputModalities: o.hasAudio ? ['video', 'audio'] : ['video'], actualMediaWindowIds: [w.id], windowId: w.id, success: !!ans, validatedOutput: !!ans, wallClockMs: Date.now() - t1, status: ans ? `next=${ans.next.op}` : `ungültig: ${err}`, input: { window: w, focus, seedIds: g.seeds.map((x) => x.id) }, rawOutput: raw, output: ans, ...(err && !ans ? { error: err } : {}) })
     await o.tracer.log('investigation.jsonl', { groupId: g.id, step: calls, window: w, focus, op: ans?.next.op ?? 'stop', reason: ans?.next.reason ?? err, confidence: ans?.confidence ?? 'unavailable', modelRevision: call.modelRevision, tracePath: call.tracePath, budgetLeft: o.profile.investigatorCalls - calls, wallClockMs: call.wallClockMs })
     wins.push(w); seen.push(w.span)
     if (!ans) { stopReason = `Modellantwort ungültig: ${err}`; break }
-    evidence.push({ id: evId, modality: o.hasAudio ? 'audio' : 'visual', state: 'observed', source: V3_AV_MODEL.id, start: w.span.start, end: w.span.end, observation: ans.observations.map((x) => `${x.role}: ${x.description}`).join(' | ').slice(0, 600), modelRev: V3_AV_MODEL.revision, ...(ans.confidence === 'low' ? { uncertainty: 'Modell unsicher' } : {}) })
+    evidence.push({ id: evId, modality: o.hasAudio ? 'audio' : 'visual', state: 'observed', source: s.modelId, start: w.span.start, end: w.span.end, observation: ans.observations.map((x) => `${x.role}: ${x.description}`).join(' | ').slice(0, 600), modelRev: s.revision, ...(ans.confidence === 'low' ? { uncertainty: 'Modell unsicher' } : {}) })
     contradiction = contradiction || ans.contradiction
     ans.observations.forEach((ob, k) => {
       const segs = w.segments.filter((x) => ob.segmentIds.includes(x.id))

@@ -331,7 +331,9 @@ export async function fetchUrlMeta(
   }
 }
 
-const DOWNLOAD_FORMAT = 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b'
+// H.264 (avc1) zuerst: AV1 im mp4 dekodiert ohne Hardware (M1/M2, ältere GPUs) nur per Software – gemessen: Keyframe-Scan > 10 min statt ~1 min,
+// TransNetV2 17 min. Fallback auf jedes mp4, dann beliebig.
+const DOWNLOAD_FORMAT = 'bv*[height<=1080][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b'
 
 export async function downloadUrlVideo(
   binPath: string,

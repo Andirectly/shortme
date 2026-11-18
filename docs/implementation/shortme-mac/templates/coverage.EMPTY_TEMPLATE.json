@@ -1,0 +1,15 @@
+{
+  "exampleOnly": true,
+  "runId": null,
+  "sourceSha256": null,
+  "modelRevision": null,
+  "timebase": null,
+  "deciles": [],
+  "lanes": {
+    "speech": "not_measured",
+    "audio": "not_measured",
+    "visual": "not_measured",
+    "cross-modal": "not_measured"
+  },
+  "semantics": "never mark inspected without true media-derived evidence and its source span"
+}

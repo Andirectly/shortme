@@ -10,7 +10,6 @@ import { exportClip, planExport } from '../../../render/exporter'
 import { layoutForClip } from '../../../layout/run'
 import { seamQuiet } from '../v2/observe'
 import type { AvSession } from '../v3/avWorker'
-import { V3_AV_MODEL } from '../v3/revisions'
 import { chooseRepair, firstRepairable, validateFinal, type Criterion, type CutCandidate, type CutEdge, type FinalJudgement, parseModelJson } from './core'
 import { avParts, cutAvMulti, probeOutput, silencesIn } from './media'
 import type { Tracer } from './trace'
@@ -51,7 +50,7 @@ export function finalPrompt(d: number, segs: string[], summary: string, parts: A
     'hook = die ersten Sekunden machen klar, warum man weiterschauen soll; standalone = verständlich ohne Vorwissen (wer, was, Bezüge); payoff = die Pointe/Reaktion/das Ergebnis ist enthalten;',
     'natural-end = endet natürlich (kein abgeschnittenes Wort, Takt oder Satz); essential-event = das eigentliche Ereignis ist zu sehen/hören.',
     'Zustand je Kriterium: pass, fail oder unknown. Nenne für pass/fail höchstens 3 Belegstellen (nicht alle). Begründung höchstens 12 Wörter. Erfinde nichts.',
-    'Antworte NUR als JSON: {"criteria":[{"id":"hook","state":"...","reason":"kurz","evidenceIds":["O1"]},{"id":"standalone",...},{"id":"payoff",...},{"id":"natural-end",...},{"id":"essential-event",...}],"title":"kurzer deutscher Titel"}'
+    'Antworte NUR als JSON: {"criteria":[{"id":"hook","state":"...","reason":"kurz","evidenceIds":["O1"]},{"id":"standalone",...},{"id":"payoff",...},{"id":"natural-end",...},{"id":"essential-event",...}],"title":"<3–7 Wörter: worum geht es in DIESEM Clip>"}'
   ].join('\n')
 }
 
@@ -113,13 +112,15 @@ export async function judgeRendered(s: AvSession, r: Rendered, o: { variantId: s
         return { id: String(c.id), state: st === 'pass' && !ids.length ? 'unknown' : st, reason: typeof c.reason === 'string' && c.reason.trim() ? c.reason.slice(0, 300) : 'ohne Begründung', evidenceIds: ids }
       })
       title = typeof j.title === 'string' ? j.title.replace(/\s+/g, ' ').trim().slice(0, 80) : undefined
+      // abgeschriebener Platzhalter aus dem Prompt ist kein Titel (gemessen: Gemma 4 E4B übernahm „kurzer deutscher Titel“ in 3 von 8 Clips)
+      if (title && /^<|kurzer deutscher titel|^3–7 wörter/i.test(title)) title = undefined
     } catch (e) { if (o.signal?.aborted) throw e; err = String(e instanceof Error ? e.message : e).slice(0, 160) }
   }
   let judgement: FinalJudgement | null = null
   if (modelCrit.length) {
     try { judgement = validateFinal({ criteria: [...modelCrit, ...m.criteria] }, { variantId: o.variantId, outputSha256: r.sha256, hasAudio: r.streams.includes('audio'), hasCaptions: r.captionWords > 0, known }) } catch (e) { err = String(e instanceof Error ? e.message : e) }
   }
-  const call = await o.tracer.record({ role: 'rendered_output_judge', modelRevision: `${V3_AV_MODEL.id}@${V3_AV_MODEL.revision}`, promptRevision: V4_PROMPT_REVISION.finalJudge, realInputModalities: r.streams.includes('audio') ? ['video', 'audio'] : ['video'], actualMediaWindowIds: [o.variantId], windowId: `${o.variantId}#r${o.round}`, inputArtifactSha256: r.sha256, success: !!judgement, validatedOutput: !!judgement, wallClockMs: Date.now() - t1, status: judgement ? judgement.decision : `ungültig: ${err}`, input: { output: r.path, sha256: r.sha256, durationSeconds: r.durationSeconds, streams: r.streams, modelInput: input, modelInputParts: parts, measured: m.evidence }, rawOutput: raw, output: judgement, ...(judgement ? {} : { error: err }) })
+  const call = await o.tracer.record({ role: 'rendered_output_judge', modelRevision: `${s.modelId}@${s.revision}`, promptRevision: V4_PROMPT_REVISION.finalJudge, realInputModalities: r.streams.includes('audio') ? ['video', 'audio'] : ['video'], actualMediaWindowIds: [o.variantId], windowId: `${o.variantId}#r${o.round}`, inputArtifactSha256: r.sha256, success: !!judgement, validatedOutput: !!judgement, wallClockMs: Date.now() - t1, status: judgement ? judgement.decision : `ungültig: ${err}`, input: { output: r.path, sha256: r.sha256, durationSeconds: r.durationSeconds, streams: r.streams, modelInput: input, modelInputParts: parts, measured: m.evidence }, rawOutput: raw, output: judgement, ...(judgement ? {} : { error: err }) })
   const { clip: _c, ...rest } = r
   void _c
   return { round: o.round, variantId: o.variantId, rendered: rest, judgement, modelCriteria: modelCrit, title, ...(judgement ? {} : { error: err }), tracePath: call.tracePath }

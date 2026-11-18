@@ -3,7 +3,6 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AvSession } from '../v3/avWorker'
-import { V3_AV_MODEL } from '../v3/revisions'
 import { enumerateEdges, latticeCandidates, validateCutJudge, type CutCandidate, type CutEdge, type CutJudgeAnswer, type EdgeInput, type EventGraph, type Span, parseModelJson } from './core'
 import { avParts, cutAvMulti } from './media'
 import type { Tracer } from './trace'
@@ -84,7 +83,7 @@ export async function judgeCuts(s: AvSession, g: EventGraph, required: Span, edg
         try { ans = validateCutJudge(firstJson(raw), starts.map((e) => e.id), ends.map((e) => e.id), known) } catch (e) { err = String(e instanceof Error ? e.message : e).slice(0, 140) }
       }
     } catch (e) { if (o.signal?.aborted) throw e; err = String(e instanceof Error ? e.message : e).slice(0, 200) } finally { await rm(file, { force: true }).catch(() => undefined) }
-    const call = await o.tracer.record({ role: 'local_cut_judge', modelRevision: `${V3_AV_MODEL.id}@${V3_AV_MODEL.revision}`, promptRevision: V4_PROMPT_REVISION.cutJudge, realInputModalities: o.hasAudio ? ['video', 'audio'] : ['video'], actualMediaWindowIds: [`${g.id}:${c.id}`], windowId: `${g.id}:${c.id}`, success: !!ans, validatedOutput: !!ans, wallClockMs: Date.now() - t1, status: ans ? `${ans.startEdgeId}→${ans.endEdgeId} preferred=${ans.preferred}` : `ungültig: ${err}`, input: { preview, parts, startEdges: starts.map((e) => e.id), endEdges: ends.map((e) => e.id), candidate: c }, rawOutput: raw, output: ans, ...(ans ? {} : { error: err }) })
+    const call = await o.tracer.record({ role: 'local_cut_judge', modelRevision: `${s.modelId}@${s.revision}`, promptRevision: V4_PROMPT_REVISION.cutJudge, realInputModalities: o.hasAudio ? ['video', 'audio'] : ['video'], actualMediaWindowIds: [`${g.id}:${c.id}`], windowId: `${g.id}:${c.id}`, success: !!ans, validatedOutput: !!ans, wallClockMs: Date.now() - t1, status: ans ? `${ans.startEdgeId}→${ans.endEdgeId} preferred=${ans.preferred}` : `ungültig: ${err}`, input: { preview, parts, startEdges: starts.map((e) => e.id), endEdges: ends.map((e) => e.id), candidate: c }, rawOutput: raw, output: ans, ...(ans ? {} : { error: err }) })
     const chosen = ans ? { id: `${ans.startEdgeId}__${ans.endEdgeId}`, startEdgeId: ans.startEdgeId, endEdgeId: ans.endEdgeId, span: { start: byId.get(ans.startEdgeId)!.t, end: byId.get(ans.endEdgeId)!.t }, prefilter: c.prefilter } : null
     // gewählte Kombination muss die Längengrenzen und den Pflichtbereich einhalten, sonst gilt der ursprüngliche Kandidat
     const valid = chosen && chosen.span.end - chosen.span.start >= o.minSec && chosen.span.end - chosen.span.start <= o.maxSec && chosen.span.end > chosen.span.start ? chosen : null

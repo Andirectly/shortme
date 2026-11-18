@@ -29,6 +29,8 @@ export interface Clip {
   notes?: string[]
   /** Engine 4: Lauf-ID für die Herkunftsansicht. */
   v4RunId?: string
+  /** Engine mit der Engine-4-Pipeline, die den Clip gefunden hat (Engine 4 oder Engine Mac). */
+  v4Label?: string
   /** Layout-Analyse läuft noch (ausgegraut, nicht anklickbar). */
   pending?: boolean
 }

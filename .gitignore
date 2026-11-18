@@ -22,3 +22,6 @@ spikes/subs/bundle.js
 
 /resources/remotion-bundle/
 __pycache__/
+
+# Swift-Build-Ausgabe der Mac-Engine
+native/mac-worker/.build/

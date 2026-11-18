@@ -100,7 +100,7 @@ const recheckFile = (hash: string, id: string): string => file(hash, id).replace
 export async function listRechecks(hash: string, id: string): Promise<ClipRecheck[]> {
   try { return JSON.parse(await readFile(recheckFile(hash, id), 'utf8')) as ClipRecheck[] } catch { return [] }
 }
-export async function addRecheck(hash: string, id: string, clipId: string, byEngine: 'multimodal-v2' | 'legacy' | 'engine4'): Promise<ClipRecheck[]> {
+export async function addRecheck(hash: string, id: string, clipId: string, byEngine: 'multimodal-v2' | 'legacy' | 'engine4' | 'engine-mac'): Promise<ClipRecheck[]> {
   const c = await getComparison(hash, id)
   if (!c) throw new Error('Vergleich nicht gefunden')
   const found = await findClip(hash, clipId)

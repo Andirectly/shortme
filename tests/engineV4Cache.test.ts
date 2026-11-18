@@ -44,6 +44,6 @@ describe('V4 Stufen-Caches werden bei Änderungen ungültig (V4-043)', () => {
   it('Engine-4-Fingerabdruck des Laufs enthält Prompt-, Anfragen- und Kantenrevision', async () => {
     const { v4Revisions } = await import('../src/main/shortme/clips/engines/v4/revisions')
     const r = v4Revisions('balanced').join(' ')
-    for (const k of ['v4-inv-3', 'v4-cut-2', 'v4-final-2', 'v4-queries-1', 'v4-edges-1', 'profile:balanced']) expect(r).toContain(k)
+    for (const k of ['v4-inv-3', 'v4-cut-2', 'v4-final-3', 'v4-queries-1', 'v4-edges-1', 'profile:balanced']) expect(r).toContain(k)
   })
 })

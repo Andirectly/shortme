@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "source_of_truth": "Screenshots and frontend source from the actual Windows ShortMe repository (NOT in this ZIP).",
+  "reference_device": "Windows app at pinned git SHA / build, with stable fixture media/project data",
+  "viewports": [
+    {
+      "logical_width": 1440,
+      "logical_height": 900
+    },
+    {
+      "logical_width": 1280,
+      "logical_height": 800
+    }
+  ],
+  "theme": "use existing app-supported themes only",
+  "scenarios": [
+    {
+      "id": "onboarding-first-run",
+      "required_state": "new install, no model, permissions or first-run guidance"
+    },
+    {
+      "id": "project-home",
+      "required_state": "recent projects + existing navigation"
+    },
+    {
+      "id": "import",
+      "required_state": "drag/drop and file-picker state"
+    },
+    {
+      "id": "project-settings",
+      "required_state": "engine chooser, mode settings, resolution and analysis preferences"
+    },
+    {
+      "id": "hardware-auto",
+      "required_state": "16 GiB Mac auto policy shown within existing UI components; if Windows has no equivalent, separately review placement"
+    },
+    {
+      "id": "analysis-progress",
+      "required_state": "video processing, current step, progress, cancellation"
+    },
+    {
+      "id": "candidate-list",
+      "required_state": "highlights found, scores/evidence, source timestamps"
+    },
+    {
+      "id": "candidate-preview",
+      "required_state": "source playback with selected highlight"
+    },
+    {
+      "id": "timeline-editor",
+      "required_state": "trim, waveforms, playhead, tracks, caption controls, full sidebar"
+    },
+    {
+      "id": "caption-settings",
+      "required_state": "font, active word styling and position safe zones"
+    },
+    {
+      "id": "visual-reframe",
+      "required_state": "9:16 crop and tracking settings"
+    },
+    {
+      "id": "export-settings",
+      "required_state": "file name, format/quality and queue controls"
+    },
+    {
+      "id": "export-progress",
+      "required_state": "actual job in progress"
+    },
+    {
+      "id": "export-results",
+      "required_state": "completed clips, preview and open in folder"
+    },
+    {
+      "id": "recheck-reanalyse",
+      "required_state": "recheck clips vs rescan original; compare engines"
+    },
+    {
+      "id": "settings",
+      "required_state": "app settings, model management/performance; add only as minimally needed"
+    },
+    {
+      "id": "error-insufficient-memory",
+      "required_state": "honest pressure fallback/resume without losing work"
+    },
+    {
+      "id": "error-missing-file",
+      "required_state": "video file moved/offline; recovery dialog"
+    }
+  ],
+  "instructions": "Adapt scenario names to real routes after source audit; do NOT invent screens or redesign app. Capture actual states with matching data and compare per screen."
+}

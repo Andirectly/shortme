@@ -170,7 +170,8 @@ class Qwen3VLEmbedder():
         default_instruction: str = "Represent the user's input.",
         **kwargs
     ):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Shortme: Apple-GPU (MPS) auf dem Mac
+        device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
 
         self.max_length = max_length
         self.min_pixels = min_pixels

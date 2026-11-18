@@ -1,0 +1,10 @@
+# Shortme AI-Worker auf dem Mac (Bildsuche Qwen3-VL-Embedding auf der Apple-GPU/MPS). Gelockt: requirements-mac.lock.txt
+# MACOSX_DEPLOYMENT_TARGET=14.0 uv pip compile requirements-mac.in --generate-hashes --python-version 3.12 --python-platform aarch64-apple-darwin
+torch==2.8.*
+torchvision==0.23.*
+transformers>=4.57.3,<5
+accelerate>=1.12.0
+qwen-vl-utils>=0.0.14
+pillow
+numpy<3
+safetensors

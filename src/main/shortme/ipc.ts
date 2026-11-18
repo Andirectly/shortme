@@ -295,13 +295,13 @@ ${meta.sourcePath}` }
     return { deleted: todo.length, skipped: busy.length }
   })
   ipcMain.handle('shortme:projects', async () => {
-    const out: Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null; source: string; isUrl: boolean }> = []
+    const out: Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null; source: string; isUrl: boolean; /** none = noch nie analysiert, running = Analyse läuft, done = Clipliste vorhanden */ status: 'none' | 'running' | 'done' }> = []
     for (const d of await readdir(projectsRoot()).catch(() => [] as string[])) {
       const meta = await loadMeta(d)
       if (!meta) continue
       allowMediaPath(meta.sourcePath)
       const clips = await loadClips(d)
-      out.push({ hash: meta.hash, title: meta.title, durationSec: meta.durationSec, clips: clips?.clips.length ?? 0, created: meta.created, poster: await dataUrl(projectFile(meta.hash, 'poster.jpg')), source: meta.sourceUrl ?? meta.sourcePath, isUrl: !!meta.sourceUrl })
+      out.push({ hash: meta.hash, title: meta.title, durationSec: meta.durationSec, clips: clips?.clips.length ?? 0, created: meta.created, poster: await dataUrl(projectFile(meta.hash, 'poster.jpg')), source: meta.sourceUrl ?? meta.sourcePath, isUrl: !!meta.sourceUrl, status: hasActiveJob(jobs, meta.hash) ? 'running' : clips ? 'done' : 'none' })
     }
     return out.sort((a, b) => b.created.localeCompare(a.created))
   })

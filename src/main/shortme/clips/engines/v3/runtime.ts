@@ -18,8 +18,10 @@ const UV_URL = `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/
 const TORCH_INDEX = 'https://download.pytorch.org/whl/cu128'
 
 export const runtimeRoot = (): string => join(dataRoot(), 'runtime')
-export const venvDir = (): string => join(runtimeRoot(), 'py312-v3')
-export const pythonExe = (): string => join(venvDir(), 'Scripts', 'python.exe')
+// Mac: eigene Umgebungen (PyTorch mit Apple-GPU statt CUDA; AV über MLX statt MiniCPM-o), eigene gelockte Listen
+export const venvDir = (): string => join(runtimeRoot(), WIN ? 'py312-v3' : 'py312-mac')
+const venvPython = (dir: string): string => (WIN ? join(dir, 'Scripts', 'python.exe') : join(dir, 'bin', 'python'))
+export const pythonExe = (): string => venvPython(venvDir())
 export const uvExe = (): string => join(runtimeRoot(), 'uv', WIN ? 'uv.exe' : 'uv')
 const markerFile = (): string => join(venvDir(), 'shortme-runtime.json')
 
@@ -29,7 +31,9 @@ export function pythonResourceDir(): string {
   return join(process.cwd(), 'resources', 'python')
 }
 export const workerScript = (): string => join(pythonResourceDir(), 'worker.py')
-const lockFile = (): string => join(pythonResourceDir(), 'requirements.lock.txt')
+const lockFile = (): string => join(pythonResourceDir(), WIN ? 'requirements.lock.txt' : 'requirements-mac.lock.txt')
+/** CUDA-Wheels nur unter Windows; auf dem Mac kommt torch (mit MPS) aus PyPI. */
+const torchIndex = (): string[] => (WIN ? ['--extra-index-url', TORCH_INDEX, '--index-strategy', 'unsafe-best-match'] : [])
 
 const sha256 = (b: Buffer): string => createHash('sha256').update(b).digest('hex')
 
@@ -82,7 +86,7 @@ export async function installRuntime(onLine: (l: string) => void, signal?: Abort
   onLine('Python 3.12 und Umgebung anlegen …')
   await run(uvExe(), ['venv', venvDir(), '--python', '3.12', '--allow-existing'], onLine, signal)
   onLine('Pakete installieren (mehrere GB, Hashes werden geprüft) …')
-  await run(uvExe(), ['pip', 'install', '--python', pythonExe(), '--require-hashes', '--extra-index-url', TORCH_INDEX, '--index-strategy', 'unsafe-best-match', '-r', lockFile()], onLine, signal)
+  await run(uvExe(), ['pip', 'install', '--python', pythonExe(), '--require-hashes', ...torchIndex(), '-r', lockFile()], onLine, signal)
   const torch = await new Promise<string>((resolve) => {
     let out = ''
     const p = spawn(pythonExe(), ['-c', 'import torch;print(torch.__version__)'], { windowsHide: true })
@@ -97,17 +101,17 @@ export async function installRuntime(onLine: (l: string) => void, signal?: Abort
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 // Zweite Umgebung (AV): MiniCPM-o braucht transformers==4.51.0, das Embedding-Modell ≥ 4.57 → getrennte Umgebung statt Versionskonflikt.
 // Die Liste ist fest gepinnt, aber ohne Hashes (Lighthouse und CLIP kommen als Git-Commit, siehe Kopf der Datei).
-export const avVenvDir = (): string => join(runtimeRoot(), 'py312-v3av')
-export const avPythonExe = (): string => join(avVenvDir(), 'Scripts', 'python.exe')
-const avLockFile = (): string => join(pythonResourceDir(), 'requirements-av.lock.txt')
+export const avVenvDir = (): string => join(runtimeRoot(), WIN ? 'py312-v3av' : 'py312-macav')
+export const avPythonExe = (): string => venvPython(avVenvDir())
+const avLockFile = (): string => join(pythonResourceDir(), WIN ? 'requirements-av.lock.txt' : 'requirements-mac-av.lock.txt')
 const avMarker = (): string => join(avVenvDir(), 'shortme-runtime.json')
 
 export async function avRuntimeStatus(): Promise<RuntimeStatus> {
-  if (!existsSync(avPythonExe())) return { state: 'missing', detail: 'AV-Laufzeit (MiniCPM-o, Lighthouse) nicht installiert' }
+  if (!existsSync(avPythonExe())) return { state: 'missing', detail: WIN ? 'AV-Laufzeit (MiniCPM-o, Lighthouse) nicht installiert' : 'AV-Laufzeit (Gemma 4 über MLX) nicht installiert' }
   try {
     const m = JSON.parse(await readFile(avMarker(), 'utf8')) as { lockSha256?: string; torch?: string }
     if (m.lockSha256 !== sha256(await readFile(avLockFile()))) return { state: 'outdated', detail: 'AV-Laufzeit passt nicht zur Paketliste (Reparatur nötig)', python: avPythonExe() }
-    return { state: 'ready', detail: `AV-Laufzeit bereit (torch ${m.torch ?? '?'})`, python: avPythonExe() }
+    return { state: 'ready', detail: `AV-Laufzeit bereit (${WIN ? 'torch' : 'mlx'} ${m.torch ?? '?'})`, python: avPythonExe() }
   } catch { return { state: 'missing', detail: 'AV-Laufzeit unvollständig (kein Marker) – Reparatur nötig' } }
 }
 
@@ -117,10 +121,11 @@ export async function installAvRuntime(onLine: (l: string) => void, signal?: Abo
   onLine('AV-Umgebung (Python 3.12) anlegen …')
   await run(uvExe(), ['venv', avVenvDir(), '--python', '3.12', '--allow-existing'], onLine, signal)
   onLine('AV-Pakete installieren (mehrere GB) …')
-  await run(uvExe(), ['pip', 'install', '--python', avPythonExe(), '--extra-index-url', TORCH_INDEX, '--index-strategy', 'unsafe-best-match', '-r', avLockFile()], onLine, signal)
+  // Windows: Lighthouse/CLIP kommen als Git-Commit (ohne Hashes); Mac: alles aus PyPI mit Hashes
+  await run(uvExe(), ['pip', 'install', '--python', avPythonExe(), ...(WIN ? [] : ['--require-hashes']), ...torchIndex(), '-r', avLockFile()], onLine, signal)
   const torch = await new Promise<string>((resolve) => {
     let out = ''
-    const p = spawn(avPythonExe(), ['-c', 'import torch;print(torch.__version__)'], { windowsHide: true })
+    const p = spawn(avPythonExe(), ['-c', WIN ? 'import torch;print(torch.__version__)' : 'import mlx.core as m;print(m.__version__)'], { windowsHide: true })
     p.stdout.on('data', (d: Buffer) => { out += d.toString() })
     p.on('close', () => resolve(out.trim()))
     p.on('error', () => resolve(''))

@@ -1,12 +1,13 @@
 // Engine 4: Versionen (gehen in Fingerabdruck und Run-Manifest ein) und Profilbudgets. Budgets sind Startwerte, nicht als optimal behauptet.
 import type { V3Profile } from '../../../../../shared/engine'
-import { V3_AV_MODEL, V3_EMBED_MODEL, V3_PROFILE_CONFIG, type V3ProfileConfig } from '../v3/revisions'
+import { MAC_AV_MODEL, V3_AV_MODEL, V3_EMBED_MODEL, V3_PROFILE_CONFIG, type V3ProfileConfig } from '../v3/revisions'
+import { SOUND_REVISION } from '../mac/sound'
 import { V2_MODELS, V2_PROMPT_REVISION } from '../v2/revisions'
 
 export const V4_PIPELINE_VERSION = '4.0'
 export const V4_ALGORITHM_REVISION = 'v4-algo-3'
 export const V4_QUERYBANK_REVISION = 'v4-queries-1'
-export const V4_PROMPT_REVISION = { investigator: 'v4-inv-3', cutJudge: 'v4-cut-2', finalJudge: 'v4-final-2' } as const
+export const V4_PROMPT_REVISION = { investigator: 'v4-inv-3', cutJudge: 'v4-cut-2', finalJudge: 'v4-final-3' } as const
 export const V4_EDGE_REVISION = 'v4-edges-1'
 
 export interface V4Profile {
@@ -45,4 +46,18 @@ export const V4_MODELS = {
 export const v4Revisions = (profile: V3Profile): string[] => [
   `pipeline:${V4_PIPELINE_VERSION}`, V4_ALGORITHM_REVISION, V4_QUERYBANK_REVISION, V4_EDGE_REVISION, ...Object.values(V4_PROMPT_REVISION), `profile:${profile}`,
   `embed:${V3_EMBED_MODEL.id}@${V3_EMBED_MODEL.revision.slice(0, 8)}`, `av:${V3_AV_MODEL.id}@${V3_AV_MODEL.revision.slice(0, 8)}`, `speech:${V2_PROMPT_REVISION}`, V2_MODELS.audioEvents
+]
+
+/** Mac-Engine: gleiche Pipeline, Mac-Bausteine (Apple SoundAnalysis statt YAMNet, Gemma 4 über MLX statt MiniCPM-o, Bildsuche auf der Apple-GPU). */
+export const MAC_MODELS = {
+  ...V4_MODELS,
+  audioEvents: `apple-soundanalysis ${SOUND_REVISION}`,
+  embedding: `${V3_EMBED_MODEL.id}@${V3_EMBED_MODEL.revision} (PyTorch MPS)`,
+  av: `${MAC_AV_MODEL.id}@${MAC_AV_MODEL.revision} (${MAC_AV_MODEL.runtime})`,
+  speechLane: `qwen3-8b/14b llama-server Metal (Textsuche ${V2_PROMPT_REVISION})`
+} as const
+
+export const macRevisions = (profile: V3Profile): string[] => [
+  `pipeline:${V4_PIPELINE_VERSION}-mac`, V4_ALGORITHM_REVISION, V4_QUERYBANK_REVISION, V4_EDGE_REVISION, ...Object.values(V4_PROMPT_REVISION), `profile:${profile}`,
+  `embed:${V3_EMBED_MODEL.id}@${V3_EMBED_MODEL.revision.slice(0, 8)}/mps`, `av:${MAC_AV_MODEL.id}@${MAC_AV_MODEL.revision.slice(0, 8)}`, `speech:${V2_PROMPT_REVISION}`, SOUND_REVISION
 ]

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
-import { Check, CheckCircle2, Circle, Clock, Film, Link2, RefreshCw, Trash2 } from 'lucide-react'
+import { Check, CheckCircle2, Circle, Clock, Film, Link2, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from './ui'
 import { PROJECTS } from './data'
 import { useProject } from './projectStore'
@@ -41,8 +41,8 @@ export function ProjectGrid({ limit, selectable, title }: { limit?: number; /** 
   useEffect(() => { void loadProjects() }, [loadProjects, hasApi])
 
   const cards = hasApi
-    ? projects.map((p) => ({ hash: p.hash, key: p.hash, source: p.source, isUrl: p.isUrl, title: p.title, dur: fmt(p.durationSec), clips: p.clips, date: ago(p.created), img: p.poster, open: async () => { const to = await openProject(p.hash); if (to) go(to) } }))
-    : PROJECTS.map((p) => ({ hash: '', key: p.id, source: '', isUrl: false, title: p.name, dur: p.duration, clips: p.clips, date: p.date, img: p.thumb, open: async () => go('clips') }))
+    ? projects.map((p) => ({ hash: p.hash, key: p.hash, source: p.source, isUrl: p.isUrl, title: p.title, dur: fmt(p.durationSec), clips: p.clips, status: p.status, date: ago(p.created), img: p.poster, open: async () => { const to = await openProject(p.hash); if (to) go(to) } }))
+    : PROJECTS.map((p) => ({ hash: '', key: p.id, source: '', isUrl: false, title: p.name, dur: p.duration, clips: p.clips, status: 'done' as const, date: p.date, img: p.thumb, open: async () => go('clips') }))
   const shown = limit ? cards.slice(0, limit) : cards
 
   const heading = title ? <h1>{title}</h1> : null
@@ -81,12 +81,14 @@ export function ProjectGrid({ limit, selectable, title }: { limit?: number; /** 
       {shown.map((p) => (
         <motion.button key={p.key} className="sm-card" onContextMenu={(e) => { if (!p.hash) return; e.preventDefault(); setCopied(false); setMenu({ x: e.clientX, y: e.clientY, hash: p.hash, source: p.source, isUrl: p.isUrl, title: p.title }) }} whileTap={{ scale: 0.97 }} transition={base} onClick={() => (picking && p.hash ? toggle(p.hash) : void p.open())} aria-pressed={picking ? picked.has(p.hash) : undefined} style={{ padding: 0, overflow: 'hidden', textAlign: 'left', position: 'relative', outline: picking && picked.has(p.hash) ? '2px solid var(--accent, #fff)' : undefined }}>
           {picking && <span aria-hidden style={{ position: 'absolute', top: 8, left: 8, zIndex: 1, display: 'grid', placeItems: 'center', borderRadius: 999, background: 'rgba(0,0,0,0.55)', padding: 2 }}>{picked.has(p.hash) ? <CheckCircle2 size={22} /> : <Circle size={22} />}</span>}
-          <div style={{ aspectRatio: '16 / 9', background: 'rgba(255,255,255,0.05)', display: 'grid', placeItems: 'center' }}>
+          <div style={{ aspectRatio: '16 / 9', background: 'rgba(255,255,255,0.05)', display: 'grid', placeItems: 'center', position: 'relative' }}>
+            {p.status === 'none' && <span className="sm-tag" style={{ position: 'absolute', left: 10, bottom: 10, background: 'rgba(0,0,0,0.65)', color: '#fff' }}>Noch nicht analysiert</span>}
+            {p.status === 'running' && <span className="sm-tag" style={{ position: 'absolute', left: 10, bottom: 10, background: 'rgba(0,0,0,0.65)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6 }}><Loader2 size={12} className="sm-spin" /> Wird analysiert …</span>}
             {p.img ? <img src={p.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <Film size={28} color="var(--text-3)" />}
           </div>
           <div style={{ padding: 14, display: 'grid', gap: 4 }}>
             <h3 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</h3>
-            <small><Clock size={11} style={{ display: 'inline', verticalAlign: -1 }} /> {p.dur} · {p.clips} Clips · {p.date}</small>
+            <small><Clock size={11} style={{ display: 'inline', verticalAlign: -1 }} /> {p.dur} · {p.status === 'none' ? 'nur geladen' : p.status === 'running' ? 'Analyse läuft' : `${p.clips} Clips`} · {p.date}</small>
           </div>
         </motion.button>
       ))}

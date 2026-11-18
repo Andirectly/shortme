@@ -78,11 +78,15 @@ export function loudnessEvents(sig: Pick<Signals, 'loudness' | 'silence'>, durat
   return { proposals, evidence }
 }
 
-export async function audioLane(series: AudioSeries | null, sig: Signals, o: { duration: number; max: number; tracer: Tracer; hasAudio: boolean }): Promise<LaneResult> {
+export async function audioLane(series: AudioSeries | null, sig: Signals, o: { duration: number; max: number; tracer: Tracer; hasAudio: boolean; /** Mac-Engine: Apple SoundAnalysis statt YAMNet */ apple?: { events: { proposals: RawProposal[]; evidence: Evidence[] }; windows: number } }): Promise<LaneResult> {
   if (!o.hasAudio) return { lane: 'audio', seeds: [], evidence: [], coverage: evenWindows('audio', o.duration, 60, 'ffprobe', 'skipped', 'Quelle ohne Tonspur'), diag: { note: 'keine Tonspur' } }
   const props: RawProposal[] = [], evidence: Evidence[] = []
   const coverage: CoverageWindow[] = evenWindows('audio', o.duration, 60, 'loudness-rms')
-  if (series) {
+  if (o.apple) {
+    props.push(...o.apple.events.proposals); evidence.push(...o.apple.events.evidence)
+    coverage.push(...evenWindows('audio', o.duration, 60, 'apple-soundanalysis'))
+    await o.tracer.record({ role: 'audio_event', modelRevision: 'apple-soundanalysis (SNClassifySoundRequest version1)', realInputModalities: ['audio'], actualMediaWindowIds: ['audio.wav'], success: true, validatedOutput: true, wallClockMs: 0, status: `Fenster ${o.apple.windows}, Vorschläge ${o.apple.events.proposals.length}`, input: { wav: 'audio.wav', windows: o.apple.windows }, output: { proposals: o.apple.events.proposals.length } })
+  } else if (series) {
     const y = audioProposals(decodeSeries(series), o.duration)
     props.push(...y.proposals); evidence.push(...y.evidence)
     coverage.push(...evenWindows('audio', Math.min(o.duration, series.frames * series.hop), 60, 'yamnet'))
@@ -92,7 +96,7 @@ export async function audioLane(series: AudioSeries | null, sig: Signals, o: { d
   }
   const ld = loudnessEvents(sig, o.duration, Math.max(4, Math.round(o.duration / 300)))
   props.push(...ld.proposals); evidence.push(...ld.evidence)
-  return { lane: 'audio', seeds: toSeeds('audio', props, o.max), evidence, coverage, diag: { yamnet: !!series, loudnessEvents: ld.proposals.length, proposals: props.length } }
+  return { lane: 'audio', seeds: toSeeds('audio', props, o.max), evidence, coverage, diag: { yamnet: !!series, appleSound: !!o.apple, loudnessEvents: ld.proposals.length, proposals: props.length } }
 }
 
 // -------------------------------------------------------------------------------------------------------------------------------- visual

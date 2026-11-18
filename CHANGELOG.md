@@ -6,6 +6,23 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.42.0] - 2026-11-18
+
+### Added
+
+- Engine Mac (nur Apple Silicon): eigene Clip-Auswahl für den Mac – Apple-Tonanalyse (Lachen, Jubel, Rufen), Bildsuche auf der Mac-GPU und Gemma 4, das jeden Kandidaten sieht und hört, Schnitte wählt und den fertigen Clip prüft. Modelle laufen nacheinander, damit 16 GB reichen. Auf dem Mac stehen Engine 1, 2 und Mac zur Wahl, unter Windows wie bisher Engine 1–4.
+- Twitch: Zeitbereich eines VODs per Leiste ziehen – zwei Griffe mit Zeitanzeige, Raster 1/5/10 Minuten, Pfeiltasten.
+- Projekte: Karten zeigen „Noch nicht analysiert“ bzw. „Wird analysiert …“, solange es noch keine Clips gibt.
+
+### Changed
+
+- YouTube-Downloads kommen bevorzugt als H.264: AV1 wird auf M1/M2-Macs nur per Software entschlüsselt und machte Bildschritte bis zu 100-mal langsamer.
+
+### Fixed
+
+- Engine 4: Clip-Titel waren manchmal der Platzhalter aus der Modellanweisung („Kurzer deutscher Titel“).
+- Engine 4: Fällt die Sprach-Suche komplett aus, gilt der Lauf als unvollständig statt fertig.
+
 ## [0.41.0] - 2026-11-18
 
 ### Added

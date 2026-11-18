@@ -89,6 +89,25 @@ const ALL: AssetSpec[] = [
     vramMb: 5000
   },
   {
+    id: 'gemma-4-e4b-it',
+    name: 'Gemma 4 E4B (Engine Mac, Bild + Ton, MLX)',
+    kind: 'vision',
+    note: 'Engine Mac: sieht und hört jeden Kandidaten (Nachuntersuchung, Schnittwahl, Prüfung des fertigen Clips) · Google Gemma 4, Apache-2.0 · 4-bit-MLX (mlx-community) · ca. 5,2 GB',
+    // Revision fest gebunden; Prüfsummen: LFS-Dateien laut Hugging-Face-API, kleine Dateien beim Anlegen des Eintrags selbst berechnet
+    files: [
+      { url: `${HF}/mlx-community/gemma-4-e4b-it-4bit/resolve/475b9088d29754a3379866cf5aeb6b41acd313c2/chat_template.jinja`, name: 'chat_template.jinja', size: 17336, sha256: '2f1b4d75d067bae3fe44e676721c7f077d243bc007156cb9c2f8b5836613d082' },
+      { url: `${HF}/mlx-community/gemma-4-e4b-it-4bit/resolve/475b9088d29754a3379866cf5aeb6b41acd313c2/config.json`, name: 'config.json', size: 6628, sha256: '780ccb3a514a5f1ced161d383f948fc22eca9b84b752ca19494f625bd9bad7a6' },
+      { url: `${HF}/mlx-community/gemma-4-e4b-it-4bit/resolve/475b9088d29754a3379866cf5aeb6b41acd313c2/generation_config.json`, name: 'generation_config.json', size: 208, sha256: 'd4226bbe3117d2d253ba4609720ba82c6c4ce4627a9a6ae05387c78983ac03de' },
+      { url: `${HF}/mlx-community/gemma-4-e4b-it-4bit/resolve/475b9088d29754a3379866cf5aeb6b41acd313c2/model.safetensors.index.json`, name: 'model.safetensors.index.json', size: 240961, sha256: 'f8accac59ee7efe87e0c298c854610b262c3cadd477407503147c71209ff0093' },
+      { url: `${HF}/mlx-community/gemma-4-e4b-it-4bit/resolve/475b9088d29754a3379866cf5aeb6b41acd313c2/processor_config.json`, name: 'processor_config.json', size: 1316, sha256: 'de3e580aebdc98272d4c4547daffe6525fcbae18a83a0e0bcf0d7444d4ee6f37' },
+      { url: `${HF}/mlx-community/gemma-4-e4b-it-4bit/resolve/475b9088d29754a3379866cf5aeb6b41acd313c2/tokenizer_config.json`, name: 'tokenizer_config.json', size: 2740, sha256: '080d9e1aff284e2f6043889cd05367966f7c7b80e025fbc0b06745e218158656' },
+      { url: `${HF}/mlx-community/gemma-4-e4b-it-4bit/resolve/475b9088d29754a3379866cf5aeb6b41acd313c2/tokenizer.json`, name: 'tokenizer.json', size: 32169626, sha256: 'cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f' },
+      { url: `${HF}/mlx-community/gemma-4-e4b-it-4bit/resolve/475b9088d29754a3379866cf5aeb6b41acd313c2/model.safetensors`, name: 'model.safetensors', size: 5146800534, sha256: '932b8271fc3fe65adcc78b96c10c6268bbfb13e8f67d1358727c0d6ee97e1eff' }
+    ],
+    expect: ['model.safetensors', 'config.json', 'tokenizer.json', 'processor_config.json'],
+    platform: 'darwin'
+  },
+  {
     id: 'minicpm-o-4_5',
     name: 'MiniCPM-o 4.5 (Engine 3, Video + Audio, PyTorch)',
     kind: 'vision',

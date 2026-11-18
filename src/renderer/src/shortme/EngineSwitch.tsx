@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Check, Loader2 } from 'lucide-react'
-import { hasProfiles, ENGINE_IDS, ENGINE_LABEL, V3_PROFILES, V3_PROFILE_LABEL, displayedRunId, engineOfRun, type SelectionEngineId, type V3Profile } from '@shared/engine'
+import { hasProfiles, enginesFor, ENGINE_LABEL, V3_PROFILES, V3_PROFILE_LABEL, displayedRunId, engineOfRun, type SelectionEngineId, type V3Profile } from '@shared/engine'
 import { Button, Segmented } from './ui'
 import { useProject } from './projectStore'
 import { useStore } from './store'
@@ -11,10 +11,14 @@ const fmtMB = (n: number): string => (n >= 1e9 ? `${(n / 1e9).toFixed(1).replace
  * Gegenseitig ausschließender Zweifachschalter: genau eine Engine ist für den nächsten Lauf gewählt. Der Schalter steuert dieselbe, im Main-Prozess gespeicherte
  * Projektauswahl wie überall; Gewählte Engine, laufender Job und angezeigter Ergebnislauf sind getrennte Zustände.
  */
+/** Engines, die auf diesem Rechner laufen können (Mac: Engine 1, 2, Mac; Windows: Engine 1–4). */
+export const localEngines = (): SelectionEngineId[] => enginesFor(window.cutawan?.platform ?? 'win32')
+
 export function EngineSwitch({ onSelect, value, disabled }: { onSelect: (e: SelectionEngineId) => void; value: SelectionEngineId; disabled?: boolean }): React.JSX.Element {
+  const ids = localEngines()
   return (
     <div role="group" aria-label="Auswahl-Engine" style={{ opacity: disabled ? 0.55 : 1, pointerEvents: disabled ? 'none' : 'auto' }}>
-      <Segmented options={ENGINE_IDS.map((e) => ENGINE_LABEL[e])} value={ENGINE_LABEL[value]} onChange={(l) => onSelect(ENGINE_IDS.find((e) => ENGINE_LABEL[e] === l) ?? 'legacy')} />
+      <Segmented options={ids.map((e) => ENGINE_LABEL[e])} value={ENGINE_LABEL[value]} onChange={(l) => onSelect(ids.find((e) => ENGINE_LABEL[e] === l) ?? 'legacy')} />
     </div>
   )
 }
@@ -49,7 +53,7 @@ export function RuntimeInstall({ onDone }: { onDone: () => void }): React.JSX.El
 
 /** Gut sichtbares Kennzeichen, welche Engine gemeint ist (neue Engine hervorgehoben). */
 export function EngineBadge({ engine, prefix }: { engine: SelectionEngineId; prefix?: string }): React.JSX.Element {
-  const bg = engine === 'engine4' ? '#0f9d74' : engine === 'adaptive-v3' ? '#7c3aed' : engine === 'multimodal-v2' ? '#3b6df0' : 'rgba(255,255,255,0.16)'
+  const bg = engine === 'engine-mac' ? '#d97706' : engine === 'engine4' ? '#0f9d74' : engine === 'adaptive-v3' ? '#7c3aed' : engine === 'multimodal-v2' ? '#3b6df0' : 'rgba(255,255,255,0.16)'
   return <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: bg, color: '#fff' }}>{prefix}{ENGINE_LABEL[engine]}</span>
 }
 

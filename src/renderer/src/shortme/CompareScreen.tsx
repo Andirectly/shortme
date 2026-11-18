@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
-import { ENGINE_IDS, ENGINE_LABEL, LEGACY_RUN_ID, type RunInfo, type SelectionEngineId } from '@shared/engine'
+import { localEngines } from './EngineSwitch'
+import { ENGINE_LABEL, LEGACY_RUN_ID, type RunInfo, type SelectionEngineId } from '@shared/engine'
 import { clipPieces, sourceToOutputTime, type ClipRecheckView, type EngineComparison, type EventMatch } from '@shared/compare'
 import { Button, Segmented } from './ui'
 import { useProject } from './projectStore'
@@ -77,7 +78,7 @@ export function CompareScreen(): React.JSX.Element {
         <strong>Dasselbe Originalvideo mit einer anderen Engine analysieren</strong>
         <small>Startet eine volle Analyse des Originals (Suche und Anzahl wie im letzten Lauf). Bestehende Läufe und Bearbeitungen bleiben erhalten.</small>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          {ENGINE_IDS.map((e) => {
+          {localEngines().map((e) => {
             const last = [...(state?.runs ?? [])].reverse().find((r) => r.engineId === e && r.status === 'done')
             const has = e === 'legacy' ? true : !!last
             const ref = [...(state?.runs ?? [])].reverse().find((r) => r.status === 'done')
@@ -108,7 +109,7 @@ export function CompareScreen(): React.JSX.Element {
                 <option value="">Clip wählen …</option>
                 {Object.entries(cmp.clips).map(([id, k]) => <option key={id} value={id}>{id.slice(-12)} · {mmss(k.start)}–{mmss(k.end)} · {k.title.slice(0, 40)}</option>)}
               </select>
-              {(['engine4', 'multimodal-v2', 'legacy'] as const).map((e) => <Button key={e} variant="secondary" disabled={!rcClip || rcBusy} onClick={() => { setRcBusy(true); void api()!.compareRecheck(hash, c.comparisonId, rcClip, e).then(setRechecks).catch((x: unknown) => setErr(String(x))).finally(() => setRcBusy(false)) }}>{rcBusy ? 'Prüft …' : `Mit ${ENGINE_LABEL[e]} prüfen`}</Button>)}
+              {(['engine4', 'engine-mac', 'multimodal-v2', 'legacy'] as const).filter((e) => localEngines().includes(e)).map((e) => <Button key={e} variant="secondary" disabled={!rcClip || rcBusy} onClick={() => { setRcBusy(true); void api()!.compareRecheck(hash, c.comparisonId, rcClip, e).then(setRechecks).catch((x: unknown) => setErr(String(x))).finally(() => setRcBusy(false)) }}>{rcBusy ? 'Prüft …' : `Mit ${ENGINE_LABEL[e]} prüfen`}</Button>)}
             </div>
             {rechecks.map((r) => <small key={r.recheckId} style={{ display: 'block' }}><b>Clip-Recheck · {ENGINE_LABEL[r.byEngine]} · {r.clipId.slice(-12)}</b>: {r.status === 'done' ? `${r.qualityLabel ?? ''} – ${r.reasons ?? ''}` : r.note}{r.uncertain?.length ? ` (unsicher: ${r.uncertain.join('; ')})` : ''}</small>)}
           </div>

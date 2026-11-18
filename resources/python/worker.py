@@ -28,10 +28,12 @@ WORKER_VERSION = "1.0.0"
 EMBED_MODELS = {"qwen3-vl-embedding-2b"}
 TEMPORAL_MODELS = {"lighthouse-cg-detr-clip"}
 AV_MODELS = {"minicpm-o-4_5"}
+# Mac: Gemma 4 E4B (Google, Apache-2.0) über MLX (mlx-vlm) – Bild + Ton, ohne torch
+MLX_AV_MODELS = {"gemma-4-e4b-it"}
 AV_MIN_VRAM_BYTES = int(float(os.environ.get("SHORTME_AV_MIN_VRAM_GB", "20")) * 2**30)
-SUPPORTED_MODELS = EMBED_MODELS | TEMPORAL_MODELS | AV_MODELS
+SUPPORTED_MODELS = EMBED_MODELS | TEMPORAL_MODELS | AV_MODELS | MLX_AV_MODELS
 
-_state = {"embedder": None, "temporal": None, "av": None, "tokenizer": None, "model_id": None, "cancel": set(), "busy": False}
+_state = {"embedder": None, "temporal": None, "av": None, "tokenizer": None, "model_id": None, "av_kind": None, "cancel": set(), "busy": False}
 _args = None
 
 
@@ -85,11 +87,87 @@ def finite_list(x, name: str, n_max: int) -> list:
     return x
 
 
+# --------------------------------------------------------------------------------------------------------------------------------- GPU (CUDA, Apple MPS, MLX)
+
+
+def _torch():
+    try:
+        import torch
+
+        return torch
+    except Exception:  # noqa: BLE001  (MLX-Umgebung hat kein torch)
+        return None
+
+
+def _mlx():
+    try:
+        import mlx.core as mx
+
+        return mx
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _gpu() -> str:
+    t = _torch()
+    if t is not None and t.cuda.is_available():
+        return "cuda"
+    if t is not None and getattr(t.backends, "mps", None) is not None and t.backends.mps.is_available():
+        return "mps"
+    return "mlx" if _mlx() is not None else "none"
+
+
+def _reset_peak() -> None:
+    g = _gpu()
+    if g == "cuda":
+        _torch().cuda.reset_peak_memory_stats()
+    elif g == "mlx":
+        _mlx().reset_peak_memory()
+
+
+def _alloc() -> int:
+    g = _gpu()
+    if g == "cuda":
+        return int(_torch().cuda.memory_allocated())
+    if g == "mps":
+        return int(_torch().mps.current_allocated_memory())
+    if g == "mlx":
+        return int(_mlx().get_active_memory())
+    return 0
+
+
+def _peak() -> int:
+    """Höchststand seit _reset_peak (MPS kennt keinen Höchststand: dort der aktuell vom Treiber belegte Speicher)."""
+    g = _gpu()
+    if g == "cuda":
+        return int(_torch().cuda.max_memory_allocated())
+    if g == "mps":
+        return int(_torch().mps.driver_allocated_memory())
+    if g == "mlx":
+        return int(_mlx().get_peak_memory())
+    return 0
+
+
+def _empty() -> None:
+    g = _gpu()
+    if g == "cuda":
+        _torch().cuda.empty_cache()
+        _torch().cuda.synchronize()
+    elif g == "mps":
+        _torch().mps.empty_cache()
+    elif g == "mlx":
+        _mlx().clear_cache()
+
+
 # --------------------------------------------------------------------------------------------------------------------------------- Operationen
 
 
 def op_health(req, p):
     info = {"worker": WORKER_VERSION, "protocol": PROTOCOL_VERSION, "python": sys.version.split()[0], "loadedModel": _state["model_id"]}
+    info["gpu_backend"] = _gpu()
+    mx = _mlx()
+    if mx is not None:
+        info["mlx"] = getattr(mx, "__version__", "?")
     try:
         import torch
 
@@ -136,12 +214,14 @@ def op_capabilities(req, p):
         models.append({"id": "lighthouse-cg-detr-clip", "role": "temporal-grounding", "status": "available"})
     if ver == "4.51.0" and _importable("minicpmo"):
         models.append({"id": "minicpm-o-4_5", "role": "av-verification", "status": "available"})
+    if _importable("mlx_vlm"):
+        models.append({"id": "gemma-4-e4b-it", "role": "av-verification", "status": "available"})
     ops = ["health", "capabilities", "load_model", "unload_model", "cancel", "shutdown"]
     if any(m["id"] == "qwen3-vl-embedding-2b" for m in models):
         ops += ["embed_frames", "embed_text"]
     if any(m["id"] == "lighthouse-cg-detr-clip" for m in models):
         ops += ["temporal_ground"]
-    if any(m["id"] == "minicpm-o-4_5" for m in models):
+    if any(m["role"] == "av-verification" for m in models):
         ops += ["analyze_av"]
     return {"ops": ops, "models": models, "notImplemented": ["select_frames", "rank_candidates"]}
 
@@ -155,10 +235,12 @@ def op_load_model(req, p):
             return {"modelId": model_id, "alreadyLoaded": True}
         raise WorkerError("model-busy", "Ein anderes Modell ist geladen; zuerst unload_model", True)
     path = inside(p.get("modelDir"), _args.model_root)
+    if model_id in MLX_AV_MODELS:
+        return _load_mlx_av(model_id, path)
     import torch
 
-    if not torch.cuda.is_available():
-        raise WorkerError("no-cuda", "Keine CUDA-GPU verfügbar", False)
+    if _gpu() not in ("cuda", "mps"):
+        raise WorkerError("no-gpu", "Keine CUDA-GPU bzw. Apple-GPU (MPS) verfügbar", False)
     if model_id in TEMPORAL_MODELS:
         return _load_temporal(model_id, path)
     if model_id in AV_MODELS:
@@ -167,10 +249,10 @@ def op_load_model(req, p):
     from qwen3_vl_embedding import Qwen3VLEmbedder  # type: ignore  # vendored, Apache-2.0 (siehe vendor/NOTICE)
 
     t0 = time.time()
-    torch.cuda.reset_peak_memory_stats()
+    _reset_peak()
     embedder = Qwen3VLEmbedder(model_name_or_path=path, torch_dtype=torch.bfloat16, attn_implementation="sdpa", fps=float(p.get("fps", 1)), max_frames=int(p.get("maxFrames", 16)))
     _state["embedder"], _state["model_id"] = embedder, model_id
-    return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": int(torch.cuda.memory_allocated()), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+    return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": _alloc(), "vramPeakBytes": _peak()}
 
 
 def _load_temporal(model_id: str, path: str) -> dict:
@@ -197,7 +279,7 @@ def _load_temporal(model_id: str, path: str) -> dict:
     # torch.load(weights_only=False) liegt in Lighthouse: Pickle! Nur der geprüfte Checkpoint (MD5 laut Zenodo, SHA-256 im Katalog) darf hierher.
     _state["temporal"] = CGDETRPredictor(ckpt, device="cuda", feature_name="clip", slowfast_path=None, pann_path=None)
     _state["model_id"] = model_id
-    return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": int(torch.cuda.memory_allocated()), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+    return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": _alloc(), "vramPeakBytes": _peak()}
 
 
 def _load_av(model_id: str, path: str) -> dict:
@@ -205,6 +287,8 @@ def _load_av(model_id: str, path: str) -> dict:
     import torch
     from transformers import AutoModel, AutoTokenizer  # type: ignore
 
+    if _gpu() != "cuda":
+        raise WorkerError("no-cuda", "MiniCPM-o braucht eine CUDA-GPU (auf dem Mac: gemma-4-e4b-it)", False)
     # bf16-Gewichte belegen 18,1 GB (gemessen); kleinere GPUs lagern unter Windows still in den RAM aus (stundenlang) → klar abbrechen
     total = torch.cuda.mem_get_info()[1]
     if total < AV_MIN_VRAM_BYTES:
@@ -215,20 +299,30 @@ def _load_av(model_id: str, path: str) -> dict:
     _state["av"] = model.eval().cuda()
     _state["tokenizer"] = AutoTokenizer.from_pretrained(path, trust_remote_code=True, local_files_only=True)
     _state["model_id"] = model_id
-    return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": int(torch.cuda.memory_allocated()), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+    return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": _alloc(), "vramPeakBytes": _peak()}
+
+
+def _load_mlx_av(model_id: str, path: str) -> dict:
+    """Gemma 4 E4B (4-bit MLX, mlx-community-Konvertierung von google/gemma-4-E4B-it) über mlx-vlm: Bilder + Ton → Text."""
+    mx = _mlx()
+    if mx is None:
+        raise WorkerError("no-mlx", "MLX ist in dieser Umgebung nicht installiert", False)
+    from mlx_vlm import load  # type: ignore
+
+    t0 = time.time()
+    mx.reset_peak_memory()
+    model, processor = load(path)
+    _state["av"], _state["tokenizer"], _state["model_id"], _state["av_kind"] = model, processor, model_id, "mlx"
+    return {"modelId": model_id, "loadSeconds": round(time.time() - t0, 2), "vramAllocatedBytes": _alloc(), "vramPeakBytes": _peak()}
 
 
 def op_unload_model(req, p):
     import gc
 
-    import torch
-
-    _state["embedder"], _state["temporal"], _state["av"], _state["tokenizer"], _state["model_id"] = None, None, None, None, None
+    _state["embedder"], _state["temporal"], _state["av"], _state["tokenizer"], _state["model_id"], _state["av_kind"] = None, None, None, None, None, None
     gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
-    return {"unloaded": True, "vramAllocatedBytes": int(torch.cuda.memory_allocated()) if torch.cuda.is_available() else 0}
+    _empty()
+    return {"unloaded": True, "vramAllocatedBytes": _alloc()}
 
 
 def _need_model():
@@ -265,7 +359,7 @@ def op_embed_frames(req, p):
     if not np.isfinite(arr).all():
         raise WorkerError("bad-output", "Modell lieferte nicht endliche Werte")
     np.save(out_path, arr.astype(np.float16), allow_pickle=False)
-    return {"count": int(arr.shape[0]), "dimension": int(arr.shape[1]) if arr.ndim == 2 and arr.shape[0] else 0, "seconds": round(time.time() - t0, 2), "outPath": out_path, "dtype": "float16", "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+    return {"count": int(arr.shape[0]), "dimension": int(arr.shape[1]) if arr.ndim == 2 and arr.shape[0] else 0, "seconds": round(time.time() - t0, 2), "outPath": out_path, "dtype": "float16", "vramPeakBytes": _peak()}
 
 
 def op_embed_text(req, p):
@@ -313,7 +407,7 @@ def op_temporal_ground(req, p):
             sal = [round(float(x), 3) for x in pred.get("pred_saliency_scores", [])]
             per_q.append({"query": q, "moments": moments, "saliency": sal})
         out.append({"startSec": start, "clipLength": float(getattr(m, "_clip_len", 2.0)), "queries": per_q})
-    return {"windows": out, "seconds": round(time.time() - t0, 2), "vramPeakBytes": int(torch.cuda.max_memory_allocated())}
+    return {"windows": out, "seconds": round(time.time() - t0, 2), "vramPeakBytes": _peak()}
 
 
 def _has_audio_stream(path: str) -> bool:
@@ -340,9 +434,7 @@ def _frames_1fps(path: str) -> list:
 
 
 def op_analyze_av(req, p):
-    """MiniCPM-o: Video UND Audio eines kurzen Ausschnitts (≤ 60 s, vom Aufrufer zugeschnitten) mit einer Aufgabe. Liefert den Modelltext (wird im Aufrufer gegen ein Schema geprüft)."""
-    import torch
-
+    """MiniCPM-o (CUDA) bzw. Gemma 4 (MLX, Mac): Video UND Audio eines kurzen Ausschnitts (≤ 75 s, vom Aufrufer zugeschnitten) mit einer Aufgabe. Liefert den Modelltext (wird im Aufrufer gegen ein Schema geprüft)."""
     m, tok = _state["av"], _state["tokenizer"]
     if m is None:
         raise WorkerError("no-model", "Kein AV-Modell geladen")
@@ -351,6 +443,9 @@ def op_analyze_av(req, p):
     if not isinstance(prompt, str) or not 0 < len(prompt) <= 8000:
         raise WorkerError("bad-payload", "prompt: String (≤ 8000 Zeichen)")
     max_new = max(16, min(int(p.get("maxNewTokens", 300)), 600))
+    if _state["av_kind"] == "mlx":
+        return _analyze_mlx(req, p, path, prompt, max_new)
+    import torch
     from minicpmo.utils import get_video_frame_audio_segments  # type: ignore
 
     t0 = time.time()
@@ -380,6 +475,58 @@ def op_analyze_av(req, p):
     gc.collect()
     torch.cuda.empty_cache()
     return {"text": text if isinstance(text, str) else str(text), "seconds": round(time.time() - t0, 2), "hasAudio": has_audio, "vramPeakBytes": peak, "vramAllocatedBytes": int(torch.cuda.memory_allocated())}
+
+
+# gemessen (M1 Pro, 40-s-Ausschnitt): 20 Bilder 38 s / 11,5 GB Spitze, ~10 Bilder 21 s / 8,1 GB, 8 Bilder 20 s / 7,5 GB → 12 (ergibt ~10) für 16 GB
+MLX_MAX_FRAMES = int(os.environ.get("SHORTME_MLX_MAX_FRAMES", "12"))
+MLX_FRAME_WIDTH = 448
+MLX_AUDIO_CHUNK_SEC = 30  # Grenze des Gemma-4-Tonmoduls (audio_feature_extractor: max_length 480 000 Samples bei 16 kHz)
+
+
+def _analyze_mlx(req, p, path: str, prompt: str, max_new: int) -> dict:
+    """Gemma 4 (MLX): Ausschnitt → Einzelbilder (gleichmäßig, ≤ MLX_MAX_FRAMES, Quellsekunde je Bild im Prompt) + Tonspur (16 kHz mono) → Text.
+    Ohne Tonspur nur Bilder (kein erfundener Ton)."""
+    import subprocess
+    import tempfile
+
+    from mlx_vlm import generate  # type: ignore
+    from mlx_vlm.prompt_utils import apply_chat_template  # type: ignore
+
+    mx = _mlx()
+    model, processor = _state["av"], _state["tokenizer"]
+    t0 = time.time()
+    has_audio = _has_audio_stream(path)
+    with tempfile.TemporaryDirectory(prefix="shortme-mlx-") as d:
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", path, "-vf", f"fps=1,scale={MLX_FRAME_WIDTH}:-2", "-q:v", "3", os.path.join(d, "f%04d.jpg")], check=True, timeout=300)
+        names = sorted(n for n in os.listdir(d) if n.endswith(".jpg"))
+        if not names or len(names) > 75:
+            raise WorkerError("bad-media", f"Ausschnitt hat {len(names)} Sekunden (erlaubt 1–75)")
+        # Metal erlaubt einem Prozess ~11,8 GB (M1 Pro 16 GB); > 30 s Ton (mehrere Tonstücke) → höchstens 8 Bilder (gemessen 70 s: 8 Bilder + 3 Tonstücke = 7,5 GB Spitze)
+        cap = MLX_MAX_FRAMES if len(names) <= MLX_AUDIO_CHUNK_SEC else min(MLX_MAX_FRAMES, 8)
+        step = max(1, -(-len(names) // cap))
+        picked = names[::step]
+        frames = [os.path.join(d, n) for n in picked]
+        secs = [int(n[1:5]) - 1 for n in picked]
+        audios = []
+        if has_audio:
+            # Gemma 4 hört je Tonstück höchstens 30 s (mlx-vlm schneidet längeren Ton STILL ab) → in Stücke ≤ MLX_AUDIO_CHUNK_SEC teilen, alle in Reihenfolge
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", path, "-vn", "-ac", "1", "-ar", "16000", "-f", "segment", "-segment_time", str(MLX_AUDIO_CHUNK_SEC), os.path.join(d, "a%02d.wav")], check=True, timeout=300)
+            audios = [os.path.join(d, n) for n in sorted(os.listdir(d)) if n.startswith("a") and n.endswith(".wav")]
+        tone = "" if not audios else (" und die komplette Tonspur des Ausschnitts." if len(audios) == 1 else f" und die komplette Tonspur in {len(audios)} Teilen à höchstens {MLX_AUDIO_CHUNK_SEC} s, lückenlos in zeitlicher Reihenfolge (Teil k beginnt bei Sekunde {MLX_AUDIO_CHUNK_SEC}·(k−1)).")
+        note = f"Du bekommst {len(frames)} Bilder in zeitlicher Reihenfolge (Bild k zeigt Sekunde {', '.join(str(x) for x in secs)} des Ausschnitts)" + (tone or "; der Ausschnitt hat keine Tonspur.")
+        formatted = apply_chat_template(processor, model.config, f"{note}\n\n{prompt}", num_images=len(frames), num_audios=len(audios), enable_thinking=False)
+        temp = float(p.get("temperature", 0) or 0)
+        mx.reset_peak_memory()
+        res = generate(model, processor, formatted, image=frames, audio=audios or None, max_tokens=max_new, temperature=min(max(temp, 0.0), 1.0), verbose=False)
+    text = getattr(res, "text", res)
+    if isinstance(text, str):
+        # Gemma 4 kann trotz enable_thinking=False einen Denkblock voranstellen → entfernen (Aufrufer erwartet nur die Antwort)
+        import re
+
+        text = re.sub(r"<\|channel>thought.*?<channel\|>", "", text, flags=re.S).strip()
+    peak = int(mx.get_peak_memory())
+    mx.clear_cache()
+    return {"text": text if isinstance(text, str) else str(text), "seconds": round(time.time() - t0, 2), "hasAudio": bool(audios), "audioParts": len(audios), "frames": len(frames), "vramPeakBytes": peak, "vramAllocatedBytes": int(mx.get_active_memory())}
 
 
 def op_cancel(req, p):

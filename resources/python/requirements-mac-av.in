@@ -1,0 +1,5 @@
+# Shortme AV-Worker auf dem Mac: Gemma 4 E4B über MLX (mlx-vlm), Bild + Ton. Gelockt: requirements-mac-av.lock.txt
+# MACOSX_DEPLOYMENT_TARGET=14.0 uv pip compile requirements-mac-av.in --generate-hashes --python-version 3.12 --python-platform aarch64-apple-darwin
+mlx-vlm==0.8.0
+pillow
+numpy<3

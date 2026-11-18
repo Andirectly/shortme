@@ -15,6 +15,8 @@ export const V3_TEMPORAL_REVISION = 'temporal-1'
 /** Audio+Video-Prüfer: MiniCPM-o 4.5 (OpenBMB, Apache-2.0 laut Modellkarte), feste HF-Revision. */
 export const V3_AV_MODEL = { id: 'minicpm-o-4_5', revision: 'fb09628e98b1f55d8d5b863e0eccfcdd11bff499', license: 'Apache-2.0 (Modellkarte)' } as const
 export const V3_AV_PROMPT_REVISION = 'av-prompt-1'
+/** Mac-Engine: Gemma 4 E4B (Google, Apache-2.0; 4-bit-MLX-Konvertierung von mlx-community), feste HF-Revision. Läuft über mlx-vlm 0.8.0. */
+export const MAC_AV_MODEL = { id: 'gemma-4-e4b-it', revision: '475b9088d29754a3379866cf5aeb6b41acd313c2', repo: 'mlx-community/gemma-4-e4b-it-4bit', base: 'google/gemma-4-E4B-it', license: 'Apache-2.0 (Basismodell)', runtime: 'mlx-vlm 0.8.0' } as const
 
 /** Abtast- und Budgetgrenzen je Profil (Startwerte, nicht als optimal behauptet). */
 export interface V3ProfileConfig { windowSec: number; hopSec: number; frames: number; frameWidth: number; queries: number; detailMax: number; finalists: number; /** Lighthouse-Verortung aktiv */ temporal: boolean; /** Ereignisse mit Audio+Video-Prüfung (MiniCPM-o) */ avMax: number }
