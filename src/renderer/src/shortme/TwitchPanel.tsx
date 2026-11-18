@@ -87,14 +87,14 @@ export function TwitchPanel({ info, error, loading, section, setSection, busy, o
         <strong style={{ fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {loading ? 'Twitch-Link wird geprüft …' : error ? 'Twitch' : `${info?.channel ?? 'Twitch'}${info?.title && info.state !== 'live' ? ` · ${info.title}` : ''}`}
         </strong>
-        {tag && <span className="sm-tag">{tag}{info && info.durationSec > 0 ? ` · ${fmtHms(info.durationSec)}` : ''}</span>}
+        {info?.recording && <span className="sm-tag" style={{ color: 'var(--warn)' }}>läuft noch</span>}{tag && <span className="sm-tag">{tag}{info && info.durationSec > 0 ? ` · ${fmtHms(info.durationSec)}` : ''}</span>}
       </div>
       {error && <span style={{ color: 'var(--warn)', fontSize: 14 }}>{error}</span>}
       {info?.message && <span style={{ fontSize: 14, color: 'var(--text-2)' }}>{info.message}</span>}
 
       {vod && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Pill role="radio" pressed={!section} onClick={() => setSection(null)}>Ganzes VOD</Pill>
+          <Pill role="radio" pressed={!section} onClick={() => setSection(null)}>{info?.recording ? 'Ganzes VOD (bis jetzt)' : 'Ganzes VOD'}</Pill>
           <Pill role="radio" pressed={!!section} onClick={() => applyRange(from, parseHms(to) > info.durationSec ? fmtHms(info.durationSec) : to)}><Scissors size={13} /> Zeitbereich</Pill>
           {section && info && (
             <div style={{ flexBasis: '100%', display: 'grid', gap: 8 }}>

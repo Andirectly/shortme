@@ -3,7 +3,8 @@ import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => tmpdir() } }))
-import { downloadUrlVideo, stopAllYtDlp } from '../src/main/pipeline/ytdlp'
+import { controlDownloads, downloadUrlVideo, parseDownloadProgress, stopAllYtDlp } from '../src/main/pipeline/ytdlp'
+import { existsSync } from 'node:fs'
 
 // Falsches yt-dlp: zählt Aufrufe, wartet, beendet sich dann erfolgreich (oder wird vorher gestoppt)
 async function fakeBin(dir: string, sleepSec: number): Promise<string> {
@@ -35,5 +36,45 @@ describe.skipIf(process.platform === 'win32')('Download-Schutz', () => {
     stopAllYtDlp()
     await expect(p).rejects.toThrow()
     expect(Date.now() - t0).toBeLessThan(5000)
+  })
+})
+
+describe('Restzeit aus yt-dlp/ffmpeg', () => {
+  it('eigener Downloader: Anteil, Tempo, Restzeit (auch mit Stunden)', () => {
+    expect(parseDownloadProgress('[download]  45.3% of ~  1.23GiB at    4.56MiB/s ETA 02:31 (frag 10/100)')).toMatchObject({ etaSec: 151, speed: '4.56MiB/s' })
+    expect(parseDownloadProgress('[download]   2.0% of 9.10GiB at 1.00MiB/s ETA 1:02:03')).toMatchObject({ etaSec: 3723 })
+    expect(parseDownloadProgress('[download] 100% of 1.00GiB')).toEqual({ fraction: 1 })
+  })
+  it('ffmpeg (Zeitbereich): Anteil und Restzeit über die Bereichslänge', () => {
+    const l = 'frame= 5400 fps=180 q=-1.0 size=  204800KiB time=00:01:30.00 bitrate=18641.2kbits/s speed=3.00x'
+    expect(parseDownloadProgress(l, 600)).toEqual({ fraction: 0.15, etaSec: 170, speed: '3x' })
+    expect(parseDownloadProgress(l)).toBeNull() // ohne bekannte Länge kein Anteil
+    expect(parseDownloadProgress('[Merger] Merging formats')).toBeNull()
+  })
+})
+
+describe.skipIf(process.platform === 'win32')('Pause und Abbrechen', () => {
+  it('pausiert die Prozessgruppe, setzt fort, bricht ab und räumt Teildateien weg', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ytdlp-ctl-'))
+    // schreibt alle 0,2 s eine Zeile in die Teildatei → Pause = Datei wächst nicht
+    const bin = join(dir, 'yt-dlp-fake')
+    const out = join(dir, 'v3.part.mp4')
+    await writeFile(bin, `#!/bin/sh\nwhile true; do echo x >> "${out}.part"; sleep 0.2; done\n`)
+    await chmod(bin, 0o755)
+    const p = downloadUrlVideo(bin, 'https://example.invalid/v3', out, () => undefined)
+    p.catch(() => undefined)
+    await new Promise((r) => setTimeout(r, 600))
+    expect(controlDownloads('pause')).toBe(true)
+    await new Promise((r) => setTimeout(r, 300))
+    const a = (await readFile(out + '.part', 'utf8')).length
+    await new Promise((r) => setTimeout(r, 800))
+    expect((await readFile(out + '.part', 'utf8')).length).toBe(a)
+    expect(controlDownloads('resume')).toBe(true)
+    await new Promise((r) => setTimeout(r, 800))
+    expect((await readFile(out + '.part', 'utf8')).length).toBeGreaterThan(a)
+    expect(controlDownloads('cancel')).toBe(true)
+    await expect(p).rejects.toThrow('Download abgebrochen')
+    expect(existsSync(out + '.part')).toBe(false)
+    expect(controlDownloads('pause')).toBe(false) // nichts mehr aktiv
   })
 })

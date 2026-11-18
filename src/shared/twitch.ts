@@ -57,6 +57,8 @@ export interface TwitchInfo {
   live: { vodUrl: string; vodDurationSec: number; title: string } | null
   /** Verständliche Meldung (offline, keine VODs, Abonnenten-VOD …). */
   message: string | null
+  /** VOD eines Streams, der noch läuft: es wächst (ohne Ende würde der Download den Livestream bis Streamende aufnehmen). */
+  recording?: boolean
 }
 
 /** Twitch-Bezug eines Projekts (Quelle, Versatz im VOD, stumme Abschnitte, Chat vorhanden). */

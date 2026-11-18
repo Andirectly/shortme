@@ -597,6 +597,10 @@ export interface ImportProgress {
   /** 0..1, or -1 when indeterminate. */
   progress: number
   message: string
+  /** Geschätzte Restzeit des Downloads in Sekunden (fehlt, solange unbekannt). */
+  etaSec?: number
+  /** Download-Tempo, z. B. „12.4MiB/s“ oder „3.1x“ (Echtzeit-Faktor bei ffmpeg). */
+  speed?: string
 }
 
 /** Editor timeline data for a window of the source video. */

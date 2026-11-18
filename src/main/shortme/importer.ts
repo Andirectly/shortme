@@ -49,12 +49,12 @@ function blankMeta(hash: string, path: string, info: Awaited<ReturnType<typeof p
 }
 
 /** URL importieren (yt-dlp, gebündelt/selbst-aktualisierend); Download landet im Datenordner, danach wie eine Datei. */
-export async function importUrl(url: string, onProgress: (p: number, message: string) => void, opts: { section?: [number, number]; extraArgs?: string[]; urlLabel?: string } = {}): Promise<ImportResult> {
+export async function importUrl(url: string, onProgress: (p: number, message: string, extra?: { etaSec?: number; speed?: string }) => void, opts: { section?: [number, number]; extraArgs?: string[]; urlLabel?: string } = {}): Promise<ImportResult> {
   onProgress(0, 'Downloader wird vorbereitet …')
   const bin = await ensureYtDlp((p) => onProgress(p.progress, p.message))
   onProgress(0, 'Video-Infos werden abgerufen …')
   // wie der alte Importpfad: bei yt-dlp-Fehlern einmal selbst aktualisieren und wiederholen (veraltete YouTube-Extraktoren)
-  const progress = (p: { progress: number; message: string }): void => onProgress(p.progress, p.message)
+  const progress = (p: { progress: number; message: string; etaSec?: number; speed?: string }): void => onProgress(p.progress, p.message, { etaSec: p.etaSec, speed: p.speed })
   const meta = await withSelfUpdateRetry(bin, progress, () => fetchUrlMeta(bin, url, savedCookieOpts(), opts.extraArgs ?? []))
   const dir = join(dataRoot(), 'downloads')
   await mkdir(dir, { recursive: true })

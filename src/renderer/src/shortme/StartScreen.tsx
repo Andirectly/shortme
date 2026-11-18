@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { PresetTile } from './PresetUI'
 import { usePresets } from './presets'
 import { motion, AnimatePresence, useMotionValue, animate, type PanInfo } from 'motion/react'
-import { UploadCloud, Link2, Sparkles, ChevronDown, AlertTriangle } from 'lucide-react'
+import { UploadCloud, Link2, Sparkles, ChevronDown, AlertTriangle, Pause, Play, X } from 'lucide-react'
 import { useStore } from './store'
 import { isTwitchUrl } from '@shared/twitch'
 import { CONTENT_TYPES, contentLabel, FRAME_LABELS } from '@shared/videoKind'
@@ -26,6 +26,10 @@ export function StartScreen(): React.JSX.Element {
   const importing = useProject((s) => s.importing)
   const importMessage = useProject((s) => s.importMessage)
   const importProgress = useProject((s) => s.importProgress)
+  const importEta = useProject((s) => s.importEta)
+  const importSpeed = useProject((s) => s.importSpeed)
+  const importPaused = useProject((s) => s.importPaused)
+  const controlImport = useProject((s) => s.controlImport)
   const importError = useProject((s) => s.importError)
   const importPath = useProject((s) => s.importPath)
   const importUrl = useProject((s) => s.importUrl)
@@ -44,7 +48,8 @@ export function StartScreen(): React.JSX.Element {
   const openLink = async (): Promise<void> => {
     if (!link.trim()) return
     if (!hasApi) { openSheet(true); return }
-    if (isTwitchUrl(link)) { if (await twitchImport(link.trim(), { section: section ?? undefined })) openSheet(true); return }
+    // laufendes VOD: „Ganzes VOD“ = alles bis jetzt (festes Ende), sonst nähme der Download den Livestream bis Streamende auf
+    if (isTwitchUrl(link)) { const whole: [number, number] | undefined = tw.info?.recording && tw.info.durationSec > 0 ? [0, Math.floor(tw.info.durationSec)] : undefined; if (await twitchImport(link.trim(), { section: section ?? whole })) openSheet(true); return }
     if (await importUrl(link.trim())) openSheet(true)
   }
   /** „Letzte N Min“: laufendes VOD laden und direkt in die Clip-Analyse. */
@@ -91,8 +96,20 @@ export function StartScreen(): React.JSX.Element {
         <div className="sm-card" role="status" aria-live="polite" style={{ padding: 14, display: 'grid', gap: 8 }}>
           {importing && (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ fontSize: 14 }}>{importMessage}</span><small>{importProgress > 0 && importProgress < 1 ? `${Math.round(importProgress * 100)} %` : ''}</small></div>
-              <div className="sm-bar"><i style={{ width: `${Math.max(importProgress, 0.03) * 100}%`, transition: 'width 0.3s' }} /></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 14 }}>{importMessage}</span>
+                <small style={{ fontVariantNumeric: 'tabular-nums' }}>{[importProgress > 0 && importProgress < 1 ? `${Math.round(importProgress * 100)} %` : '', !importPaused && importEta !== null ? `noch ca. ${fmtEta(importEta)}` : '', !importPaused && importSpeed ? importSpeed : ''].filter(Boolean).join(' · ')}</small>
+              </div>
+              <div className="sm-bar"><i style={{ width: `${Math.max(importProgress, 0.03) * 100}%`, transition: 'width 0.3s', opacity: importPaused ? 0.4 : 1 }} /></div>
+              {/* Steuerung nur während des eigentlichen Downloads (0,15–0,95 des Imports); Pause gibt es auf dem Mac (Windows: nur Abbrechen) */}
+              {importProgress >= 0.15 && importProgress < 0.96 && (
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  {window.cutawan?.platform !== 'win32' && (importPaused
+                    ? <Button variant="secondary" onClick={() => void controlImport('resume')}><Play size={14} /> Weiter</Button>
+                    : <Button variant="secondary" onClick={() => void controlImport('pause')}><Pause size={14} /> Pausieren</Button>)}
+                  <Button variant="secondary" onClick={() => { if (window.confirm('Download abbrechen? Bereits geladene Teile werden gelöscht.')) void controlImport('cancel') }}><X size={14} /> Abbrechen</Button>
+                </div>
+              )}
             </>
           )}
           {importError && <span style={{ color: 'var(--warn)', fontSize: 14 }}>{importError}</span>}

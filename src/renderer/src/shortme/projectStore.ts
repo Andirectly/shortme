@@ -14,6 +14,11 @@ interface ProjectState {
   importing: boolean
   importMessage: string
   importProgress: number
+  /** Download: geschätzte Restzeit (s), Tempo, pausiert? */
+  importEta: number | null
+  importSpeed: string
+  importPaused: boolean
+  controlImport: (action: 'pause' | 'resume' | 'cancel') => Promise<void>
   importError: string
   job: ShortmeJob | null
   clipsFile: ShortmeClips | null
@@ -94,6 +99,10 @@ export const useProject = create<ProjectState>((set, get) => ({
   importing: false,
   importMessage: '',
   importProgress: 0,
+  importEta: null,
+  importSpeed: '',
+  importPaused: false,
+  controlImport: async (action) => { const a = api(); if (!a) return; if (await a.importControl(action)) set({ importPaused: action === 'pause', ...(action === 'pause' ? { importMessage: 'Download pausiert' } : {}) }) },
   importError: '',
   job: null,
   clipsFile: null,
@@ -242,14 +251,14 @@ export const useProject = create<ProjectState>((set, get) => ({
           }
         }
       }),
-      a.onImportProgress((p) => set({ importMessage: p.message, importProgress: p.progress }))
+      a.onImportProgress((p) => set((s) => ({ importMessage: s.importPaused ? 'Download pausiert' : p.message, importProgress: p.progress, importEta: p.etaSec ?? (p.progress >= 0.96 || p.progress < 0.15 ? null : s.importEta), importSpeed: p.speed ?? '' })))
     ]
     void a.jobs().then((list) => { const live = list.find((j) => j.state === 'running' || j.state === 'queued' || j.state === 'paused'); if (live) set({ job: live }) })
   },
   importPath: async (path) => {
     const a = api()
     if (!a) return false
-    set({ importing: true, importError: '', importProgress: 0, importMessage: 'Video wird geprüft …' })
+    set({ importing: true, importError: '', importProgress: 0, importEta: null, importSpeed: '', importPaused: false, importMessage: 'Video wird geprüft …' })
     try {
       const r = await a.importFile(path)
       set({ imported: r, importing: false })
@@ -263,7 +272,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   importUrl: async (url) => {
     const a = api()
     if (!a) return false
-    set({ importing: true, importError: '', importProgress: 0, importMessage: 'Link wird geprüft …' })
+    set({ importing: true, importError: '', importProgress: 0, importEta: null, importSpeed: '', importPaused: false, importMessage: 'Link wird geprüft …' })
     try {
       const r = await a.importUrl(url)
       set({ imported: r, importing: false })
@@ -298,7 +307,7 @@ export const useProject = create<ProjectState>((set, get) => ({
   twitchImport: async (url, opts) => {
     const a = api()
     if (!a) return false
-    set({ importing: true, importError: '', importProgress: 0, importMessage: 'Twitch-Link wird geprüft …' })
+    set({ importing: true, importError: '', importProgress: 0, importEta: null, importSpeed: '', importPaused: false, importMessage: 'Twitch-Link wird geprüft …' })
     try {
       const r = await a.twitch.import(url, opts)
       set({ imported: r, importing: false })

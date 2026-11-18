@@ -1,7 +1,7 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { createWriteStream, existsSync } from 'node:fs'
-import { chmod, mkdir, rename } from 'node:fs/promises'
-import { join } from 'node:path'
+import { chmod, mkdir, readdir, rename, rm } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { ReadableStream as WebReadableStream } from 'node:stream/web'
@@ -206,6 +206,48 @@ function jsRuntimeArgs(): string[] {
 }
 
 const WIN = process.platform === 'win32'
+
+/**
+ * Fortschritt aus einer yt-dlp-/ffmpeg-Zeile: eigener Downloader „[download]  45.3% of ~1.23GiB at 4.56MiB/s ETA 02:31“,
+ * ffmpeg (Zeitbereiche/HLS) „time=00:01:23.45 … speed=3.1x“ → Anteil über die bekannte Bereichslänge.
+ */
+export function parseDownloadProgress(line: string, sectionSec?: number): { fraction: number; etaSec?: number; speed?: string } | null {
+  const y = line.match(/\[download\]\s+([\d.]+)%(?:\s+of\s+~?\s*[\d.]+\w+)?(?:\s+at\s+([\d.]+\w+\/s))?(?:\s+ETA\s+((?:\d+:)?\d+:\d+))?/)
+  if (y) {
+    const eta = y[3] ? y[3].split(':').map(Number).reduce((a, b) => a * 60 + b, 0) : undefined
+    return { fraction: Math.min(1, Number(y[1]) / 100), ...(eta !== undefined && Number.isFinite(eta) ? { etaSec: eta } : {}), ...(y[2] ? { speed: y[2] } : {}) }
+  }
+  const f = line.match(/time=\s*(\d+):(\d+):([\d.]+)[\s\S]*?speed=\s*([\d.]+)x/)
+  if (f && sectionSec && sectionSec > 0) {
+    const t = Number(f[1]) * 3600 + Number(f[2]) * 60 + Number(f[3]), sp = Number(f[4])
+    const left = Math.max(0, sectionSec - t)
+    // erst nach 5 s geladenem Material: ffmpeg läuft langsam an (gemessen 0,15× am Anfang, dann 4,7×) → sonst zeigt die Restzeit kurz Stunden
+    return { fraction: Math.min(1, t / sectionSec), ...(sp > 0 && t >= 5 ? { etaSec: Math.round(left / sp) } : {}), speed: `${sp}x` }
+  }
+  return null
+}
+
+/** Pausierte bzw. vom Nutzer abgebrochene Downloads. */
+let paused = false
+const cancelled = new WeakSet<ChildProcess>()
+
+/**
+ * Laufende Downloads steuern. Pause hält die ganze Prozessgruppe an (SIGSTOP/SIGCONT, nur macOS/Linux; Windows: false).
+ * Abbrechen beendet yt-dlp samt ffmpeg; der Download endet dann mit „Download abgebrochen“.
+ */
+export function controlDownloads(action: 'pause' | 'resume' | 'cancel'): boolean {
+  if (!running.size) return false
+  if (action === 'cancel') {
+    for (const c of running) { cancelled.add(c); if (!WIN && paused && c.pid) try { process.kill(-c.pid, 'SIGCONT') } catch { /* weg */ } killTree(c) }
+    paused = false
+    return true
+  }
+  if (WIN) return false
+  for (const c of running) if (c.pid) try { process.kill(-c.pid, action === 'pause' ? 'SIGSTOP' : 'SIGCONT') } catch { /* weg */ }
+  paused = action === 'pause'
+  return true
+}
+export const downloadsPaused = (): boolean => paused
 /** Laufende yt-dlp-Prozesse (inkl. ihrer ffmpeg-Kinder): werden beim Beenden der App gestoppt, sonst laden sie verwaist weiter. */
 const running = new Set<ChildProcess>()
 
@@ -256,13 +298,23 @@ export function runYtDlp(
         for (const line of lines) onLine(line)
       }
     })
+    let errBuf = ''
     child.stderr.on('data', (d: Buffer) => {
-      stderr += d.toString()
+      const text = d.toString()
+      stderr += text
       if (stderr.length > 65536) stderr = stderr.slice(-32768)
+      // ffmpeg schreibt seinen Fortschritt (time=, speed=) mit \r auf stderr
+      if (onLine) {
+        errBuf += text
+        const lines = errBuf.split(/[\r\n]/)
+        errBuf = lines.pop() ?? ''
+        for (const line of lines) if (line.includes('time=')) onLine(line)
+      }
     })
     child.on('error', reject)
     child.on('close', (code) => {
-      if (code === 0) resolve(stdout)
+      if (cancelled.has(child)) reject(new Error('Download abgebrochen'))
+      else if (code === 0) resolve(stdout)
       else if (BOT_CHECK.test(stderr)) reject(new YtDlpError('YouTube blockiert gerade diese Verbindung („Bot-Prüfung“), meist nur zeitweise. Später erneut versuchen; hilft das nicht: Einstellungen → YouTube-Anmeldung (Firefox oder cookies.txt).'))
       else reject(new YtDlpError(cleanYtDlpError(stderr) || `yt-dlp exited with code ${code}`))
     })
@@ -392,6 +444,30 @@ async function downloadOnce(
   cookieOpts: CookieAuthOptions,
   extraArgs: string[]
 ): Promise<void> {
+  // Länge des Zeitbereichs (für die Restzeit, wenn ffmpeg lädt): --download-sections *a-b
+  const sec = extraArgs[extraArgs.indexOf('--download-sections') + 1]?.match(/^\*([\d.]+)-([\d.]+)$/)
+  const sectionSec = extraArgs.includes('--download-sections') && sec ? Number(sec[2]) - Number(sec[1]) : undefined
+  try {
+    await downloadRun(binPath, url, outPath, onProgress, cookieOpts, extraArgs, sectionSec)
+  } catch (e) {
+    // abgebrochen: Teildateien (…part.mp4, .part, .ytdl, Fragmente) entfernen, damit ein neuer Versuch sauber beginnt
+    if (e instanceof Error && e.message === 'Download abgebrochen') {
+      const dir = dirname(outPath), base = basename(outPath)
+      for (const f of await readdir(dir).catch(() => [] as string[])) if (f.startsWith(base)) await rm(join(dir, f), { force: true }).catch(() => undefined)
+    }
+    throw e
+  }
+}
+
+async function downloadRun(
+  binPath: string,
+  url: string,
+  outPath: string,
+  onProgress: ProgressFn,
+  cookieOpts: CookieAuthOptions,
+  extraArgs: string[],
+  sectionSec: number | undefined
+): Promise<void> {
   await runYtDlp(
     binPath,
     [
@@ -407,11 +483,10 @@ async function downloadOnce(
       url
     ],
     (line) => {
-      const match = line.match(/\[download\]\s+([\d.]+)%/)
-      if (match) {
-        // Map download to 0.15..0.95 of the import (after binary setup).
-        const fraction = Number(match[1]) / 100
-        onProgress({ progress: 0.15 + fraction * 0.8, message: 'Downloading video…' })
+      const pr = parseDownloadProgress(line, sectionSec)
+      if (pr) {
+        // Download = 0.15..0.95 des Imports (nach Einrichtung des Downloaders)
+        onProgress({ progress: 0.15 + pr.fraction * 0.8, message: downloadsPaused() ? 'Download pausiert' : 'Video wird heruntergeladen …', ...(pr.etaSec !== undefined ? { etaSec: pr.etaSec } : {}), ...(pr.speed ? { speed: pr.speed } : {}) })
       } else if (line.includes('[Merger]')) {
         onProgress({ progress: 0.96, message: 'Merging streams…' })
       }

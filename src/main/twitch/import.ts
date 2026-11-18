@@ -81,7 +81,8 @@ export async function inspectTwitch(url: string): Promise<TwitchInfo | null> {
   try {
     if (ref.kind === 'vod') {
       const j = await ytJson(bin, `https://www.twitch.tv/videos/${ref.id}`, ['--no-playlist'])
-      return { ...base, state: 'vod', channel: j.uploader_id ?? j.uploader ?? null, title: j.title ?? '', durationSec: j.duration ?? 0 }
+      const recording = !!j.is_live
+      return { ...base, state: 'vod', channel: j.uploader_id ?? j.uploader ?? null, title: j.title ?? '', durationSec: j.duration ?? 0, recording, message: recording ? 'Der Stream läuft noch – das VOD wächst. „Ganzes VOD“ lädt alles bis jetzt.' : null }
     }
     if (ref.kind === 'clip') {
       const j = await ytJson(bin, ref.channel ? `https://www.twitch.tv/${ref.channel}/clip/${ref.slug}` : `https://clips.twitch.tv/${ref.slug}`, ['--no-playlist'])
@@ -112,7 +113,7 @@ export interface TwitchImportOptions {
   lastMinutes?: number
 }
 
-export async function importTwitch(url: string, opts: TwitchImportOptions, onProgress: (p: number, message: string) => void): Promise<ImportResult> {
+export async function importTwitch(url: string, opts: TwitchImportOptions, onProgress: (p: number, message: string, extra?: { etaSec?: number; speed?: string }) => void): Promise<ImportResult> {
   const ref: TwitchRef | null = parseTwitchUrl(url)
   if (!ref) throw new Error('Das ist kein Twitch-Link.')
   const hasToken = !!(await readTwitchToken())

@@ -4,6 +4,7 @@ import { listCustomFonts } from '../fonts'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'node:path'
 import { importFile, importUrl, type ImportResult } from './importer'
+import { controlDownloads } from '../pipeline/ytdlp'
 import { JobQueue } from './jobs'
 import { discardProject, loadMeta, projectFile, projectsRoot, saveMeta } from './project'
 import { allowMediaPath } from '../mediaAccess'
@@ -69,7 +70,9 @@ export function registerShortmeIpc(): void {
   jobs.on('removed', (id) => broadcast('shortme:job-removed', id))
 
   ipcMain.handle('shortme:importFile', async (_e, path: string) => withStills(await importFile(path)))
-  ipcMain.handle('shortme:importUrl', async (_e, url: string) => withStills(await importUrl(url, (p, message) => broadcast('shortme:importProgress', { progress: p, message }))))
+  ipcMain.handle('shortme:importUrl', async (_e, url: string) => withStills(await importUrl(url, (p, message, extra) => broadcast('shortme:importProgress', { progress: p, message, ...extra }))))
+  /** Laufenden Download pausieren, fortsetzen oder abbrechen (Pause nur macOS). */
+  ipcMain.handle('shortme:importControl', (_e, action: unknown) => (action === 'pause' || action === 'resume' || action === 'cancel' ? controlDownloads(action) : false))
   // Inhaltstyp-Vorschlag, Facecam-Layouts pro Kanal
   ipcMain.handle('shortme:suggestKind', async (_e, hash: string) => { const meta = await loadMeta(hash); if (!meta) throw new Error('Projekt nicht gefunden'); return suggestKind(meta) })
   /** Inhaltstyp nachträglich ändern: Ausschnitt und Ranking werden neu berechnet (Transkript bleibt). */

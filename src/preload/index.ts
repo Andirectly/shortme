@@ -311,8 +311,9 @@ const api = {
       ipcRenderer.on('shortme:job', l)
       return () => ipcRenderer.removeListener('shortme:job', l)
     },
-    onImportProgress: (cb: (p: { progress: number; message: string }) => void): (() => void) => {
-      const l = (_e: Electron.IpcRendererEvent, p: { progress: number; message: string }): void => cb(p)
+    importControl: (action: 'pause' | 'resume' | 'cancel'): Promise<boolean> => ipcRenderer.invoke('shortme:importControl', action),
+    onImportProgress: (cb: (p: { progress: number; message: string; etaSec?: number; speed?: string }) => void): (() => void) => {
+      const l = (_e: Electron.IpcRendererEvent, p: { progress: number; message: string; etaSec?: number; speed?: string }): void => cb(p)
       ipcRenderer.on('shortme:importProgress', l)
       return () => ipcRenderer.removeListener('shortme:importProgress', l)
     }

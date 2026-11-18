@@ -40,7 +40,7 @@ export function registerTwitchIpc(): void {
   ipcMain.handle('twitch:inspect', (_e, url: string) => inspectTwitch(url))
   /** Importiert VOD/Clip/„letzte Minuten“; mit `analyze` startet danach automatisch die Clip-Analyse. */
   ipcMain.handle('twitch:import', async (_e, url: string, opts: TwitchImportOptions & { analyze?: boolean }) => {
-    const res = await importTwitch(url, opts, (p, message) => broadcast('shortme:importProgress', { progress: p, message }))
+    const res = await importTwitch(url, opts, (p, message, extra) => broadcast('shortme:importProgress', { progress: p, message, ...extra }))
     if (opts.analyze) await analyze(res.meta.hash)
     return withStills(res)
   })

@@ -6,6 +6,18 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.42.1] - 2026-11-18
+
+### Added
+
+- Downloads: Restzeit und Tempo während des Herunterladens; Download pausieren/fortsetzen (Mac) und abbrechen (bereits geladene Teile werden gelöscht).
+- Twitch: VODs, deren Stream noch läuft, sind markiert („läuft noch“); „Ganzes VOD“ lädt dort alles bis jetzt.
+
+### Fixed
+
+- Downloads liefen nach dem Beenden der App weiter und konnten mehrfach in dieselbe Datei schreiben; jetzt werden sie beim Beenden gestoppt, doppelte Downloads hängen sich an den laufenden an, Reste einer alten Sitzung werden beim Start beendet.
+- „Ganzes VOD“ eines laufenden Streams nahm den Livestream bis zum Streamende auf (Download endete nie).
+
 ## [0.42.0] - 2026-11-18
 
 ### Added
