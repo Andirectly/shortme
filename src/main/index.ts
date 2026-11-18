@@ -15,6 +15,7 @@ import { initialWindowSize, MIN_WINDOW } from './windowSize'
 import { resolveUserDataPath } from './userData'
 import { stopInference } from './inference/client'
 import { validatePackage } from './packageValidation'
+import { killOrphanYtDlp, stopAllYtDlp, ytDlpPath } from './pipeline/ytdlp'
 
 app.setName('Cutawan')
 app.setPath('userData', resolveUserDataPath(app.getPath('appData'), process.env.CUTAWAN_USER_DATA))
@@ -301,6 +302,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  killOrphanYtDlp(ytDlpPath())
   if (process.env.CUTAWAN_PACKAGE_CHECK) {
     void validatePackage(process.env.CUTAWAN_PACKAGE_CHECK).then(() => app.quit()).catch(error => {
       console.error('Packaged validation failed:', error)
@@ -347,4 +349,4 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => { stopInference(); void shutdownTwitch() })
+app.on('before-quit', () => { stopInference(); stopAllYtDlp(); void shutdownTwitch() })

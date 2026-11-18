@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { createWriteStream, existsSync } from 'node:fs'
 import { chmod, mkdir, rename } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -205,13 +205,44 @@ function jsRuntimeArgs(): string[] {
   return existsSync(exe) ? ['--js-runtimes', `node:${exe}`] : []
 }
 
+const WIN = process.platform === 'win32'
+/** Laufende yt-dlp-Prozesse (inkl. ihrer ffmpeg-Kinder): werden beim Beenden der App gestoppt, sonst laden sie verwaist weiter. */
+const running = new Set<ChildProcess>()
+
+/** Prozess samt Kindern beenden (Windows: taskkill /T; sonst ganze Prozessgruppe, yt-dlp startet als eigene Gruppe). */
+function killTree(child: ChildProcess): void {
+  if (!child.pid || child.exitCode !== null) return
+  if (WIN) { execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], () => undefined); return }
+  try { process.kill(-child.pid, 'SIGTERM') } catch { child.kill('SIGTERM') }
+}
+
+/** Beim Beenden der App: alle Downloads stoppen (gemessen: drei Twitch-Downloads liefen nach einem Neustart weiter und schrieben in dieselbe Datei). */
+export function stopAllYtDlp(): void {
+  for (const c of running) killTree(c)
+  running.clear()
+}
+
+/** Beim Start (macOS): verwaiste yt-dlp-Prozesse dieser App aus einer abgestürzten/beendeten Sitzung stoppen (Elternprozess launchd, eigener Binärpfad). */
+export function killOrphanYtDlp(binPath: string): void {
+  if (WIN) return
+  execFile('/usr/bin/pgrep', ['-P', '1', '-f', binPath], (err, out) => {
+    if (err) return
+    for (const pid of out.split('\n').map(Number).filter((n) => n > 1)) {
+      execFile('/usr/bin/pkill', ['-TERM', '-P', String(pid)], () => undefined) // ffmpeg-Kinder
+      try { process.kill(pid, 'SIGTERM') } catch { /* schon weg */ }
+    }
+  })
+}
+
 export function runYtDlp(
   binPath: string,
   args: string[],
   onLine?: (line: string) => void
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(binPath, [...jsRuntimeArgs(), ...args], { windowsHide: true })
+    const child = spawn(binPath, [...jsRuntimeArgs(), ...args], { windowsHide: true, detached: !WIN })
+    running.add(child)
+    child.on('exit', () => running.delete(child))
     let stdout = ''
     let stderr = ''
     let lineBuf = ''
@@ -335,13 +366,31 @@ export async function fetchUrlMeta(
 // TransNetV2 17 min. Fallback auf jedes mp4, dann beliebig.
 const DOWNLOAD_FORMAT = 'bv*[height<=1080][ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b'
 
-export async function downloadUrlVideo(
+/** Laufende Downloads je Zieldatei: ein zweiter Import desselben Ziels hängt sich an, statt parallel in dieselbe Datei zu schreiben. */
+const activeDownloads = new Map<string, Promise<void>>()
+
+export function downloadUrlVideo(
   binPath: string,
   url: string,
   outPath: string,
   onProgress: ProgressFn,
   cookieOpts: CookieAuthOptions = {},
   extraArgs: string[] = []
+): Promise<void> {
+  const same = activeDownloads.get(outPath)
+  if (same) { onProgress({ progress: -1, message: 'Wird schon heruntergeladen – warte auf den laufenden Download …' }); return same }
+  const p = downloadOnce(binPath, url, outPath, onProgress, cookieOpts, extraArgs).finally(() => activeDownloads.delete(outPath))
+  activeDownloads.set(outPath, p)
+  return p
+}
+
+async function downloadOnce(
+  binPath: string,
+  url: string,
+  outPath: string,
+  onProgress: ProgressFn,
+  cookieOpts: CookieAuthOptions,
+  extraArgs: string[]
 ): Promise<void> {
   await runYtDlp(
     binPath,
