@@ -9,7 +9,7 @@ import { discardProject, loadMeta, projectFile, projectsRoot, saveMeta } from '.
 import { allowMediaPath } from '../mediaAccess'
 import { editorAssets } from './editorAssets'
 import { planExport } from './render/exporter'
-import { sanitizeLog } from '../../shared/edits'
+import { editWindow, sanitizeLog } from '../../shared/edits'
 import { loadTranscript, runTranscription } from './transcription'
 import { findClip, loadClips, saveClips, layoutFile } from './clips/analysis'
 import { ENGINE_LABEL, LEGACY_RUN_ID, isV3Profile } from '../../shared/engine'
@@ -310,7 +310,8 @@ ${meta.sourcePath}` }
     const meta = await loadMeta(hash)
     const clip = (await findClip(hash, clipId))?.clip
     if (!meta || !clip) throw new Error('Clip nicht gefunden')
-    return editorAssets(meta, clip)
+    const [start, end] = editWindow(clip.start, clip.end, meta.durationSec)
+    return editorAssets(meta, { id: clip.id, start, end })
   })
   /** Editor: exakt der Plan, den der Export verwendet (Pausenschnitte, Stücke mit Ausschnitt/Zoom) → Vorschau = Export. */
   ipcMain.handle('shortme:previewPlan', async (_e, hash: string, clipId: string, rawLog: unknown, presetId?: string) => {

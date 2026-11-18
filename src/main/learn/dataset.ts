@@ -67,7 +67,8 @@ export async function projectRecords(hash: string, split: 'train' | 'test'): Pro
     const mine = corr.filter((e) => e.clipId === c.id)
     const rec: CandRecord = {
       ...base, id: `${hash}:${c.id}`, source: 'shortme', start: c.start, end: c.end, transcript: textIn(words, c.start, c.end), marks: marks(c.start, c.end),
-      rubric: c.v2 ? null : c.criteria, ...(c.v2 ? { engine: 'multimodal-v2', runId: c.runId, eventId: c.v2.eventId, variantId: c.v2.variantId } : {}), heat: h(c.start, c.end), rating: ratings[c.id] ? { level: ratings[c.id].level, reasons: ratings[c.id].reasons } : null,
+      // Engine je Clip (Engine 3/4 tragen auch ein v2-Feld – nicht daran erkennen); Engine 1 ohne Kennung = 'legacy'
+      rubric: c.v2 ? null : c.criteria, engine: c.engine ?? (c.v2 ? 'multimodal-v2' : 'legacy'), ...(c.runId ? { runId: c.runId } : {}), ...(c.v2 ? { eventId: c.v2.eventId, variantId: c.v2.variantId } : {}), heat: h(c.start, c.end), rating: ratings[c.id] ? { level: ratings[c.id].level, reasons: ratings[c.id].reasons } : null,
       corrections: changed ? { startShift: +(st.start - c.start).toFixed(2), endShift: +(st.end - c.end).toFixed(2), cutText, hook: st.hook.text !== c.hookText ? { before: c.hookText, after: st.hook.text } : undefined, framing: st.layoutOps.length + st.streamOps.length > 0, ...(st.autoCuts.length < (c.autoCuts?.length ?? 0) ? { autoCutsRestored: true } : {}) } : null,
       exported: mine.some((e) => e.kind === 'export'), playedSec: mine.reduce((s, e) => s + (e.kind === 'played' ? e.sec : 0), 0), fate: gone.some((g) => g.clip.id === c.id) ? 'deleted' : 'selected'
     }

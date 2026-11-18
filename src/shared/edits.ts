@@ -120,6 +120,11 @@ export function sanitizeLog(x: unknown, clipId: string): EditLog {
   return { version: 1, clipId, ops, cursor: Math.max(0, Math.min(ops.length, Number.isInteger(l.cursor) ? (l.cursor as number) : ops.length)) }
 }
 
+/** Puffer im Editor: so viele Sekunden vor und nach dem Clip lassen sich dazunehmen (Clip startet zu spät / endet zu früh). */
+export const EDIT_PAD_SEC = 60
+/** Sichtbarer Bereich der Editor-Zeitleiste (Quellzeit), auf die Quelle begrenzt. */
+export const editWindow = (start: number, end: number, sourceSec: number): [number, number] => [Math.max(0, start - EDIT_PAD_SEC), Math.min(Math.max(end, sourceSec || end), end + EDIT_PAD_SEC)]
+
 export interface WordT { start: number; end: number }
 
 /** Wirksamer Clip nach den Edits: neue Wortgrenzen, Shots auf den neuen Beginn bezogen und mit Layout-/Follow-Überschreibungen. */

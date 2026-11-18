@@ -62,6 +62,7 @@ export async function filmstrip(meta: ProjectMeta, clip: Pick<ShortmeClip, 'id' 
 
 export interface EditorAssets { peaks: number[]; step: number; strip: string[] }
 
+/** `clip` = angezeigter Bereich (Clip samt Puffer, siehe editWindow). */
 export async function editorAssets(meta: ProjectMeta, clip: Pick<ShortmeClip, 'id' | 'start' | 'end'>): Promise<EditorAssets> {
   const cache = projectFile(meta.hash, join('edit', `${clip.id.replace(/[^\w.-]/g, '_')}-peaks-${clip.start.toFixed(1)}-${clip.end.toFixed(1)}.json`))
   let peaks: number[]

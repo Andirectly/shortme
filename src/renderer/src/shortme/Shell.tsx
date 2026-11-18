@@ -36,7 +36,8 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
   useEffect(() => { void refreshLive(); const t = setInterval(() => void refreshLive(), 3000); return () => clearInterval(t) }, [refreshLive])
   return (
     <div className="sm-root" data-theme={theme}>
-      <div className="sm-ambient" style={{ backgroundImage: `url(${IMG.ambient})` }} />
+      {/* Festes Stimmungsbild nur in der Browser-Vorschau; in der App scheint der echte Desktop durch (Windows-Acrylic) */}
+      {!window.cutawan && <div className="sm-ambient" style={{ backgroundImage: `url(${IMG.ambient})` }} />}
       <div className="sm-titlebar">
         <span className="sm-logo"><Logo size={16} /></span>
         <strong style={{ color: 'var(--text-1)', fontWeight: 600 }}>Shortme</strong>

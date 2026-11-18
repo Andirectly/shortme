@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
-import { baseState, canRedo, canUndo, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
+import { baseState, canRedo, canUndo, editWindow, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
 import type { PreviewPlan, ShortmeShot } from '@shared/shortme'
 import { groupWords } from '@shared/captions'
 import type { PresetPatch } from '@shared/preset'
@@ -49,9 +49,14 @@ export function EditorScreen(): React.JSX.Element {
   const { base } = useSprings()
 
   // ---------- Nicht-destruktive Bearbeitung: Operationslog, Autosave ----------
-  const origStart = real?.start ?? 0
-  const D = real ? real.end - real.start : clip.duration
-  const baseSt = useMemo(() => baseState({ start: origStart, end: real?.end ?? clip.duration, hookText: clip.hook, corrections: real?.corrections, autoCuts: real?.autoCuts }, useStore.getState().presetId, styleDefaults), [origStart, real?.end, clip.duration, clip.hook, real?.corrections, real?.autoCuts, styleDefaults])
+  // Zeitleiste = Clip samt Puffer davor/danach (Ursprung `origStart`); der Clip selbst liegt bei clipStart…clipEnd
+  const clipStart = real?.start ?? 0
+  // Quelldauer: aus der Clipliste, sonst Projektliste, sonst letztes Wort (ohne Angabe gäbe es keinen Puffer hinter dem Clip)
+  const projectSec = useProject((s) => s.projects.find((p) => p.hash === hash)?.durationSec ?? 0)
+  const sourceSec = source?.durationSec || projectSec || (transcript?.words.at(-1)?.end ?? 0)
+  const [origStart, winEnd] = real ? editWindow(real.start, real.end, sourceSec) : [0, clip.duration]
+  const D = winEnd - origStart
+  const baseSt = useMemo(() => baseState({ start: clipStart, end: real?.end ?? clip.duration, hookText: clip.hook, corrections: real?.corrections, autoCuts: real?.autoCuts }, useStore.getState().presetId, styleDefaults), [clipStart, real?.end, clip.duration, clip.hook, real?.corrections, real?.autoCuts, styleDefaults])
   const [log, setLog] = useState<EditLog>(emptyLog(clipId))
   const [loaded, setLoaded] = useState(false)
   const [saved, setSaved] = useState(true)
@@ -85,8 +90,8 @@ export function EditorScreen(): React.JSX.Element {
 
   // ---------- Wörter, Zustand ----------
   const rawWords = useMemo(() => (real && transcript
-    ? transcript.words.slice(real.firstWord, real.lastWord + 1).map((w, i) => ({ w: w.w, t: Math.max(0, w.start - real.start), e: Math.max(0, w.end - real.start), g: real.firstWord + i, hi: real.tags.some((x) => x.word === real.firstWord + i) }))
-    : real ? [] : TRANSCRIPT.map((w, i) => ({ ...w, g: i, t: (i * clip.duration) / TRANSCRIPT.length, e: ((i + 0.8) * clip.duration) / TRANSCRIPT.length }))), [clip.duration, real, transcript])
+    ? transcript.words.map((w, g) => ({ w, g })).filter(({ w }) => w.start >= origStart && w.end <= winEnd).map(({ w, g }) => ({ w: w.w, t: w.start - origStart, e: w.end - origStart, g, hi: real.tags.some((x) => x.word === g) }))
+    : real ? [] : TRANSCRIPT.map((w, i) => ({ ...w, g: i, t: (i * clip.duration) / TRANSCRIPT.length, e: ((i + 0.8) * clip.duration) / TRANSCRIPT.length }))), [clip.duration, real, transcript, origStart, winEnd])
   const words = useMemo(() => rawWords.map((w) => ({ ...w, w: st.wordEdits[w.g] ?? w.w, edited: st.wordEdits[w.g] !== undefined })), [rawWords, st.wordEdits])
   const [t, setT] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -461,6 +466,9 @@ export function EditorScreen(): React.JSX.Element {
         cuts={(plan?.cuts ?? []).map((c) => [c[0] - origStart, c[1] - origStart] as [number, number])}
         shots={(plan?.shots ?? []).map((s) => ({ ...s, start: s.start + (plan ? plan.start - origStart : 0), end: s.end + (plan ? plan.start - origStart : 0) }))}
         outDuration={outDuration}
+        ranges={st.autoCuts.filter((c) => c.end > origStart && c.start < origStart + D).map((c) => [c.start - origStart, c.end - origStart] as [number, number])}
+        onCutRange={(r) => commit({ t: 'autoCuts', ranges: [{ start: origStart + r[0], end: origStart + r[1] }], cut: true })}
+        onRestoreRange={(r) => commit({ t: 'autoCuts', ranges: [{ start: origStart + r[0], end: origStart + r[1] }], cut: false })}
         onTrim={(next) => { setLiveTrim(null); if (next[0] !== committed[0] || next[1] !== committed[1]) commit({ t: 'trim', start: origStart + next[0], end: origStart + next[1] }) }} onPreview={setLiveTrim} base={base}
         onCheckEnd={() => { seek(Math.max(trim[0], trim[1] - 2.5)); const v = videoRef.current; if (v) void v.play().then(() => setPlaying(true)).catch(() => undefined); else setPlaying(true) }} />
     </div>
@@ -471,10 +479,14 @@ interface TimelineProps {
   duration: number; trim: [number, number]; t: number; onSeek: (n: number) => void; words: { t: number; e: number }[]; playing: boolean; onToggle: () => void; muted: boolean; onMute: () => void; volume: number; onVolume: (v: number) => void
   peaks?: number[]; strip?: string[]; cuts: Array<[number, number]>; shots: ShortmeShot[]; outDuration: number
   onTrim: (t: [number, number]) => void; onPreview: (t: [number, number]) => void; onCheckEnd: () => void; base: object
+  /** Von Hand (oder automatisch) herausgeschnittene Zeitbereiche, relativ zum Clip; Klick stellt wieder her. */
+  ranges: Array<[number, number]>; onCutRange: (r: [number, number]) => void; onRestoreRange: (r: [number, number]) => void
 }
 
-function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, onMute, volume, onVolume, peaks, strip, cuts, shots, outDuration, onTrim, onPreview, onCheckEnd, base }: TimelineProps): React.JSX.Element {
+function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, onMute, volume, onVolume, peaks, strip, cuts, shots, outDuration, onTrim, onPreview, onCheckEnd, base, ranges, onCutRange, onRestoreRange }: TimelineProps): React.JSX.Element {
   const track = useRef<HTMLDivElement>(null)
+  /** Anfang eines Bereichs, der gelöscht werden soll (Abspielposition beim Markieren); Ende = aktuelle Position. */
+  const [mark, setMark] = useState<number | null>(null)
   const [grab, setGrab] = useState<'in' | 'out' | 'head' | null>(null)
   const live = useRef<[number, number]>(trim)
   const offset = useRef(0)
@@ -524,6 +536,12 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         <small style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-1)', minWidth: 130 }}>{fmt(t)} / {fmt(trim[1] - trim[0])}</small>
         <small>Export nach Kürzen: <b style={{ color: 'var(--text-1)' }}>{outDuration.toFixed(1)} s</b></small>
         <div style={{ flex: 1 }} />
+        {mark === null
+          ? <Pill onClick={() => setMark(t)}><Scissors size={13} /> Ab hier markieren</Pill>
+          : <>
+              <Pill onClick={() => { const a = snap(Math.min(mark, t)), b = snap(Math.max(mark, t)); if (b - a >= 0.2) onCutRange([a, b]); setMark(null) }}><Scissors size={13} /> Bis hier löschen ({Math.abs(t - mark).toFixed(1)} s)</Pill>
+              <Pill onClick={() => setMark(null)}>Abbrechen</Pill>
+            </>}
         <Pill onClick={onCheckEnd}><Rewind size={13} /> Ende prüfen</Pill>
         <Pill onClick={() => onTrim([trim[0], Math.min(duration, snap(trim[1] + 4))])}><Scissors size={13} /> Satz verlängern</Pill>
         <Pill onClick={() => onTrim([trim[0], Math.max(trim[0] + 1, snap(trim[1] - 4))])}><Scissors size={13} /> Satz kürzen</Pill>
@@ -546,6 +564,8 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         <div style={{ position: 'relative', borderRadius: 6, background: 'rgba(255,255,255,0.04)' }}>
           {shots.map((s, i) => <div key={i} title={`${LAYOUT_LABEL[s.layout]}${s.auto ? " (automatisch: keine Person im Ausschnitt → Vollbild)" : ""} · ${fmt(s.start)}–${fmt(s.end)}`} style={{ position: 'absolute', top: 2, bottom: 2, left: pct(s.start), width: `calc(${pct(s.end)} - ${pct(s.start)})`, background: LAYOUT_COLOR[s.layout], borderRadius: 4, fontSize: 10, lineHeight: '20px', paddingLeft: 4, overflow: 'hidden', whiteSpace: 'nowrap', color: '#fff', ...(s.auto ? { outline: '1px dashed var(--warn)' } : {}) }}>{LAYOUT_LABEL[s.layout]}{s.auto ? ' · auto' : ''}</div>)}
         </div>
+        {mark !== null && <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: pct(Math.min(mark, t)), width: `calc(${pct(Math.max(mark, t))} - ${pct(Math.min(mark, t))})`, background: 'rgba(255,80,80,0.28)', border: '1px solid rgba(255,120,120,0.9)', borderRadius: 6, pointerEvents: 'none' }} />}
+        {ranges.map((r, i) => <button key={`r${i}`} type="button" title={`Gelöscht ${fmt(r[0])}–${fmt(r[1])} · Klicken zum Wiederherstellen`} aria-label={`Gelöschten Bereich ${fmt(r[0])} bis ${fmt(r[1])} wiederherstellen`} onPointerDown={(e) => e.stopPropagation()} onClick={() => onRestoreRange(r)} style={{ position: 'absolute', top: 56, height: 22, left: pct(r[0]), width: `calc(${pct(r[1])} - ${pct(r[0])})`, minWidth: 14, zIndex: 2, border: '1px solid rgba(255,255,255,0.8)', borderRadius: 6, background: 'rgba(255,80,80,0.35)', color: '#fff', fontSize: 11, lineHeight: '18px', padding: 0, cursor: 'pointer', overflow: 'hidden' }}>↺</button>)}
         {/* außerhalb des Beschnitts abdunkeln */}
         <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: pct(trim[0]), background: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: `calc(100% - ${pct(trim[1])})`, background: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }} />

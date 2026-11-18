@@ -6,6 +6,23 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.38.0] - 2026-11-18
+
+### Added
+
+- Editor: Die Zeitleiste zeigt 60 Sekunden vor und nach dem Clip – Start und Ende lassen sich in beide Richtungen ziehen (früher anfangen, später aufhören).
+- Editor: Bereich in der Mitte löschen – „Ab hier markieren“, zur Endstelle spulen, „Bis hier löschen“. Gelöschte Bereiche sind in der Zeitleiste markiert; ein Klick stellt sie wieder her.
+
+### Changed
+
+- Fenster-Hintergrund: echter Glas-Effekt (Windows-Acrylic) statt eines festen Hintergrundbilds.
+- Projekte: „Auswählen“ steht oben rechts neben der Überschrift.
+
+### Fixed
+
+- Clip-Karten: Bewertungsknöpfe überlappen Titel und Dauer nicht mehr.
+- Lerndaten: Clips von Engine 3 und 4 werden mit ihrer richtigen Engine gespeichert (vorher als Engine 2).
+
 ## [0.37.0] - 2026-11-18
 
 ### Added

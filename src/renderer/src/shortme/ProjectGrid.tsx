@@ -16,7 +16,7 @@ const ago = (iso: string): string => {
 }
 
 /** Projektkarten mit 16:9-Vorschaubild (nicht zugeschnitten): YouTube-Thumbnail bei Links, sonst Screenshot des Videos. */
-export function ProjectGrid({ limit, selectable }: { limit?: number; /** Mehrfachauswahl + Massen-Löschen (nur in „Projekte“). */ selectable?: boolean }): React.JSX.Element {
+export function ProjectGrid({ limit, selectable, title }: { limit?: number; /** Mehrfachauswahl + Massen-Löschen (nur in „Projekte“). */ selectable?: boolean; /** Überschrift; die Auswahl-Knöpfe stehen dann rechts daneben. */ title?: string }): React.JSX.Element {
   const hasApi = useProject((s) => s.hasApi)
   const projects = useProject((s) => s.projects)
   const loadProjects = useProject((s) => s.loadProjects)
@@ -45,12 +45,16 @@ export function ProjectGrid({ limit, selectable }: { limit?: number; /** Mehrfac
     : PROJECTS.map((p) => ({ hash: '', key: p.id, source: '', isUrl: false, title: p.name, dur: p.duration, clips: p.clips, date: p.date, img: p.thumb, open: async () => go('clips') }))
   const shown = limit ? cards.slice(0, limit) : cards
 
-  if (shown.length === 0) return <small>Noch keine Projekte – ziehe oben ein Video hinein.</small>
+  const heading = title ? <h1>{title}</h1> : null
+  if (shown.length === 0) return <>{heading}<small>Noch keine Projekte – ziehe oben ein Video hinein.</small></>
   const recent = projects.filter((p) => withinDays(p.created, 30)).map((p) => p.hash)
   return (
     <>
-    {selectable && hasApi && (
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+    {(heading || (selectable && hasApi)) && (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+      {heading}
+      {selectable && hasApi && (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }}>
         {!picking ? <Button variant="secondary" onClick={() => { setPicking(true); setNote('') }}>Auswählen</Button> : (
           <>
             <small style={{ minWidth: 92 }}>{picked.size} ausgewählt</small>
@@ -62,6 +66,8 @@ export function ProjectGrid({ limit, selectable }: { limit?: number; /** Mehrfac
           </>
         )}
         {note && <small role="status">{note}</small>}
+      </div>
+      )}
       </div>
     )}
     {menu && (

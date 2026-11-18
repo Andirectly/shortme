@@ -17,7 +17,7 @@
   --r-card: 14px;
   --r-pill: 999px;
   --font: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
-  --shell-bg: rgba(10, 10, 14, 0.72);
+  --shell-bg: rgba(10, 10, 14, 0.5); /* über Acrylic: dunkel genug für Lesbarkeit, Desktop scheint durch */
   --titlebar-h: 44px;
 }
 

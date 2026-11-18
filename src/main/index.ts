@@ -259,7 +259,8 @@ function createWindow(): void {
             // Shortme: Mica on Windows 11 (build >= 22000), solid dark on Windows 10.
             // Native caption buttons stay on the right via the title bar overlay.
             backgroundColor: winSupportsMica() ? '#00000000' : '#0b0b10',
-            ...(winSupportsMica() ? { backgroundMaterial: 'mica' as const } : {}),
+            // Acrylic = echter, laufender Blur dessen, was hinter dem Fenster liegt (Mica zeigt nur das Desktop-Hintergrundbild)
+            ...(winSupportsMica() ? { backgroundMaterial: 'acrylic' as const } : {}),
             titleBarStyle: 'hidden' as const,
             titleBarOverlay: { color: '#00000000', symbolColor: '#ffffffcc', height: 44 }
           }
