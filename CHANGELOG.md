@@ -6,6 +6,14 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.39.0] - 2026-11-18
+
+### Changed
+
+- Live: „Stoppen & sichern“ beendet die Aufnahme und sichert alles bis dahin Aufgenommene als Projekt (inkl. Analyse). „Verwerfen“ beendet ohne Sichern (mit Rückfrage).
+- Live: Während einer Aufnahme leuchtet das ganze Live-Symbol in der Navigation rot.
+- Editor: Transkript-Spalte breiter und ruhiger gesetzt; beim Öffnen springt sie zum Clipbeginn.
+
 ## [0.38.0] - 2026-11-18
 
 ### Added

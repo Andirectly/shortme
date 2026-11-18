@@ -16,7 +16,8 @@ interface TwitchState {
   refreshSaves: () => Promise<void>
   refreshStatus: () => Promise<void>
   start: (channel: string) => Promise<string | null>
-  stop: () => Promise<void>
+  /** Stoppt den Puffer; `save` (Standard) sichert alles Aufgenommene als Projekt. Ergebnis: Fehlertext oder null, `saved` = gesichert. */
+  stop: (save?: boolean) => Promise<{ error: string | null; saved: boolean }>
   save: (minutes: number) => Promise<string | null>
 }
 
@@ -36,7 +37,11 @@ export const useTwitch = create<TwitchState>((set, get) => ({
     if (!a) return 'Nur in der Desktop-App verfügbar.'
     try { set({ live: await a.liveStart(channel) }); return null } catch (e) { return errText(e) }
   },
-  stop: async () => { const a = api(); if (a) set({ live: await a.liveStop() }) },
+  stop: async (save = true) => {
+    const a = api()
+    if (!a) return { error: 'Nur in der Desktop-App verfügbar.', saved: false }
+    try { const s = await a.liveStop(save); set({ live: s }); if (s.saved) void get().refreshSaves(); return { error: null, saved: !!s.saved } } catch (e) { return { error: errText(e), saved: false } }
+  },
   save: async (minutes) => {
     const a = api()
     if (!a) return 'Nur in der Desktop-App verfügbar.'

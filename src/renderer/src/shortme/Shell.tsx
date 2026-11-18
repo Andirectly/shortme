@@ -44,10 +44,9 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
       </div>
       <nav className="sm-nav sm-glass" aria-label="Hauptnavigation">
         {NAV.filter((n) => n.id !== 'testlab' || testlab).map((n) => (
-          <button key={n.id} className="sm-nav-item" aria-current={active === n.id ? 'page' : undefined} aria-label={n.label} title={n.label} onClick={() => go(n.id)}>
+          <button key={n.id} className={`sm-nav-item${n.id === 'live' && liveOn ? ' sm-nav-live' : ''}`} aria-current={active === n.id ? 'page' : undefined} aria-label={n.id === 'live' && liveOn ? `${n.label} – Aufnahme läuft` : n.label} title={n.id === 'live' && liveOn ? `${n.label} – Aufnahme läuft` : n.label} onClick={() => go(n.id)}>
             {active === n.id && <motion.span layoutId="nav-glow" className="sm-nav-glow" transition={base} />}
             {n.icon}
-            {n.id === 'live' && liveOn && <span aria-label="Live-Puffer läuft" className="sm-live-dot" />}
           </button>
         ))}
       </nav>

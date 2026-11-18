@@ -309,6 +309,8 @@ export function EditorScreen(): React.JSX.Element {
   const absT = origStart + t
   const wordRef = useRef<HTMLSpanElement>(null)
   useEffect(() => { if (playing) wordRef.current?.scrollIntoView({ block: 'nearest' }) }, [curIdx, playing])
+  // Beim Öffnen zum Clipbeginn scrollen (das Transkript zeigt auch den Puffer davor)
+  useEffect(() => { const id = setTimeout(() => wordRef.current?.scrollIntoView({ block: 'center' }), 400); return () => clearTimeout(id) }, [clipId])
 
   const exportNow = async (): Promise<void> => { await persist(logRef.current); await exportClips([clipId], st.caption.presetId, false) }
   const applyAll = async (): Promise<void> => {
@@ -358,18 +360,18 @@ export function EditorScreen(): React.JSX.Element {
         <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportNow()}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'clamp(230px, 14vw, 320px) minmax(0, 1fr) clamp(360px, 26vw, 500px)', gap: 14, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'clamp(300px, 22vw, 440px) minmax(0, 1fr) clamp(340px, 24vw, 480px)', gap: 14, minHeight: 0 }}>
         {/* Transkript */}
         <div className="sm-glass" style={{ padding: 16, overflowY: 'auto' }}>
           <h3 style={{ marginBottom: 10 }}>Transkript</h3>
-          <div style={{ lineHeight: 1.9, fontSize: 14 }}>
+          <div style={{ lineHeight: 1.75, fontSize: 14, textAlign: 'left', wordSpacing: 0 }}>
             {words.map((w, i) => (
               <Fragment key={w.g}>
                 {editing === w.g
                   ? <input autoFocus value={draft} size={Math.max(3, draft.length + 1)} onChange={(ev) => setDraft(ev.target.value)} onBlur={() => finishEdit(true)} onKeyDown={(ev) => { if (ev.key === 'Enter') finishEdit(true); else if (ev.key === 'Escape') finishEdit(false) }}
                       style={{ font: 'inherit', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: 4, color: '#fff', padding: '0 3px', outline: 'none' }} />
                   : <span ref={i === curIdx ? wordRef : undefined} onClick={(ev) => { setSel(w.g); if (ev.altKey) toggleCut(w.g); else seek(w.t) }} onDoubleClick={() => startEdit(w.g, w.w)} title="Klick: springen/auswählen · Doppelklick: Text ändern · Entf: herausschneiden"
-                      style={{ cursor: 'pointer', padding: '1px 2px', borderRadius: 4, marginRight: 3, textDecoration: cut.includes(w.g) ? 'line-through' : w.edited ? 'underline dotted rgba(255,255,255,0.6)' : 'none', opacity: cut.includes(w.g) ? 0.35 : w.t < trim[0] - 0.01 || w.e > trim[1] + 0.05 ? 0.4 : 1, background: i === curIdx ? 'rgba(255,255,255,0.22)' : 'transparent', outline: sel === w.g ? '1px solid rgba(255,255,255,0.55)' : 'none', color: cut.includes(w.g) ? 'rgba(255,255,255,0.45)' : undefined }}>{w.w}</span>}{' '}
+                      style={{ cursor: 'pointer', padding: '1px 2px', borderRadius: 4, textDecoration: cut.includes(w.g) ? 'line-through' : w.edited ? 'underline dotted rgba(255,255,255,0.6)' : 'none', opacity: cut.includes(w.g) ? 0.35 : w.t < trim[0] - 0.01 || w.e > trim[1] + 0.05 ? 0.4 : 1, background: i === curIdx ? 'rgba(255,255,255,0.22)' : 'transparent', outline: sel === w.g ? '1px solid rgba(255,255,255,0.55)' : 'none', color: cut.includes(w.g) ? 'rgba(255,255,255,0.45)' : undefined }}>{w.w}</span>}{' '}
               </Fragment>
             ))}
           </div>

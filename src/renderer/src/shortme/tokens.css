@@ -131,9 +131,10 @@ textarea.sm-input { height: auto; padding: 10px 16px; border-radius: 18px; resiz
 .sm-root select option:disabled { color: #8a8a90; }
 
 .sm-nav-item { position: relative; }
-.sm-live-dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: #ff4d4f; box-shadow: 0 0 0 2px rgba(20,20,26,0.9), 0 0 8px rgba(255,77,79,0.7); animation: sm-live-pulse 2s ease-in-out infinite; }
-@keyframes sm-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
-@media (prefers-reduced-motion: reduce) { .sm-live-dot { animation: none; } }
+/* Live-Aufnahme läuft: das ganze Symbol leuchtet sanft rot (statt eines kleinen Punkts) */
+.sm-nav-item.sm-nav-live { color: #ff5a5f; background: rgba(255,77,79,0.16); box-shadow: 0 0 0 1px rgba(255,90,95,0.55), 0 0 18px rgba(255,77,79,0.45); animation: sm-live-pulse 2.4s ease-in-out infinite; }
+@keyframes sm-live-pulse { 0%, 100% { box-shadow: 0 0 0 1px rgba(255,90,95,0.55), 0 0 18px rgba(255,77,79,0.45); } 50% { box-shadow: 0 0 0 1px rgba(255,90,95,0.3), 0 0 8px rgba(255,77,79,0.2); } }
+@media (prefers-reduced-motion: reduce) { .sm-nav-item.sm-nav-live { animation: none; } }
 
 .sm-build { position: fixed; left: 14px; bottom: 8px; z-index: 45; font-size: 11px; color: var(--text-3); opacity: 0.8; pointer-events: none; user-select: text; }
 

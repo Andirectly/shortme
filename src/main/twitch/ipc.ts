@@ -46,7 +46,8 @@ export function registerTwitchIpc(): void {
   })
 
   ipcMain.handle('twitch:liveStart', async (_e, channel: string) => { const s = await startLive(channel); broadcast('twitch:live', s); return s })
-  ipcMain.handle('twitch:liveStop', async () => { const s = await stopLive(); broadcast('twitch:live', s); return s })
+  // Stoppen sichert standardmäßig alles Aufgenommene als Projekt und analysiert es; `save=false` = verwerfen
+  ipcMain.handle('twitch:liveStop', async (_e, save = true) => { const s = await stopLive(save !== false); broadcast('twitch:live', s); if (s.saved) await analyze(s.saved.hash); return s })
   ipcMain.handle('twitch:liveStatus', () => liveStatus())
   ipcMain.handle('twitch:liveSaves', () => loadSaves())
   ipcMain.handle('twitch:liveSave', async (_e, minutes: number) => {

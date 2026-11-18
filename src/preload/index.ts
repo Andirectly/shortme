@@ -293,7 +293,7 @@ const api = {
       inspect: (url: string): Promise<TwitchInfo | null> => ipcRenderer.invoke('twitch:inspect', url),
       import: (url: string, opts: { section?: [number, number]; lastMinutes?: number; analyze?: boolean }): Promise<ShortmeImport> => ipcRenderer.invoke('twitch:import', url, opts),
       liveStart: (channel: string): Promise<LiveStatus> => ipcRenderer.invoke('twitch:liveStart', channel),
-      liveStop: (): Promise<LiveStatus> => ipcRenderer.invoke('twitch:liveStop'),
+      liveStop: (save = true): Promise<LiveStatus & { saved?: { hash: string; title: string; seconds: number } }> => ipcRenderer.invoke('twitch:liveStop', save),
       liveStatus: (): Promise<LiveStatus> => ipcRenderer.invoke('twitch:liveStatus'),
       liveSaves: (): Promise<LiveSave[]> => ipcRenderer.invoke('twitch:liveSaves'),
       liveSave: (minutes: number): Promise<{ hash: string; title: string; seconds: number }> => ipcRenderer.invoke('twitch:liveSave', minutes)

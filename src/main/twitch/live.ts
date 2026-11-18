@@ -110,21 +110,25 @@ export async function startLive(rawChannel: string): Promise<LiveStatus> {
   return liveStatus()
 }
 
-/** Stoppt die Aufnahme und löscht alle Segmente. */
-export async function stopLive(): Promise<LiveStatus> {
+/** Stoppt die Aufnahme. `save`: vorher alles Aufgenommene (ganzer Puffer) als Projekt sichern; danach werden die Segmente gelöscht. */
+export async function stopLive(save = false): Promise<LiveStatus & { saved?: { hash: string; title: string; seconds: number } }> {
   running = false
   if (timer) clearInterval(timer)
   if (retryTimer) clearTimeout(retryTimer)
   timer = retryTimer = null
-  chat?.stop(); chat = null
   const procs = [sl, ff]
   sl = null; ff = null
   for (const p of procs) killTree(p)
   await new Promise((r) => setTimeout(r, 400))
-  await rm(segDir(), { recursive: true, force: true }).catch(() => undefined)
-  cached = { bytes: 0, count: 0 }
-  channel = null; startedAt = null
-  return liveStatus()
+  let saved: { hash: string; title: string; seconds: number } | undefined
+  // Chat erst nach dem Sichern beenden (die Nachrichten des Bereichs gehören ins Projekt)
+  try { if (save && channel && (await listSegments()).some((s) => s.size > 0)) saved = await saveLive(Math.max(1, Math.ceil((await listSegments()).length * SEGMENT_SEC / 60))) } finally {
+    chat?.stop(); chat = null
+    await rm(segDir(), { recursive: true, force: true }).catch(() => undefined)
+    cached = { bytes: 0, count: 0 }
+    channel = null; startedAt = null
+  }
+  return { ...liveStatus(), ...(saved ? { saved } : {}) }
 }
 
 export function liveStatus(): LiveStatus {

@@ -40,7 +40,10 @@ export function LiveScreen(): React.JSX.Element {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input className="sm-input" style={{ flex: 1 }} aria-label="Twitch-Kanal" placeholder="Kanalname, z. B. papaplatte" disabled={live.running} value={live.running ? live.channel ?? '' : draft} onChange={(e) => setDraft(e.target.value)} />
           {live.running
-            ? <Button variant="secondary" disabled={busy} onClick={() => void run(async () => { await stop(); return null })}><Square size={14} /> Stoppen</Button>
+            ? <>
+                <Button variant="primary" disabled={busy} title="Aufnahme beenden und alles Aufgenommene als Projekt sichern" onClick={() => void run(async () => { const r = await stop(true); if (r.saved) go('processing'); return r.error })}><Square size={14} /> Stoppen &amp; sichern</Button>
+                <Button variant="secondary" disabled={busy} title="Aufnahme beenden, nichts sichern" onClick={() => { if (window.confirm('Aufnahme beenden und das Aufgenommene verwerfen?')) void run(async () => (await stop(false)).error) }}>Verwerfen</Button>
+              </>
             : <Button variant="primary" disabled={busy || channel.length < 2} onClick={() => void run(() => start(channel))}><Radio size={14} /> Puffer starten</Button>}
         </div>
 
