@@ -51,7 +51,7 @@ import { ensureProxy, needsProxy } from './proxy'
 import { MAC2_MODELS, MAC2_PIPELINE_VERSION, mac2Revisions } from './revisions'
 
 /** Laufzeit-Grenzen (05_LAUFZEITREGELN): weiches Zielbudget, Gemma-Rückfragen, Reparaturen. */
-export const MAC2_LIMITS = { softRunBudgetMs: 30 * 60_000, gemmaQuestions: 2, repairRounds: 1, extraRequestsPerCandidate: 1, observePadSec: 12, maxObserveSec: 60 } as const
+export const MAC2_LIMITS = { softRunBudgetMs: 30 * 60_000, gemmaQuestions: 2, repairRounds: 1, extraRequestsPerCandidate: 1, observePadSec: 12, maxObserveSec: 30 } as const
 
 const sleep0 = (): Promise<void> => new Promise((r) => setImmediate(r))
 
@@ -64,6 +64,13 @@ export function typeQueries(contentType: string | null | undefined, transcriptTe
   else if (/stream|gaming|twitch/.test(t)) q.push(['t-game', 'a dramatic moment in a video game'], ['t-react', 'a streamer reacting loudly to the screen'])
   else q.push(['t-surprise', 'a person reacting with surprise to something'], ['t-present', 'a person showing something to the camera'])
   return q.map(([id, text]) => ({ id, text, polarity: 'pos' as const, origin: 'bank' as const }))
+}
+
+/** Gesprochener Text der Ausgabe in 5-s-Blöcken („[0–5 s] …“): halb so viele Token wie eine Zeitangabe je Wort, Zeitbezug bleibt erhalten. */
+export function spokenBlocks(words: Array<{ w: string; start: number }>, block = 5): string {
+  const out: string[] = []
+  for (const w of words) { const k = Math.floor(w.start / block); out[k] = out[k] ? `${out[k]} ${w.w}` : w.w }
+  return out.map((txt, k) => (txt ? `[${k * block}–${(k + 1) * block} s] ${txt}` : '')).filter(Boolean).join('\n').slice(0, 4000)
 }
 
 interface Candidate { id: string; group: SeedGroup; span: Span; packets: Packet[]; obs: PacketObs[]; extraUsed: number; failed: string[]; gemma?: string }
@@ -246,7 +253,12 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     const edges: CutEdge[] = buildEdges({ duration: dur, words: t.words, silences: hasAudio ? req.input.signals.silences : [], shots: req.input.cuts, actions: scan ? actionEdges(scan.times, frameDiffs(scan.frames), Math.max(20, Math.round(dur / 15))) : [], audioPhrases: [] })
     const edgeMap = new Map(edges.map((e) => [e.id, e]))
     await save('cut_edges.json', { count: edges.length, edges })
-    const observed = cands.filter((c) => c.obs.length || c.gemma)
+    // Schnittpläne nur für die aussichtsreichsten (Wunschzahl + 4): zuerst belegte Kernereignisse (Reaktion, Pointe, Aussage, Handlung), dann Suchrang
+    // (gemessen: 35 s je Plan; 18 Pläne für 10 Wunsch-Clips kosteten 11 min). Nicht geplante Kandidaten werden protokolliert.
+    const strength = (c: Candidate): number => c.obs.flatMap((o) => o.events).filter((e) => e.state === 'observed' && e.role !== 'context').length + (c.gemma ? 1 : 0)
+    const viewed = cands.filter((c) => c.obs.length || c.gemma)
+    const observed = viewed.map((c, i) => ({ c, i, k: strength(c) })).sort((a, b) => b.k - a.k || a.i - b.i).slice(0, wanted + 4).map((x) => x.c)
+    await tracer.log('scheduler.jsonl', { plannedCandidates: observed.map((c) => c.id), skippedForPlanBudget: viewed.filter((c) => !observed.includes(c)).map((c) => ({ id: c.id, strength: strength(c) })) })
     const sentenceText = (sp: Span): string => sentences.filter((s) => s.end > sp.start && s.start < sp.end).map((s) => `S${s.index} ${s.start.toFixed(1)}s: ${s.text}`).join('\n').slice(0, 5000)
     const plans: ClipPlan[] = []
     let rankOrder: string[] = []
@@ -257,8 +269,8 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
         const c = observed[i]
         say('snap', i / Math.max(1, observed.length), `Schnitt planen ${i + 1} von ${observed.length}`)
         // ±45 s Kontext: genug Raum, um Einführung und Ausgang einzuschließen (gemessen: bei ±25 s lehnte Qwen fast alles als „aus dem Zusammenhang“ ab)
-        const win = { start: Math.max(0, c.span.start - 45), end: Math.min(dur, c.span.end + 45) }
-        const near = edgesNear(edges, c.span, 45, 40) // 40 Kanten: weniger Prompt-Token (Planung kostete 35 s je Aufruf)
+        const win = { start: Math.max(0, c.span.start - 40), end: Math.min(dur, c.span.end + 40) }
+        const near = edgesNear(edges, c.span, 40, 36) // 40 Kanten: weniger Prompt-Token (Planung kostete 35 s je Aufruf)
         const starts = near.filter((e) => e.t <= c.span.end - minSec + 2), ends = near.filter((e) => e.t >= c.span.start + minSec - 2)
         if (!starts.length || !ends.length) { fail(`plan ${c.id}`, new Error('keine passenden Schnittkanten im Fenster')); continue }
         let retries = 0
@@ -268,7 +280,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
             starts, ends, edges: edgeMap, minSec, maxSec, mayRetry: () => retries < 1, onRetry: () => { retries++; L.book({ kind: 'plan', label: `${c.id} Korrektur`, candidate: c.id, reason: 'schema-retry', model: MAC_QWEN.id, ms: 0, ok: true, units: 0 }) }, signal
           }))
           plans.push({ ...r.plan, coldOpen: coldOpenFromObs(c.obs, r.plan.span) })
-          await tracer.log('plans.jsonl', { candidate: c.id, attempts: r.attempts, plan: r.plan, raw: r.raw.slice(0, 2000) })
+          await tracer.log('plans.jsonl', { candidate: c.id, attempts: r.attempts, ms: r.ms, usage: r.usage, plan: r.plan, raw: r.raw.slice(0, 2000) })
         } catch (e) { if (signal?.aborted) throw e; fail(`plan ${c.id}`, e) }
       }
       const usable = plans.filter((p) => p.decision === 'use')
@@ -296,13 +308,24 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       const clip = clipFor(`${req.runId}-${o.plan.candidateId}-r${o.round}`, o.cut, t, trims, { title: o.titleFinal, runId: req.runId, engine: 'engine-mac', ...(o.plan.coldOpen ? { coldOpen: o.plan.coldOpen } : {}) })
       o.rendered = await L.run(reason === 'repair' ? 'repair-render' : 'render', `${o.plan.candidateId} rendern`, { candidate: o.plan.candidateId, reason, units: o.cut.span.end - o.cut.span.start }, () => renderVariant(meta, t, req.input.signals, req.input.cuts, clip, join(runDir, 'previews', `${o.plan.candidateId}-r${o.round}`), signal))
     }
-    await phase('render', async () => { for (let i = 0; i < outs.length; i++) { try { await renderOne(outs[i], i, outs.length, [], 'initial') } catch (e) { if (signal?.aborted) throw e; fail(`render ${outs[i].plan.candidateId}`, e) } } })
+    // Rendern läuft nacheinander im Hintergrund (CPU/VideoToolbox, keine GPU-Sperre); die LFM-Prüfung beginnt mit jedem fertigen Clip (Überlappung statt Wartezeit)
+    const renderChain = (list: Out[], run: (o: Out, i: number) => Promise<void>): Map<Out, Promise<void>> => {
+      const ready = new Map<Out, Promise<void>>()
+      let prev: Promise<void> = Promise.resolve()
+      list.forEach((o, i) => {
+        const p = prev.then(() => run(o, i)).catch((e) => { if (signal?.aborted) throw e; fail(`render ${o.plan.candidateId} r${o.round}`, e); o.rendered = null })
+        ready.set(o, p); prev = p.catch(() => undefined)
+      })
+      return ready
+    }
+    const t0Render = Date.now()
+    const ready0 = renderChain(outs, (o, i) => renderOne(o, i, outs.length, [], 'initial'))
 
     // ------------------------------------------------------------------------------------------------ G+H Prüfung der fertigen Dateien (LFM beobachtet, Qwen prüft)
-    const audit = async (list: Out[], label: string): Promise<void> => {
-      const todo = list.filter((o) => o.rendered)
+    const audit = async (list: Out[], label: string, ready: Map<Out, Promise<void>>): Promise<void> => {
+      const todo = [...list]
       for (const o of todo) o.obs = []
-      if (label !== 'r0') { L.plan('audit-packet', todo.reduce((n, o) => n + packetsFor('x', { start: 0, end: o.rendered!.durationSeconds }).length, 0)); L.plan('audit-judge', todo.length); L.plan('model-load', 2) } // Reparaturrunde: zusätzliche Arbeit
+      if (label !== 'r0') { L.plan('audit-packet', todo.reduce((n, o) => n + packetsFor('x', o.cut.span).length, 0)); L.plan('audit-judge', todo.length); L.plan('model-load', 2) } // Reparaturrunde: zusätzliche Arbeit
       await phase(`audit-observe-${label}`, async () => {
         let i = 0, restarts = 0
         while (i < todo.length && restarts <= 2) {
@@ -310,7 +333,11 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
             await withLfm(async (s) => {
               bookLoad(s, `Prüfung ${label}`)
               for (; i < todo.length; i++) {
-                const o = todo[i], r = o.rendered!
+                const o = todo[i]
+                say('compare', 0.4 * (i / todo.length), `Clip ${i + 1} von ${todo.length} wird gerendert und dann geprüft`)
+                await ready.get(o)
+                const r = o.rendered
+                if (!r) continue // Rendern fehlgeschlagen (in errors protokolliert)
                 for (const p of packetsFor(`${o.plan.candidateId}.r${o.round}`, { start: 0, end: r.durationSeconds })) {
                   say('compare', 0.4 + 0.3 * (i / todo.length), `Fertigen Clip ${i + 1} von ${todo.length} prüfen (Ton-/Bildpaket ${p.id.split('.p')[1]})`)
                   try { o.obs.push(await L.run('audit-packet', `${o.plan.candidateId} ${p.id}`, { candidate: o.plan.candidateId, model: MAC_LFM.id }, () => observePacket(s, { video: r.path, audio: r.streams.includes('audio') ? r.path : null, packet: p, mode: 'render', signal }))) }
@@ -321,13 +348,16 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
           } catch (e) { if (signal?.aborted) throw e; i++; restarts++ }
         }
       })
+      // alle Renders fertig (auch wenn die Beobachtung vorher abbrach)
+      await Promise.all(todo.map((o) => ready.get(o)))
+      const judged = todo.filter((o) => o.rendered)
       await phase(`audit-judge-${label}`, () => withQwen(async (s) => {
         bookLoad(s, `Inhaltsprüfung ${label}`)
-        for (let i = 0; i < todo.length; i++) {
-          const o = todo[i], r = o.rendered!
-          say('compare', 0.7 + 0.3 * (i / todo.length), `Inhalt prüfen ${i + 1} von ${todo.length}`)
+        for (let i = 0; i < judged.length; i++) {
+          const o = judged[i], r = o.rendered!
+          say('compare', 0.7 + 0.3 * (i / judged.length), `Inhalt prüfen ${i + 1} von ${judged.length}`)
           const cov = coverageOf({ start: 0, end: r.durationSeconds }, o.obs.map((x) => x.packet))
-          const spoken = planExport(r.clip, t, req.input.signals, false, (r.clip.autoCuts ?? []).map((c) => [c.start, c.end] as [number, number])).words.map((w) => `${w.start.toFixed(1)} ${w.w}`).join(' ').slice(0, 4000)
+          const spoken = spokenBlocks(planExport(r.clip, t, req.input.signals, false, (r.clip.autoCuts ?? []).map((c) => [c.start, c.end] as [number, number])).words)
           const m = await measuredCriteria(r, wav, hasAudio, edges, signal)
           let model: Criterion[] = (['hook', 'standalone', 'payoff', 'natural-end', 'essential-event'] as const).map((id) => ({ id, state: 'unknown' as const, reason: 'nicht geprüft', evidenceIds: [] }))
           try {
@@ -344,10 +374,14 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
         }
       }))
     }
-    await audit(outs, 'r0')
+    await audit(outs, 'r0', ready0)
+    phaseSec['render+audit-observe overlap'] = Math.round((Date.now() - t0Render) / 100) / 10
 
     // ------------------------------------------------------------------------------------------------ I höchstens eine Reparatur je Clip
     const repair: Out[] = []
+    type Snap = Pick<Out, 'cut' | 'rendered' | 'obs' | 'criteria' | 'decision' | 'titleFinal' | 'round'>
+    const before = new Map<Out, Snap>()
+    const trimsOf = new Map<Out, Array<{ start: number; end: number }>>()
     for (const o of outs) {
       if (!o.rendered || o.decision === 'acceptable') continue
       const failure = firstRepairable(o.criteria)
@@ -356,16 +390,22 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       const plan = planRepair(failure, o.cut, edges, o.rendered, sil, { minSec, maxSec })
       if (!plan) { await tracer.log('repairs.jsonl', { candidate: o.plan.candidateId, failure, op: 'stop', reason: 'keine begründete Änderung möglich' }); continue }
       await tracer.log('repairs.jsonl', { candidate: o.plan.candidateId, failure, op: plan.op, reason: plan.reason })
-      const prev = { ...o }
-      o.cut = plan.cut; o.round = 1
+      before.set(o, { cut: o.cut, rendered: o.rendered, obs: o.obs, criteria: o.criteria, decision: o.decision, titleFinal: o.titleFinal, round: o.round })
+      o.cut = plan.cut; o.round = 1; trimsOf.set(o, plan.trims)
       L.plan('repair-render', o.cut.span.end - o.cut.span.start)
-      try { await renderOne(o, repair.length, outs.length, plan.trims, 'repair'); repair.push(o) } catch (e) { if (signal?.aborted) throw e; fail(`repair ${o.plan.candidateId}`, e); Object.assign(o, prev) }
+      repair.push(o)
     }
     if (repair.length) {
-      const before = new Map(repair.map((o) => [o.plan.candidateId, o.history[o.history.length - 1]]))
-      await audit(repair, 'r1')
-      // schlechter geworden → zurück zur geprüften Vorversion ist nicht mehr möglich (Datei ersetzt); Entscheidung bleibt die der neuen Prüfung
-      for (const o of repair) await tracer.log('repairs.jsonl', { candidate: o.plan.candidateId, before: before.get(o.plan.candidateId), after: o.history[o.history.length - 1] })
+      const ready1 = renderChain(repair, (o, i) => renderOne(o, i, repair.length, trimsOf.get(o) ?? [], 'repair'))
+      await audit(repair, 'r1', ready1)
+      // Reparatur nur behalten, wenn sie nicht schlechter ist (Vorversion liegt in einem eigenen Vorschau-Ordner und bleibt gültig)
+      const rankD = { acceptable: 0, 'needs-review': 1, reject: 2 }
+      for (const o of repair) {
+        const b = before.get(o)!
+        const worse = !o.rendered || rankD[o.decision] > rankD[b.decision]
+        await tracer.log('repairs.jsonl', { candidate: o.plan.candidateId, before: b.decision, after: o.rendered ? o.decision : 'render-fehlgeschlagen', kept: worse ? 'vorher' : 'repariert' })
+        if (worse) Object.assign(o, b)
+      }
     }
 
     // ------------------------------------------------------------------------------------------------ Ergebnis

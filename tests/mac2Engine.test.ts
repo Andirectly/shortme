@@ -4,7 +4,7 @@ import { coldOpenFromObs, coverageOf, packetsFor } from '../src/main/shortme/cli
 import { validatePlan, edgesNear } from '../src/main/shortme/clips/engines/mac2/director'
 import { candidateLimits, decideExtraInvestigation, mayRequestInspection } from '../src/main/shortme/clips/engines/mac2/runtimePolicy'
 import { Ledger, etaText } from '../src/main/shortme/clips/engines/mac2/ledger'
-import { typeQueries } from '../src/main/shortme/clips/engines/mac2'
+import { spokenBlocks, typeQueries } from '../src/main/shortme/clips/engines/mac2'
 import type { CutEdge } from '../src/main/shortme/clips/engines/v4/core'
 
 describe('Engine Mac 2 – Pakete und Abdeckung', () => {
@@ -89,5 +89,11 @@ describe('Engine Mac 2 – Bildsuch-Anfragen', () => {
   it('Food-Vlog bekommt Essens-Anfragen, Podcast Gesprächs-Anfragen', () => {
     expect(typeQueries('vlog', 'der Döner schmeckt richtig gut').map((q) => q.id)).toEqual(expect.arrayContaining(['t-bite', 't-taste', 't-surprise']))
     expect(typeQueries('podcast', 'wir reden über Arbeit').map((q) => q.id)).toEqual(['t-talk', 't-explain'])
+  })
+})
+
+describe('Engine Mac 2 – Text für die Inhaltsprüfung', () => {
+  it('fasst Wörter in 5-s-Blöcke zusammen', () => {
+    expect(spokenBlocks([{ w: 'Das', start: 0.2 }, { w: 'Brot', start: 1 }, { w: 'ist', start: 6.1 }, { w: 'trocken.', start: 12 }])).toBe('[0–5 s] Das Brot\n[5–10 s] ist\n[10–15 s] trocken.')
   })
 })

@@ -6,6 +6,18 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.43.1] - 2026-11-19
+
+### Changed
+
+- Engine Mac schneller: Rendern und Prüfen der fertigen Clips laufen überlappend, Qwen3.5 rechnet den gleichbleibenden Teil der Anweisung nur einmal (Zwischenspeicher), kürzere Prompts, Schnittpläne nur für die aussichtsreichsten Kandidaten, Kandidaten in einem 30-s-Paket.
+- Engine Mac: Cold Opener aus beobachteten Reaktionen; Untertitel beginnen nach dem Vorspann in einer neuen Zeile.
+
+### Fixed
+
+- Engine Mac: Eine Reparatur, die schlechter bewertet wird als vorher, ersetzt die geprüfte Vorversion nicht mehr.
+- Engine Mac: abgeschnittene Beobachtungen (zu wenig Antwortlänge) und doppelt angesehene Kandidaten.
+
 ## [0.43.0] - 2026-11-19
 
 ### Added

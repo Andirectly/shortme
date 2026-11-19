@@ -5,7 +5,7 @@ import { EVENT_KINDS, type EventKind } from '../../../../../shared/engineV2'
 import type { CutEdge, Criterion, CritState, Span } from '../v4/core'
 import { mlxJson, type MlxSession } from './mlxServer'
 
-export const DIRECTOR_PROMPT_REVISION = 'mac2-director-3'
+export const DIRECTOR_PROMPT_REVISION = 'mac2-director-4'
 export const DIRECTOR_TIMEOUT_MS = 120_000
 
 export interface ClipPlan { candidateId: string; decision: 'use' | 'reject'; reason: string; kind: EventKind; startEdge: string; endEdge: string; span: Span; title: string; summary: string; coldOpen: Span | null }
@@ -29,22 +29,26 @@ export function edgesNear(edges: CutEdge[], span: Span, pad: number, max: number
 }
 
 export function planPrompt(o: { contentType?: string | null; hint: string; observations: string; transcript: string; starts: CutEdge[]; ends: CutEdge[]; minSec: number; maxSec: number; query?: string }): string {
-  const fmt = (e: CutEdge): string => `${e.id} @${e.t.toFixed(1)}s (${e.kind})`
+  // kompakt (Prompt-Token kosten fast die ganze Zeit: gemessen ~165 Token/s Einlesen, Antwort 2–3 s): „E12@61.2s/Satz“
+  const KIND: Record<string, string> = { sentence: 'Satz', pause: 'Pause', shot: 'Bild', speaker: 'Sprecher', 'source-boundary': 'Rand', action: 'Aktion', reaction: 'Reaktion', 'audio-phrase': 'Ton' }
+  const fmt = (e: CutEdge): string => `${e.id}@${e.t.toFixed(1)}s/${KIND[e.kind] ?? e.kind}`
+  // Gleicher Regelteil zuerst, wechselnde Daten danach: der MLX-Server (APC) rechnet den gemeinsamen Anfang nur einmal je Lauf
   return [
-    'Du bist Redakteur für Kurzvideos (9:16, 15–75 s). Aus diesem langen Video sollen mehrere Shorts entstehen; dieser Abschnitt ist einer der Kandidaten.',
-    'Baue daraus die BESTE eigenständige Version: Start so früh, dass man versteht, worum es geht (z. B. wo das Thema/das Essen/die Situation eingeführt wird), Ende nach dem Urteil, der Pointe oder der Reaktion. Nutze dafür das ganze Fenster unten – erweitere lieber, als abzulehnen.',
+    'Du bist Redakteur für Kurzvideos (9:16, 15–75 s). Aus diesem langen Video sollen mehrere Shorts entstehen; der Abschnitt unten ist einer der Kandidaten.',
+    'Baue daraus die BESTE eigenständige Version: Start so früh, dass man versteht, worum es geht (z. B. wo das Thema/das Essen/die Situation eingeführt wird), Ende nach dem Urteil, der Pointe oder der Reaktion. Nutze dafür das ganze Fenster – erweitere lieber, als abzulehnen.',
     'Ein Teil aus einer Reihe (z. B. eine von mehreren Bewertungen) ist ein guter Short, wenn Vorstellung und Urteil drin sind.',
     contentGuide(o.contentType),
     o.query ? `Der Nutzer sucht besonders: ${o.query}` : '',
+    `Regeln: Länge zwischen ${o.minSec} und ${o.maxSec} s. Der Clip muss mit dem Satz beginnen, der den Moment verständlich macht, und nach der Pointe/Reaktion bzw. dem Satzende aufhören – nicht mitten im Satz.`,
+    'Wähle Start/Ende NUR aus den erlaubten Kanten-IDs. decision=reject NUR, wenn auch mit allen erlaubten Kanten kein verständlicher Clip möglich ist (reiner Übergang, nichts passiert oder gesagt); dann trotzdem gültige Kanten angeben.',
+    'title: Titel in der Sprache des Clips, 3–7 Wörter, konkret aus dem Inhalt (z. B. was passiert oder gesagt wird), keine erfundenen Superlative, keine Platzhalter.',
+    'summary: ein Satz, worum es geht.',
+    '--- Kandidat ---',
     `Hinweis der Suche (kann falsch sein): ${o.hint}`,
     'Beobachtungen (Bild + Ton, vom lokalen Prüfmodell, mit Beleg-IDs):', o.observations || '(keine)',
     'Transkript (Satznummer, Quellzeit, Originalwortlaut):', o.transcript || '(keine Sprache)',
     `Erlaubte START-Kanten (Quellzeit): ${o.starts.map(fmt).join(', ')}`,
-    `Erlaubte END-Kanten (Quellzeit): ${o.ends.map(fmt).join(', ')}`,
-    `Regeln: Länge zwischen ${o.minSec} und ${o.maxSec} s. Der Clip muss mit dem Satz beginnen, der den Moment verständlich macht, und nach der Pointe/Reaktion bzw. dem Satzende aufhören – nicht mitten im Satz.`,
-    'Wähle Start/Ende NUR aus den erlaubten Kanten-IDs. decision=reject NUR, wenn auch mit allen erlaubten Kanten kein verständlicher Clip möglich ist (reiner Übergang, nichts passiert oder gesagt); dann trotzdem gültige Kanten angeben.',
-    'title: Titel in der Sprache des Clips, 3–7 Wörter, konkret aus dem Inhalt (z. B. was passiert oder gesagt wird), keine erfundenen Superlative, keine Platzhalter.',
-    'summary: ein Satz, worum es geht.'
+    `Erlaubte END-Kanten (Quellzeit): ${o.ends.map(fmt).join(', ')}`
   ].filter(Boolean).join('\n')
 }
 
@@ -69,7 +73,7 @@ export function validatePlan(x: { decision: string; reason: string; kind: string
 }
 
 /** Schnittplan; höchstens eine Korrekturanfrage (gemeinsames Zusatzbudget), danach Fehler. */
-export async function planCandidate(s: MlxSession, o: { candidateId: string; prompt: string; starts: CutEdge[]; ends: CutEdge[]; edges: Map<string, CutEdge>; minSec: number; maxSec: number; mayRetry: () => boolean; onRetry: () => void; signal?: AbortSignal }): Promise<{ plan: ClipPlan; raw: string; attempts: number }> {
+export async function planCandidate(s: MlxSession, o: { candidateId: string; prompt: string; starts: CutEdge[]; ends: CutEdge[]; edges: Map<string, CutEdge>; minSec: number; maxSec: number; mayRetry: () => boolean; onRetry: () => void; signal?: AbortSignal }): Promise<{ plan: ClipPlan; raw: string; attempts: number; ms: number; usage?: { prompt_tokens?: number; completion_tokens?: number } }> {
   const schema = {
     type: 'object', additionalProperties: false, required: ['decision', 'reason', 'kind', 'startEdge', 'endEdge', 'title', 'summary'],
     properties: {
@@ -81,7 +85,7 @@ export async function planCandidate(s: MlxSession, o: { candidateId: string; pro
   let err = ''
   for (let attempt = 0; ; attempt++) {
     const r = await mlxJson<Parameters<typeof validatePlan>[0]>(s, { content: attempt ? `${o.prompt}\n\nDeine letzte Antwort war ungültig: ${err}. Korrigiere genau das.` : o.prompt, schema, maxTokens: 450, timeoutMs: DIRECTOR_TIMEOUT_MS, temperature: attempt ? 0.3 : 0, signal: o.signal })
-    try { return { plan: validatePlan(r.value, { ...o, starts: o.starts, ends: o.ends }), raw: r.raw, attempts: attempt + 1 } } catch (e) {
+    try { return { plan: validatePlan(r.value, { ...o, starts: o.starts, ends: o.ends }), raw: r.raw, attempts: attempt + 1, ms: r.ms, usage: r.usage } } catch (e) {
       err = e instanceof Error ? e.message : String(e)
       if (!o.mayRetry()) throw new Error(`Schnittplan ungültig: ${err}`, { cause: e })
       o.onRetry()
@@ -115,15 +119,17 @@ export const MODEL_CRITERIA = ['hook', 'standalone', 'payoff', 'natural-end', 'e
 export async function judgeRender(s: MlxSession, o: { title: string; durationSec: number; contentType?: string | null; spoken: string; observations: string; evidenceIds: string[]; signal?: AbortSignal }): Promise<{ criteria: Criterion[]; titleOk: boolean; betterTitle: string; raw: string }> {
   const ev = [...o.evidenceIds, 'transcript']
   const prompt = [
-    `Prüfe einen FERTIGEN Kurzclip (${o.durationSec.toFixed(1)} s, Titel „${o.title}“). Grundlage sind nur die Beobachtungen der Ausgabedatei und der darin gesprochene Text – nicht, warum er ausgewählt wurde.`,
+    'Prüfe einen FERTIGEN Kurzclip. Grundlage sind nur die Beobachtungen der Ausgabedatei und der darin gesprochene Text – nicht, warum er ausgewählt wurde.',
     contentGuide(o.contentType),
-    'Gesprochener Text in der Ausgabe (Clipzeit):', o.spoken || '(keine Sprache)',
-    'Beobachtungen der Ausgabedatei (Bild + Ton, Clipzeit, Beleg-IDs):', o.observations || '(keine)',
     'Bewerte genau diese 5 Kriterien mit pass, fail oder unknown:',
     'hook = die ersten 3 Sekunden machen klar, warum man weiterschauen soll; standalone = ohne Vorwissen verständlich (wer, was, Bezüge); payoff = Pointe, Reaktion, Ergebnis oder die Kernaussage ist enthalten;',
     'natural-end = endet nach einem Satz-/Handlungsende, nicht abgeschnitten; essential-event = das Wesentliche (Ereignis ODER Aussage) ist vollständig drin.',
     'pass nur mit Beleg (Segment-ID oder "transcript"). Wenn die Belege nicht reichen: unknown. Sei streng: im Zweifel nicht pass.',
-    'titleOk: passt der Titel zum tatsächlichen Inhalt? betterTitle: falls nicht, ein besserer (3–7 Wörter, Sprache des Clips), sonst leer.'
+    'titleOk: passt der Titel zum tatsächlichen Inhalt? betterTitle: falls nicht, ein besserer (3–7 Wörter, Sprache des Clips), sonst leer.',
+    '--- Clip ---',
+    `Länge ${o.durationSec.toFixed(1)} s, Titel „${o.title}“.`,
+    'Gesprochener Text in der Ausgabe (Clipzeit):', o.spoken || '(keine Sprache)',
+    'Beobachtungen der Ausgabedatei (Bild + Ton, Clipzeit, Beleg-IDs):', o.observations || '(keine)'
   ].join('\n')
   const schema = {
     type: 'object', additionalProperties: false, required: ['criteria', 'titleOk', 'betterTitle'],

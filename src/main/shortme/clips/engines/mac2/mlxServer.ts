@@ -32,7 +32,7 @@ function mlxServer(name: string, spec: { id: string; revision: string }): <T>(fn
       const t0 = Date.now()
       const port = await freePort()
       const model = assetDir(spec.id)
-      const c = spawn(avPythonExe(), ['-I', '-m', 'mlx_vlm.server', '--model', model, '--host', '127.0.0.1', '--port', String(port), '--max-tokens', '2048'], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', HF_HUB_DISABLE_TELEMETRY: '1' } })
+      const c = spawn(avPythonExe(), ['-I', '-m', 'mlx_vlm.server', '--model', model, '--host', '127.0.0.1', '--port', String(port), '--max-tokens', '2048'], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', HF_HUB_DISABLE_TELEMETRY: '1', APC_ENABLED: '1', APC_DISK_ENABLED: '0' } })
       child = c
       let tail = ''
       const keep = (d: Buffer): void => { tail = (tail + d.toString()).slice(-3000) }
