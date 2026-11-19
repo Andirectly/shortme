@@ -5,7 +5,7 @@
 export type SelectionEngineId = 'legacy' | 'multimodal-v2' | 'adaptive-v3' | 'engine4' | 'engine-mac'
 export const ENGINE_IDS: SelectionEngineId[] = ['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4', 'engine-mac']
 /** Welche Engines auf welchem System laufen können (Engine 3/4 brauchen CUDA, die Mac-Engine Apple Silicon). */
-export const enginesFor = (platform: string): SelectionEngineId[] => platform === 'darwin' ? ['legacy', 'multimodal-v2', 'engine-mac'] : ['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4']
+export const enginesFor = (platform: string): SelectionEngineId[] => platform === 'darwin' ? ['engine-mac'] : ['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4']
 export const ENGINE_LABEL: Record<SelectionEngineId, string> = { legacy: 'Engine 1 – Original', 'multimodal-v2': 'Engine 2 – Multimodal', 'adaptive-v3': 'Engine 3 – Adaptive AI', engine4: 'Engine 4', 'engine-mac': 'Engine Mac' }
 /** Kurzbeschreibung für den Erstellen-Dialog. */
 export const ENGINE_BLURB: Record<SelectionEngineId, string> = {
@@ -19,7 +19,7 @@ export const ENGINE_BLURB: Record<SelectionEngineId, string> = {
 export const V4_ENGINE_VERSION = '4.0'
 export const ENGINE4_MANIFEST = { id: 'engine4', displayName: 'Engine 4', pipeline: 'adaptive-event-intelligence', pipelineVersion: '4.0', protocolVersion: 1, supportedProfiles: ['fast', 'balanced', 'deep'] } as const
 /** Engines mit Analyseprofil (Schnell/Ausgewogen/Gründlich). */
-export const hasProfiles = (e: SelectionEngineId): boolean => e === 'adaptive-v3' || e === 'engine4' || e === 'engine-mac'
+export const hasProfiles = (e: SelectionEngineId): boolean => e === 'adaptive-v3' || e === 'engine4'
 /** Engines mit der Engine-4-Pipeline (eigener Orchestrator in clips/engines/v4). */
 export const isV4Pipeline = (e: SelectionEngineId | string): boolean => e === 'engine4' || e === 'engine-mac'
 /** Analyseprofile der Engine 3 (keine eigene Engine): Tiefe der Suche. */

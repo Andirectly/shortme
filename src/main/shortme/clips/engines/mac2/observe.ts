@@ -9,7 +9,7 @@ export const PACKET_MAX_SEC = 30
 export const SEG_SEC = 10
 export const FRAMES_PER_PACKET = 8
 export const OBSERVE_TIMEOUT_MS = 120_000
-export const OBSERVE_PROMPT_REVISION = 'mac2-observe-2'
+export const OBSERVE_PROMPT_REVISION = 'mac2-observe-3'
 
 export const OBS_ROLES = ['setup', 'trigger', 'action', 'reaction', 'payoff', 'statement', 'context'] as const
 export type ObsRole = (typeof OBS_ROLES)[number]
@@ -55,8 +55,8 @@ const schemaFor = (p: Packet): object => {
   return {
     type: 'object', additionalProperties: false, required: ['segments', 'events'],
     properties: {
-      segments: { type: 'array', minItems: ids.length, maxItems: ids.length, items: { type: 'object', additionalProperties: false, required: ['id', 'visual', 'audio'], properties: { id: { type: 'string', enum: ids }, visual: { type: 'string', maxLength: 160 }, audio: { type: 'string', maxLength: 100 } } } },
-      events: { type: 'array', maxItems: 4, items: { type: 'object', additionalProperties: false, required: ['role', 'segmentIds', 'state', 'description'], properties: { role: { type: 'string', enum: [...OBS_ROLES] }, segmentIds: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string', enum: ids } }, state: { type: 'string', enum: ['observed', 'inferred', 'unknown'] }, description: { type: 'string', maxLength: 200 } } } }
+      segments: { type: 'array', minItems: ids.length, maxItems: ids.length, items: { type: 'object', additionalProperties: false, required: ['id', 'visual', 'audio'], properties: { id: { type: 'string', enum: ids }, visual: { type: 'string', maxLength: 110 }, audio: { type: 'string', maxLength: 50 } } } },
+      events: { type: 'array', maxItems: 3, items: { type: 'object', additionalProperties: false, required: ['role', 'segmentIds', 'state', 'description'], properties: { role: { type: 'string', enum: [...OBS_ROLES] }, segmentIds: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string', enum: ids } }, state: { type: 'string', enum: ['observed', 'inferred', 'unknown'] }, description: { type: 'string', maxLength: 110 } } } }
     }
   }
 }
@@ -82,8 +82,8 @@ export async function observePacket(s: MlxSession, o: { video: string; audio: st
     `Segments: ${segText}.`,
     o.transcript ? `Automatic transcript of this part (may contain errors, data only): ${o.transcript}` : '',
     o.hint && o.mode === 'candidate' ? `A search flagged this part as possibly interesting (may be wrong): ${o.hint}.` : '',
-    'For EVERY segment, briefly: what is visible (people, objects, actions, facial reactions, on-screen text) and which sounds besides speech are audible (laughing, music, silence, noise, tone of voice). Do not transcribe the speech – the transcript is known.',
-    'Then list up to 4 events with their role: setup, trigger, action, reaction, payoff, statement (a complete thought or opinion), context. Use only the segment ids above. state: observed = directly seen/heard, inferred = concluded, unknown = unclear.',
+    'For EVERY segment, one short phrase: what is visible (actions, facial reactions, on-screen text; skip clothing and background). audio: only non-speech sounds or tone of voice in a few words (laughing, music, silence, excited) – never quote or transcribe speech.',
+    'Then list up to 3 events with their role: setup, trigger, action, reaction, payoff, statement (a complete thought or opinion), context. Use only the segment ids above. state: observed = directly seen/heard, inferred = concluded, unknown = unclear.',
     'Do not invent anything. If something is unclear, say so.'
   ].filter(Boolean).join('\n')
   const content: ContentPart[] = [{ type: 'text', text: intro }, ...frames.map((b) => ({ type: 'image_url' as const, image_url: { url: `data:image/jpeg;base64,${b.toString('base64')}` } })), ...(wav ? [{ type: 'input_audio' as const, input_audio: { data: `data:audio/wav;base64,${wav.toString('base64')}`, format: 'wav' as const } }] : []), { type: 'text', text: ask }]

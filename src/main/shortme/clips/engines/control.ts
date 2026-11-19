@@ -15,6 +15,7 @@ const defaultFile = (): string => join(dataRoot(), 'engine-default.json')
 
 /** Standard-Engine für neue Projekte (zunächst Engine 3, bis der Nutzer etwas anderes wählt). */
 export async function loadDefaultEngine(): Promise<SelectionEngineId> {
+  if (process.platform === 'darwin') return 'engine-mac'
   try { const e = (JSON.parse(await readFile(defaultFile(), 'utf8')) as { engine?: unknown }).engine; return ENGINE_IDS.includes(e as SelectionEngineId) ? (e as SelectionEngineId) : 'adaptive-v3' } catch { return 'adaptive-v3' }
 }
 export async function saveDefaultEngine(engine: SelectionEngineId): Promise<SelectionEngineId> {

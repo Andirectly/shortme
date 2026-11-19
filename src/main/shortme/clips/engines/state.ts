@@ -3,7 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { writeFileAtomic } from '../../atomic'
 import { projectFile } from '../../project'
-import { emptyAnalysisState, isSafeRunId, LEGACY_RUN_ID, sanitizeAnalysisState, type AnalysisState, type RunInfo, type SelectionEngineId } from '../../../../shared/engine'
+import { emptyAnalysisState, enginesFor, isSafeRunId, LEGACY_RUN_ID, sanitizeAnalysisState, type AnalysisState, type RunInfo, type SelectionEngineId } from '../../../../shared/engine'
 
 const stateFile = (hash: string): string => projectFile(hash, 'analysis/state.json')
 
@@ -18,7 +18,11 @@ export const runFile = (hash: string, runId: string, name: string): string => jo
 export const clipsPathFor = (hash: string, runId: string): string => (runId === LEGACY_RUN_ID ? projectFile(hash, 'clips.json') : runFile(hash, runId, 'clips.json'))
 
 export async function loadState(hash: string): Promise<AnalysisState> {
-  try { return sanitizeAnalysisState(JSON.parse(await readFile(stateFile(hash), 'utf8'))) } catch { return emptyAnalysisState() }
+  let s: AnalysisState
+  try { s = sanitizeAnalysisState(JSON.parse(await readFile(stateFile(hash), 'utf8'))) } catch { s = emptyAnalysisState() }
+  // Mac: nur Engine Mac (ältere Projekte mit Engine 1/2 gewählt laufen ab jetzt mit Engine Mac; vorhandene Ergebnisse bleiben sichtbar)
+  if (!enginesFor(process.platform).includes(s.selected)) s.selected = enginesFor(process.platform)[0]
+  return s
 }
 
 const chains = new Map<string, Promise<unknown>>()

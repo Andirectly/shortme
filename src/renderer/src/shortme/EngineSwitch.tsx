@@ -11,11 +11,12 @@ const fmtMB = (n: number): string => (n >= 1e9 ? `${(n / 1e9).toFixed(1).replace
  * Gegenseitig ausschließender Zweifachschalter: genau eine Engine ist für den nächsten Lauf gewählt. Der Schalter steuert dieselbe, im Main-Prozess gespeicherte
  * Projektauswahl wie überall; Gewählte Engine, laufender Job und angezeigter Ergebnislauf sind getrennte Zustände.
  */
-/** Engines, die auf diesem Rechner laufen können (Mac: Engine 1, 2, Mac; Windows: Engine 1–4). */
+/** Engines, die auf diesem Rechner laufen können (Mac: nur Engine Mac; Windows: Engine 1–4). */
 export const localEngines = (): SelectionEngineId[] => enginesFor(window.cutawan?.platform ?? 'win32')
 
-export function EngineSwitch({ onSelect, value, disabled }: { onSelect: (e: SelectionEngineId) => void; value: SelectionEngineId; disabled?: boolean }): React.JSX.Element {
+export function EngineSwitch({ onSelect, value, disabled }: { onSelect: (e: SelectionEngineId) => void; value: SelectionEngineId; disabled?: boolean }): React.JSX.Element | null {
   const ids = localEngines()
+  if (ids.length < 2) return null // Mac: nur Engine Mac, nichts zu wählen
   return (
     <div role="group" aria-label="Auswahl-Engine" style={{ opacity: disabled ? 0.55 : 1, pointerEvents: disabled ? 'none' : 'auto' }}>
       <Segmented options={ids.map((e) => ENGINE_LABEL[e])} value={ENGINE_LABEL[value]} onChange={(l) => onSelect(ids.find((e) => ENGINE_LABEL[e] === l) ?? 'legacy')} />

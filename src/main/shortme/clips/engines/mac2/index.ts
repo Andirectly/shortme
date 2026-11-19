@@ -280,18 +280,34 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     }
     // Vorab-Rendern: jeder fertige Schnittplan wird sofort im Hintergrund gerendert (CPU/VideoToolbox), während Qwen auf der GPU weiterplant.
     // Gemessen Lauf 4: Rendern begann erst nach der Rangfolge (13 min Render+Prüfung). Nicht gebrauchte Reservepläne dienen als Nachrücker; der Rest wird am Ende übersprungen.
+    // Warteschlange mit Vorrang (gemessen Lauf 7: Prüfung wartete 5 min auf Renders in Planungsreihenfolge): nach der Rangfolge zuerst Gewinner in Rangfolge,
+    // dann Reserve in Rangfolge; zwei Renders gleichzeitig (CPU/VideoToolbox, die GPU nutzt nur das Sprachmodell).
+    const RENDER_WORKERS = 2
     const outOf = new Map<string, Out>()
     const ready0 = new Map<Out, Promise<void>>()
     const needed = new Set<Out>()
-    let specTail: Promise<void> = Promise.resolve()
+    const queue: Array<{ o: Out; seq: number; done: (e?: unknown) => void }> = []
+    let active = 0, seq = 0
+    const prio = (q: { o: Out; seq: number }): number => { const k = rankOrder.indexOf(q.o.plan.candidateId); return (needed.has(q.o) ? 0 : 1000) + (k >= 0 ? k : 500 + q.seq) }
+    const pump = (): void => {
+      queue.sort((x, y) => prio(x) - prio(y))
+      while (active < RENDER_WORKERS && queue.length) {
+        const q = queue.shift()!
+        if (specStop && !needed.has(q.o)) { q.done(); continue }
+        active++
+        renderOne(q.o, 0, 1, [], 'initial')
+          .then(() => q.done(), (e) => { if (signal?.aborted) return q.done(e); fail(`render ${q.o.plan.candidateId} r0`, e); q.o.rendered = null; q.done() })
+          .finally(() => { active--; pump() })
+      }
+    }
     const preRender = (p: ClipPlan): void => {
       const o = mkOut(p)
       outOf.set(p.candidateId, o)
-      const job = specTail.then(() => (specStop && !needed.has(o) ? undefined : renderOne(o, 0, 1, [], 'initial')))
-        .catch((e) => { if (signal?.aborted) throw e; fail(`render ${p.candidateId} r0`, e); o.rendered = null })
+      const job = new Promise<void>((res, rej) => queue.push({ o, seq: seq++, done: (e) => (e ? rej(e) : res()) }))
       job.catch(() => undefined) // nicht gebrauchte Reserve wird nie abgewartet
-      ready0.set(o, job); specTail = job.catch(() => undefined)
+      ready0.set(o, job); pump()
     }
+    const allRenders = (): Promise<unknown> => { specStop = true; pump(); return Promise.allSettled([...ready0.values()]) }
     const plans: ClipPlan[] = []
     let rankOrder: string[] = []
     L.set('plan', observed.length)
@@ -332,6 +348,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     }
     const outs: Out[] = winners.map((p) => outOf.get(p.candidateId)!)
     for (const o of outs) needed.add(o)
+    pump() // Rangfolge bekannt → Warteschlange neu ordnen
     L.set('render', plans.reduce((n, p) => n + (p.span.end - p.span.start), 0)); L.set('audit-packet', outs.reduce((n, o) => n + packetsFor('x', o.plan.span).length, 0)); L.set('audit-judge', outs.length)
 
     // Rendern läuft nacheinander im Hintergrund (CPU/VideoToolbox, keine GPU-Sperre); die LFM-Prüfung beginnt mit jedem fertigen Clip (Überlappung statt Wartezeit)
@@ -412,7 +429,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       if (!o || outs.includes(o)) continue
       if ([...good(), ...backfill].some((w) => overlapRatio(w.plan.span, o.plan.span) > 0.3)) continue
       if (L.elapsedMs() + (backfill.length + 1) * perClipMs + 60_000 > MAC2_LIMITS.softRunBudgetMs) { await tracer.log('scheduler.jsonl', { backfillStopped: 'Zeitbudget', candidate: id }); break }
-      backfill.push(o); needed.add(o)
+      backfill.push(o); needed.add(o); pump()
     }
     if (backfill.length) {
       await tracer.log('scheduler.jsonl', { backfill: backfill.map((o) => o.plan.candidateId) })
@@ -478,7 +495,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       } as ShortmeClip
     })
     await save('selection.json', { wanted, winners: winners.map((w) => w.candidateId), results: outs.map((o) => ({ candidate: o.plan.candidateId, title: o.titleFinal, decision: o.decision, round: o.round, output: o.rendered?.path ?? null, sha256: o.rendered?.sha256 ?? null, history: o.history, coldOpen: o.plan.coldOpen })), chosen: clips.map((c) => c.id) })
-    await specTail // übersprungene Reserve-Renders sind sofort fertig
+    await allRenders() // übersprungene Reserve-Renders sind sofort fertig
     await save('evidence.json', [...evidence.values()])
     const partial = errors.length > 0
     await finish(partial ? 'partial' : 'completed')

@@ -10,8 +10,8 @@ describe('V4 Registrierung und Dispatcher (V4-001/003/004/005)', () => {
   it('fünf Engines, Engine 4 mit eigenem Manifest; je System nur die lauffähigen', () => {
     expect(ENGINE_IDS).toEqual(['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4', 'engine-mac'])
     expect(enginesFor('win32')).toEqual(['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4'])
-    expect(enginesFor('darwin')).toEqual(['legacy', 'multimodal-v2', 'engine-mac'])
-    expect(hasProfiles('engine-mac')).toBe(true)
+    expect(enginesFor('darwin')).toEqual(['engine-mac'])
+    expect(hasProfiles('engine-mac')).toBe(false)
     expect(ENGINE_LABEL.engine4).toBe('Engine 4')
     expect(ENGINE4_MANIFEST).toMatchObject({ id: 'engine4', pipelineVersion: '4.0', protocolVersion: 1 })
     expect(hasProfiles('engine4')).toBe(true)

@@ -169,7 +169,8 @@ export const useProject = create<ProjectState>((set, get) => ({
     const a = api()
     if (!a) return
     latestEngineReq = hash
-    const [r, missing] = await Promise.all([a.engineState(hash), a.engineMissing('multimodal-v2')])
+    const r = await a.engineState(hash)
+    const missing = await a.engineMissing(r.state.selected) // Modelle der gewählten Engine (vorher fest Engine 2 → falsche Warnung bei Engine Mac)
     // verspätete Antwort für ein anderes Projekt überschreibt die aktuelle Ansicht nicht (maßgeblich ist die zuletzt angeforderte)
     if (latestEngineReq !== hash) return
     const cur = get().engine
