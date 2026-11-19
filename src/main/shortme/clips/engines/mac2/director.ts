@@ -52,7 +52,10 @@ export function planFromSentences(x: { kind: string; startSentence: string; endS
   let note = ''
   while (b < o.sentences.length - 1 && o.sentences[b].end - o.sentences[a].start < o.minSec) { b++; note = ' (Ende satzweise verlängert: Länge)' }
   while (b > a && o.sentences[b].end - o.sentences[a].start > o.maxSec) { b--; note = ' (Ende satzweise gekürzt: Länge)' }
-  const t0 = Math.max(0, o.sentences[a].start - 0.15), t1 = o.sentences[b].end + 0.15
+  // 0,15 s Luft, aber nie bis in den Nachbarsatz (gemessen: kurze Folgewörter wie „Das“/„Ich“ landeten sonst am Clipende)
+  const prev = o.sentences[a - 1], next = o.sentences[b + 1]
+  const t0 = Math.max(0, o.sentences[a].start - 0.15, prev ? (prev.end + o.sentences[a].start) / 2 : 0)
+  const t1 = Math.min(o.sentences[b].end + 0.15, next ? (o.sentences[b].end + next.start) / 2 : Infinity)
   if (t1 - t0 < o.minSec - 1 || t1 - t0 > o.maxSec + 2) throw new Error(`Länge ${(t1 - t0).toFixed(1)} s außerhalb ${o.minSec}–${o.maxSec} s`)
   const title = x.title.replace(/\s+/g, ' ').replace(/^["„“']+|["„“']+$/g, '').trim()
   if (title.length < 3 || title.length > 80 || PLACEHOLDER.test(title)) throw new Error(`Titel unbrauchbar: „${title}“`)

@@ -40,6 +40,11 @@ describe('Engine Mac 2 – Schnittplan über Satznummern', () => {
     expect(validate({ ...base, endSentence: 'S2' }).span.end).toBeCloseTo(30.15, 2) // S1–S2 = 10 s < 15 → bis S3
     expect(validate({ ...base, startSentence: 'S3', endSentence: 'S1' }).span.start).toBeCloseTo(9.85, 2)
   })
+  it('Puffer reicht nie in den Nachbarsatz (kein „Das“ des Folgesatzes am Ende)', () => {
+    const tight = [{ index: 1, start: 10, end: 20, text: 'a.' }, { index: 2, start: 20.1, end: 30, text: 'b.' }, { index: 3, start: 30.06, end: 31, text: 'Das' }]
+    const p = planFromSentences({ ...base, startSentence: 'S2', endSentence: 'S2' }, { ...o, sentences: tight, minSec: 5 })
+    expect(p.span.start).toBeCloseTo(20.05, 2); expect(p.span.end).toBeCloseTo(30.03, 2)
+  })
   it('zu lang → Ende früher; Platzhalter-Titel und unbekannte Sätze abgelehnt', () => {
     expect(validate({ ...base, endSentence: 'S4' }).span.end).toBeCloseTo(30.15, 2) // S1–S4 = 90 s > 75 → S3
     expect(() => validate({ ...base, title: 'Kurzer deutscher Titel' })).toThrow(/Titel/)
