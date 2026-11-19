@@ -166,6 +166,26 @@ describe('Export-Planung', () => {
     expect(p.cuts).toHaveLength(0)
     expect(p.duration).toBeCloseTo(5.2, 6)
   })
+  it('Cold Opener: Vorspann aus dem Clip vorn, danach der ganze Clip; Untertitel doppelt an der richtigen Stelle', () => {
+    const c = { ...clip, coldOpen: { start: 14, end: 15 } } as ShortmeClip
+    const off = planExport(c, t, { silences: [] }, false)
+    expect(off.coldOpen).toBeNull()
+    expect(off.duration).toBeCloseTo(5.2, 6)
+    const p = planExport(c, t, { silences: [] }, false, [], {}, 3)
+    expect(p.coldOpen).toEqual([14, 15]) // Wortgrenzen (Neu … hier.) statt genau 3 s
+    expect(p.duration).toBeCloseTo(1 + 5.2, 6)
+    expect(p.pieces[0]).toMatchObject({ src0: 14, src1: 15, out0: 0 })
+    expect(p.pieces[1]).toMatchObject({ src0: 9.9, out0: 1 })
+    expect(p.words.map((w) => w.w)).toEqual(['Neu', 'hier.', 'Hallo', 'Welt.', 'Neu', 'hier.'])
+    expect(p.words[0].start).toBeCloseTo(0, 6)
+    expect(p.words[2].start).toBeCloseTo(1 + (10 - 9.9), 6)
+    expect(p.words[4].start).toBeCloseTo(1 + (14 - 9.9), 6)
+    expect(p.words[1].end).toBeLessThanOrEqual(1)
+  })
+  it('Cold Opener außerhalb des Clips oder ohne Vorschlag wird ignoriert', () => {
+    expect(planExport({ ...clip, coldOpen: { start: 20, end: 22 } } as ShortmeClip, t, { silences: [] }, false, [], {}, 3).coldOpen).toBeNull()
+    expect(planExport(clip, t, { silences: [] }, false, [], {}, 3).coldOpen).toBeNull()
+  })
   it('SRT-Ausgabe', () => {
     const srt = buildSrt([{ w: 'a', start: 0, end: 0.5 }, { w: 'b', start: 0.6, end: 1 }], 4)
     expect(srt).toContain('00:00:00,000 --> 00:00:01,100')

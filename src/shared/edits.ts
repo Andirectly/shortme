@@ -60,7 +60,7 @@ export interface EditState {
 export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops: [], cursor: 0 })
 
 /** Globale Standardwerte (Stil-Studio → „Als Standard festlegen“, Erstellen-Dialog): Preset, Änderungen daran, Titel an/aus. */
-export interface StyleDefaults { presetId?: string; style?: PresetPatch; titleEnabled?: boolean }
+export interface StyleDefaults { presetId?: string; style?: PresetPatch; titleEnabled?: boolean; /** Cold Opener: Zieldauer des Vorspanns in Sekunden (0–5, 0 = aus); wirkt beim Export auf Clips mit Vorschlag. */ coldOpenSec?: number }
 
 export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string>; autoCuts?: ShortmeClip['autoCuts'] }, presetId = 'glow-karaoke', defaults: StyleDefaults = {}): EditState {
   return { start: clip.start, end: clip.end, cutWords: [], autoCuts: (clip.autoCuts ?? []).map((c) => ({ start: c.start, end: c.end })), hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [] }

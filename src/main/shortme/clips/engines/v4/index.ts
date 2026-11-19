@@ -23,7 +23,7 @@ import type { SelectionOutcome, SelectionRequest } from '..'
 import { ensureSeries, decodeSeries } from '../v2/audioIndex'
 import { frameDiffs, keyframeScan } from '../v2/visualIndex'
 import { withEmbedder } from '../v3/embedWorker'
-import { withAv, withMacAv, type AvSession } from '../v3/avWorker'
+import { withAv, type AvSession } from '../v3/avWorker'
 import { decilesCovered, fuseSeeds, overlapRatio, rankFinal, requiredSpan, selectBalanced, type CoverageWindow, type CutCandidate, type Finalist, type Seed, type SeedGroup, type Span } from './core'
 import { audioLane, crossModalLane, expandQueries, QUERY_BANK, speechLane, speechUncertainWindows, visualLane, type LaneResult } from './lanes'
 import { investigateGroup, type InvestigationResult } from './investigate'
@@ -32,27 +32,24 @@ import { clipFor, firstRepairable, judgeRendered, measuredCriteria, planRepair, 
 import { probeSource, type SourceInfo } from './media'
 import { Tracer } from './trace'
 import { checkpointKey, loadCheckpoint, saveCheckpoint } from './checkpoint'
-import { MAC_AV_MODEL, V3_AV_MODEL } from '../v3/revisions'
-import { macMissingModels, v4MissingModels } from './models'
-import { MAC_MODELS, macRevisions, V4_ALGORITHM_REVISION, V4_EDGE_REVISION, V4_MODELS, V4_PIPELINE_VERSION, V4_PROFILES, V4_PROMPT_REVISION, V4_QUERYBANK_REVISION, v4Revisions } from './revisions'
-import { analyzeSound, musicWindows, probeMac, soundEvents, soundProposals, type SoundWindow } from '../mac/sound'
+import { V3_AV_MODEL } from '../v3/revisions'
+import { v4MissingModels } from './models'
+import { V4_ALGORITHM_REVISION, V4_EDGE_REVISION, V4_MODELS, V4_PIPELINE_VERSION, V4_PROFILES, V4_PROMPT_REVISION, V4_QUERYBANK_REVISION, v4Revisions } from './revisions'
 
 export type V4Status = 'queued' | 'running' | 'partial' | 'completed' | 'cancelled' | 'failed'
 
-/** Gleiche Pipeline, austauschbare Bausteine: Engine 4 (CUDA: YAMNet, MiniCPM-o) oder Mac-Engine (Apple SoundAnalysis, Gemma 4/MLX). */
+/** Bausteine der Engine-4-Pipeline (Modelle, AV-Resident, Revisionen); die Mac-Engine hat seit 0.43 einen eigenen Ablauf (clips/engines/mac2). */
 export interface V4Flavor {
   engineId: 'engine4' | 'engine-mac'
   label: string
   withAv: <T>(runId: string, fn: (s: AvSession) => Promise<T>) => Promise<T>
   avModel: { id: string; revision: string }
-  audio: 'yamnet' | 'apple'
   models: Record<string, string>
   revisions: (p: V3Profile) => string[]
   missing: () => Promise<Array<{ id: string; name: string; sizeBytes: number }>>
   weightIds: string[]
 }
-export const ENGINE4_FLAVOR: V4Flavor = { engineId: 'engine4', label: 'Engine 4', withAv, avModel: V3_AV_MODEL, audio: 'yamnet', models: V4_MODELS, revisions: v4Revisions, missing: v4MissingModels, weightIds: ['qwen3-vl-embedding-2b', 'minicpm-o-4_5', 'yamnet', 'qwen3-14b'] }
-export const MAC_FLAVOR: V4Flavor = { engineId: 'engine-mac', label: 'Engine Mac', withAv: withMacAv, avModel: MAC_AV_MODEL, audio: 'apple', models: MAC_MODELS, revisions: macRevisions, missing: macMissingModels, weightIds: ['qwen3-vl-embedding-2b', 'gemma-4-e4b-it', 'qwen3-8b', 'qwen3-14b'] }
+export const ENGINE4_FLAVOR: V4Flavor = { engineId: 'engine4', label: 'Engine 4', withAv, avModel: V3_AV_MODEL, models: V4_MODELS, revisions: v4Revisions, missing: v4MissingModels, weightIds: ['qwen3-vl-embedding-2b', 'minicpm-o-4_5', 'yamnet', 'qwen3-14b'] }
 
 function gitSha(): string {
   try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: process.cwd(), windowsHide: true, timeout: 5000 }).toString().trim() } catch { return `app-${app?.getVersion?.() ?? 'unknown'}` }
@@ -86,7 +83,7 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
   const manifest = {
     runId: req.runId, projectId: project.hash, engineId: F.engineId, kind: 'full-source-analysis' as const, pipeline: 'adaptive-event-intelligence', pipelineVersion: V4_PIPELINE_VERSION, protocolVersion: 1,
     source: { mediaId: project.hash, path: src.path, sha256: src.sha256, durationPts: src.durationPts, timebaseNum: src.timebaseNum, timebaseDen: src.timebaseDen, durationSec: src.durationSec, vfr: src.vfr, audioOffsetSec: src.audioOffsetSec, streams: src.streams.map((s) => s.type) },
-    snapshot: { gitSha: gitSha(), configSha256: sha({ P, profileId }), modelRevisions: { ...F.models, asr: t.model ?? V4_MODELS.asr }, weightHashes, promptVersions: { ...V4_PROMPT_REVISION }, queryRevision: V4_QUERYBANK_REVISION, edgeRevision: V4_EDGE_REVISION, seed: 0, profile: profileId, revisions: F.revisions(profileId), ...(F.audio === 'apple' ? { device: await probeMac().catch((e) => ({ error: String(e).slice(0, 200) })) } : {}), options: req.options.query ? { query: req.options.query, wanted: req.options.wanted ?? null } : { wanted: req.options.wanted ?? null } },
+    snapshot: { gitSha: gitSha(), configSha256: sha({ P, profileId }), modelRevisions: { ...F.models, asr: t.model ?? V4_MODELS.asr }, weightHashes, promptVersions: { ...V4_PROMPT_REVISION }, queryRevision: V4_QUERYBANK_REVISION, edgeRevision: V4_EDGE_REVISION, seed: 0, profile: profileId, revisions: F.revisions(profileId), options: req.options.query ? { query: req.options.query, wanted: req.options.wanted ?? null } : { wanted: req.options.wanted ?? null } },
     status: 'running' as V4Status, createdAt: new Date().toISOString(), finishedAt: undefined as string | undefined, stageSec, errors
   }
   await save('manifest.json', manifest)
@@ -103,10 +100,8 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
     await tracer.record({ role: 'asr', modelRevision: t.model ?? 'parakeet-v3', realInputModalities: hasAudio ? ['audio'] : [], actualMediaWindowIds: ['audio.wav'], success: hasAudio, validatedOutput: true, wallClockMs: 0, status: `${t.words.length} Wörter (gespeichertes Transkript, Version ${t.version})`, input: { wav: 'audio.wav', durationSec: dur }, output: { words: t.words.length, speech: t.speech?.length ?? null } })
     // Keyframe-Scan (CPU/FFmpeg) läuft parallel zu YAMNet und Sprach-Lane (GPU/LLM); gemessen 83 s auf 15 min Material
     const scanP = src.video ? stage('keyframes', () => keyframeScan(project.sourcePath, signal)).catch((e) => { if (signal?.aborted) throw e; fail('keyframes', e); return null }) : Promise.resolve(null)
-    report('signals', 0.3, F.audio === 'apple' ? 'Ton-Klassen (Apple SoundAnalysis) …' : 'Ton-Klassen (YAMNet) …')
-    const series = hasAudio && F.audio === 'yamnet' ? await stage('yamnet', async () => (await ensureSeries(project.hash, wav, signal)).series).catch((e) => { fail('yamnet', e); return null }) : null
-    const apple: SoundWindow[] | null = hasAudio && F.audio === 'apple' ? await stage('apple-sound', () => analyzeSound(wav, signal)).catch((e) => { if (signal?.aborted) throw e; fail('apple-sound', e); return null }) : null
-    if (apple) await save('sound_events.json', { revision: MAC_MODELS.audioEvents, windows: apple.length, events: soundEvents(apple) })
+    report('signals', 0.3, 'Ton-Klassen (YAMNet) …')
+    const series = hasAudio ? await stage('yamnet', async () => (await ensureSeries(project.hash, wav, signal)).series).catch((e) => { fail('yamnet', e); return null }) : null
     report('signals', 1, 'Billige Merkmale fertig')
 
     // ---------------------------------------------------------------------------------------------------------------- S3 vier Lanes
@@ -115,7 +110,7 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
     report('candidates', 0, 'Sprach-Lane (lokales LLM) …')
     const speech = await stage('lane-speech', () => withLlm((url) => speechLane(url, sentences, { duration: dur, query: req.options.query, asrModel: t.model ?? 'parakeet', max: P.perLane * 4, tracer, signal, onProgress: (f) => report('candidates', 0.3 * f, 'Sprach-Lane …') })))
     report('candidates', 0.3, 'Ton-Lane …')
-    const audio = await stage('lane-audio', () => audioLane(series, req.input.signals, { duration: dur, max: P.perLane * 4, tracer, hasAudio, apple: apple ? { events: soundProposals(soundEvents(apple), dur, P.perLane * 4), windows: apple.length } : undefined }))
+    const audio = await stage('lane-audio', () => audioLane(series, req.input.signals, { duration: dur, max: P.perLane * 4, tracer, hasAudio }))
     report('candidates', 0.35, 'Bildänderungen …')
     const scan = await scanP
     const visual = visualLane(scan, { duration: dur, max: P.perLane * 4 })
@@ -123,17 +118,17 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
     const queries = expandQueries(QUERY_BANK, req.options.query, speech.seeds)
     const xm = await stage('lane-cross-modal', () => withEmbedder(req.runId, (s) => crossModalLane(s, { hash: project.hash, video: project.sourcePath, duration: dur, profile: P, queries, max: P.perLane * 4, tracer, signal, onProgress: (f, m) => report('candidates', 0.4 + 0.5 * f, m) })))
     // Gesang/Musik (YAMNet) → ASR-Wörter dort unsicher: Abdeckung „partial“, Sprachbelege „unknown“ (keine Sicherheit vortäuschen)
-    const unsure = series ? speechUncertainWindows(decodeSeries(series) as never, series.hop, dur) : apple ? musicWindows(apple, dur) : []
+    const unsure = series ? speechUncertainWindows(decodeSeries(series) as never, series.hop, dur) : []
     if (unsure.length) {
       for (const w of speech.coverage) if (w.source.startsWith('asr:') && unsure.some((u) => u.start < w.endSeconds && u.end > w.startSeconds)) Object.assign(w, { status: 'partial', reason: 'Gesang/Musik: ASR-Wörter unsicher' })
-      for (const e of speech.evidence) if (unsure.some((u) => u.start < e.end && u.end > e.start)) Object.assign(e, { state: 'unknown', uncertainty: `Gesang/Musik im Ton (${F.audio === 'apple' ? 'Apple SoundAnalysis' : 'YAMNet'}): Wortlaut unsicher` })
+      for (const e of speech.evidence) if (unsure.some((u) => u.start < e.end && u.end > e.start)) Object.assign(e, { state: 'unknown', uncertainty: 'Gesang/Musik im Ton (YAMNet): Wortlaut unsicher' })
     }
     const lanes: LaneResult[] = [speech, audio, visual, xm]
     // ganz ausgefallene Lane = Teilergebnis, nicht „fertig“ (gemessen: alle Textfenster HTTP 500 → vorher Status completed)
     if (Number(speech.diag.windows) > 0 && speech.diag.failedWindows === speech.diag.windows) fail('lane-speech', new Error(`alle ${speech.diag.windows} Textfenster fehlgeschlagen (LLM)`))
     const coverage: CoverageWindow[] = lanes.flatMap((l) => l.coverage)
     const decileReport = Object.fromEntries((['speech', 'audio', 'visual', 'cross-modal'] as const).map((ln) => [ln, decilesCovered(coverage.filter((w) => w.lane === ln), dur)]))
-    await save('coverage.json', { durationSec: dur, windows: coverage, deciles: decileReport, speechUncertain: unsure, note: `speech: ASR über die ganze Tonspur + LLM-Fenster; audio: Pegel + ${F.audio === 'apple' ? 'Apple SoundAnalysis' : 'YAMNet'} über die ganze Tonspur; visual: Keyframes + Embedding-Fenster über die ganze Zeitachse` })
+    await save('coverage.json', { durationSec: dur, windows: coverage, deciles: decileReport, speechUncertain: unsure, note: `speech: ASR über die ganze Tonspur + LLM-Fenster; audio: Pegel + YAMNet über die ganze Tonspur; visual: Keyframes + Embedding-Fenster über die ganze Zeitachse` })
     const evidence = new Map<string, Evidence>()
     for (const l of lanes) for (const e of l.evidence) evidence.set(e.id, e)
     const seeds: Seed[] = lanes.flatMap((l) => l.seeds)
@@ -163,7 +158,6 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
     const finals: Array<{ fin: Finalist; rendered: Rendered; variant: Variant; round: JudgeRound; group: SeedGroup; inv: InvestigationResult }> = []
     const tmp = join(runDir, 'tmp')
     const resumed: string[] = []
-    if (F.audio === 'apple') await stage('memory-gate', () => waitForMemory(report, signal))
     await stage('av-phase', () => F.withAv(req.runId, async (s) => {
       // S4 Nachuntersuchung
       for (let i = 0; i < toInvestigate.length; i++) {
@@ -278,18 +272,6 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
     // kein GPU-Prozess bleibt nach Ende/Abbruch geladen (MiniCPM-o hält sonst 18 GB, bis eine andere Stufe die GPU braucht)
     await vram.releaseAll().catch(() => undefined)
   }
-}
-
-/** Mac (16 GB): Gemma 4 nur laden, wenn das System nicht im kritischen Speicherdruck ist (sonst lagert macOS stark aus). Bis 60 s warten, dann klar abbrechen. */
-async function waitForMemory(report: (stage: string, f: number, m: string) => void, signal?: AbortSignal): Promise<void> {
-  for (let i = 0; i < 12; i++) {
-    const p = await probeMac().catch(() => null)
-    if (!p || p.memoryPressure !== 'critical') return
-    report('rate', 0, 'Speicher knapp (macOS meldet kritischen Druck) – warte, bis Speicher frei wird …')
-    await new Promise((r) => setTimeout(r, 5000))
-    signal?.throwIfAborted()
-  }
-  throw new Error('Zu wenig freier Arbeitsspeicher für Gemma 4 (macOS meldet seit 60 s kritischen Speicherdruck). Andere Programme schließen und erneut starten.')
 }
 
 const rankOf = (d: string): number => ({ acceptable: 0, 'needs-review': 1, reject: 2 }[d] ?? 3)

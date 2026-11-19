@@ -29,7 +29,9 @@ EMBED_MODELS = {"qwen3-vl-embedding-2b"}
 TEMPORAL_MODELS = {"lighthouse-cg-detr-clip"}
 AV_MODELS = {"minicpm-o-4_5"}
 # Mac: Gemma 4 E4B (Google, Apache-2.0) über MLX (mlx-vlm) – Bild + Ton, ohne torch
-MLX_AV_MODELS = {"gemma-4-e4b-it"}
+MLX_AV_MODELS = {"gemma-4-e4b-it", "lfm3-omni-2b"}
+# LFM3-Omni (Liquid AI, LFM Open License v1.0): Systemprompt laut Modellkarte, Textausgabe ausdrücklich anfordern
+MLX_SYSTEM = {"lfm3-omni-2b": "Answer questions about the provided images and audio. Base every answer only on what can be seen and heard. Respond with text."}
 AV_MIN_VRAM_BYTES = int(float(os.environ.get("SHORTME_AV_MIN_VRAM_GB", "20")) * 2**30)
 SUPPORTED_MODELS = EMBED_MODELS | TEMPORAL_MODELS | AV_MODELS | MLX_AV_MODELS
 
@@ -503,6 +505,8 @@ def _analyze_mlx(req, p, path: str, prompt: str, max_new: int) -> dict:
             raise WorkerError("bad-media", f"Ausschnitt hat {len(names)} Sekunden (erlaubt 1–75)")
         # Metal erlaubt einem Prozess ~11,8 GB (M1 Pro 16 GB); > 30 s Ton (mehrere Tonstücke) → höchstens 8 Bilder (gemessen 70 s: 8 Bilder + 3 Tonstücke = 7,5 GB Spitze)
         cap = MLX_MAX_FRAMES if len(names) <= MLX_AUDIO_CHUNK_SEC else min(MLX_MAX_FRAMES, 8)
+        if p.get("maxFrames"):
+            cap = max(1, min(int(p["maxFrames"]), 24))
         step = max(1, -(-len(names) // cap))
         picked = names[::step]
         frames = [os.path.join(d, n) for n in picked]
@@ -514,7 +518,9 @@ def _analyze_mlx(req, p, path: str, prompt: str, max_new: int) -> dict:
             audios = [os.path.join(d, n) for n in sorted(os.listdir(d)) if n.startswith("a") and n.endswith(".wav")]
         tone = "" if not audios else (" und die komplette Tonspur des Ausschnitts." if len(audios) == 1 else f" und die komplette Tonspur in {len(audios)} Teilen à höchstens {MLX_AUDIO_CHUNK_SEC} s, lückenlos in zeitlicher Reihenfolge (Teil k beginnt bei Sekunde {MLX_AUDIO_CHUNK_SEC}·(k−1)).")
         note = f"Du bekommst {len(frames)} Bilder in zeitlicher Reihenfolge (Bild k zeigt Sekunde {', '.join(str(x) for x in secs)} des Ausschnitts)" + (tone or "; der Ausschnitt hat keine Tonspur.")
-        formatted = apply_chat_template(processor, model.config, f"{note}\n\n{prompt}", num_images=len(frames), num_audios=len(audios), enable_thinking=False)
+        system = MLX_SYSTEM.get(_state["model_id"])
+        user = f"{note}\n\n{prompt}"
+        formatted = apply_chat_template(processor, model.config, [{"role": "system", "content": system}, {"role": "user", "content": user}] if system else user, num_images=len(frames), num_audios=len(audios), enable_thinking=False)
         temp = float(p.get("temperature", 0) or 0)
         mx.reset_peak_memory()
         res = generate(model, processor, formatted, image=frames, audio=audios or None, max_tokens=max_new, temperature=min(max(temp, 0.0), 1.0), verbose=False)

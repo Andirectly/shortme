@@ -6,6 +6,20 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.43.0] - 2026-11-19
+
+### Added
+
+- Engine Mac neu: LFM3-Omni sieht und hört jeden Kandidaten und später den fertigen Clip (Bilder + Ton, in 30-s-Paketen, ganze Tonlänge), Qwen3.5 plant die Schnitte nur an gemessenen Kanten, vergibt Titel, ordnet alle Vorschläge im direkten Vergleich und prüft den fertigen Clip. Unklare Kriterien gelten als „prüfen“, nie als bestanden. Höchstens eine Reparatur je Clip; Gemma 4 nur noch für einzelne ungelöste Fragen.
+- Fortschritt der Engine Mac mit echten Zählern („Clip 3 von 6 rendern“, „Kandidat 4 von 10 ansehen und anhören“) und Restzeit aus der verbleibenden Arbeit.
+- Cold Opener (Erstellen-Dialog, Standard aus): ein starker Moment des Clips wird beim Export 1–5 s vorangestellt, danach läuft der Clip von Anfang an.
+- AV1-Videos: einmalige Analyse-Kopie (H.264 über die Mac-Hardware), damit nicht jeder Schritt das langsame AV1 neu entpackt.
+
+### Changed
+
+- Engine Mac ersetzt den bisherigen Mac-Ablauf (Engine 4 mit Gemma); Windows-Engines unverändert.
+- Zeitlimits und Abbrechen beenden den Modellprozess wirklich (keine weiterrechnende GPU).
+
 ## [0.42.1] - 2026-11-18
 
 ### Added

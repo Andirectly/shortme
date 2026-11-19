@@ -110,6 +110,11 @@ export interface ShortmeClip {
    * damit nichts doppelt angewendet wird. Im Editor sichtbar und wiederherstellbar.
    */
   autoCuts?: Array<{ start: number; end: number }>
+  /**
+   * Cold Opener (Engine Mac): starker Moment AUS diesem Clip (Quellsekunden innerhalb start…end, an Wortgrenzen), der beim Export vorangestellt wird,
+   * wenn der Regler > 0 ist. Danach läuft der Clip normal von vorn; die Stelle kommt also absichtlich zweimal vor.
+   */
+  coldOpen?: { start: number; end: number }
   /** Keine Sprache im Clip (z. B. Gameplay-Szene): `firstWord`/`lastWord` bilden dann einen leeren Bereich (`lastWord = firstWord - 1`), es gibt keine Wörter und keine Untertitel. */
   wordless?: boolean
   /** Durchlaufene Einrast-Stufen, z. B. ['word','sentence','silence_end']. */

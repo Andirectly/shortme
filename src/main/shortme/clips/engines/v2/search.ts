@@ -32,7 +32,7 @@ export const sentenceLine = (s: Sentence): string => `S${s.index} ${Math.round(s
 export interface TextSearch { proposals: RawProposal[]; evidence: Evidence[]; windows: number; failedWindows: number; failedRanges: Array<[number, number]> }
 
 /** Alle Fenster nacheinander; ein ausgefallenes Fenster wird protokolliert (Abdeckung), nicht still ausgelassen. */
-export async function textSearch(baseUrl: string, sentences: Sentence[], opts: { query?: string; modelRev: string; signal?: AbortSignal; onProgress?: (f: number) => void }): Promise<TextSearch> {
+export async function textSearch(baseUrl: string, sentences: Sentence[], opts: { query?: string; modelRev: string; signal?: AbortSignal; onProgress?: (f: number) => void; /** mlx_vlm.server: Modellname im Request */ model?: string; timeoutMs?: number }): Promise<TextSearch> {
   const windows = textWindows(sentences)
   const proposals: RawProposal[] = []
   const evidence: Evidence[] = []
@@ -44,7 +44,7 @@ export async function textSearch(baseUrl: string, sentences: Sentence[], opts: {
     const prompt = await loadPrompt('v2/events', { max: V2_LIMITS.rawPerWindow, query: opts.query ? `Der Nutzer sucht besonders: ${opts.query}` : '', transcript: sentences.slice(from, to + 1).map(sentenceLine).join('\n') })
     try {
       const moments = await chatJson<Moment[]>(baseUrl, prompt, {
-        schema: SCHEMA(V2_LIMITS.rawPerWindow), maxTokens: 1100, temperature: 0.3, signal: opts.signal,
+        schema: SCHEMA(V2_LIMITS.rawPerWindow), maxTokens: 1100, temperature: 0.3, signal: opts.signal, model: opts.model, timeoutMs: opts.timeoutMs,
         validate: (x) => {
           if (!isObj(x) || !Array.isArray(x.moments)) throw new Error('moments fehlt')
           return x.moments.flatMap((m): Moment[] => {

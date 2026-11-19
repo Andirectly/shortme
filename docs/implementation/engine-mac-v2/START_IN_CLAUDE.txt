@@ -1,0 +1,5 @@
+Implementiere dieses vollständige ZIP-Paket im echten bestehenden Shortme-Repository. Lies zuerst 00_START_HERE.md und führe 01_CLAUDE_CODE_AUFTRAG.md, 05_LAUFZEITREGELN.md und 08_IMPLEMENTIERUNG_UND_ABNAHME.md gemeinsam aus.
+
+Programmiere die neue Mac-Engine vollständig mit echten LFM-/Qwen-MLX-Adaptern, Scheduler, Rendern, Untertiteln, Qualitätsprüfung und Persistenz. Ersetze die bisherige aktive Mac-Engine und aktiviere die neue Pipeline als Standard. Behalte die bestehende Oberfläche und den Editor bei, ergänze den optionalen Cold-Opener-Regler und halte Windows funktionsfähig.
+
+Arbeite bis zur tatsächlich integrierten Implementierung und führe die notwendigen realen Prüfungen aus. Dokumentation, Stubs oder ein deaktivierter neuer Codepfad erfüllen den Auftrag nicht. Die private lokale Nutzung ist bestätigt. Falls eine konkrete technische Voraussetzung oder eine echte Mac-Ausführung fehlt, benenne genau diesen Blocker und behaupte keine ausgeführte Abnahme.

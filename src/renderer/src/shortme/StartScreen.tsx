@@ -36,8 +36,10 @@ export function StartScreen(): React.JSX.Element {
   const twitchImport = useProject((s) => s.twitchImport)
   const go = useStore((s) => s.go)
   const tw = useTwitchInspect(link)
-  const [section, setSection] = useState<Section>(null)
-  useEffect(() => setSection(null), [link]) // neuer Link → wieder ganzes VOD
+  // Zeitbereich gilt nur für den Link, für den er gewählt wurde (neuer Link → wieder ganzes VOD), ohne setState im Effekt
+  const [picked, setPicked] = useState<{ link: string; section: Section }>({ link: '', section: null })
+  const section = picked.link === link ? picked.section : null
+  const setSection = (s: Section): void => setPicked({ link, section: s })
   const setChannelDraft = useTwitch((s) => s.setChannelDraft)
   useEffect(() => { useProject.getState().init() }, [])
   const open = async (path?: string): Promise<void> => {
@@ -243,6 +245,9 @@ function CreateSheet(): React.JSX.Element {
                 </div>
               </Row>
               <Row label="Titel einblenden" hint="Standard für alle neuen Clips; pro Clip im Editor änderbar"><Switch on={!!style.titleEnabled} onChange={(b) => void saveStyle({ ...style, titleEnabled: b })} label="Titel einblenden" /></Row>
+              <Row label="Cold Opener" hint="starker Moment des Clips vorneweg, danach der Clip von Anfang; 0 = aus (Engine Mac)">
+                <Segmented options={['Aus', '1 s', '2 s', '3 s', '4 s', '5 s']} value={style.coldOpenSec ? `${style.coldOpenSec} s` : 'Aus'} onChange={(v) => void saveStyle({ ...style, coldOpenSec: v === 'Aus' ? 0 : Number(v.split(' ')[0]) })} />
+              </Row>
               <Row label="Anzahl Clips" hint="Auto ≈ 1 je 2,5 Min"><Segmented options={['Auto', '5', '10', '15', '20', '30', '40', '50']} value={opts.count ?? 'Auto'} onChange={(count) => setOpts({ count })} /></Row>
               <Row label="Sprechpausen entfernen"><Switch on={opts.removePauses} onChange={(removePauses) => setOpts({ removePauses })} label="Sprechpausen entfernen" /></Row>
               <Row label="Workflow"><Segmented options={['Automatisch', 'Prüfen & Bearbeiten']} value={opts.workflow} onChange={(workflow) => setOpts({ workflow })} /></Row>

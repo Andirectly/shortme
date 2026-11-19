@@ -48,6 +48,8 @@ export interface ExportOptions {
   /** KI-Hervorhebung (betonte Wörter) an/aus. */
   caption?: { highlight?: boolean }
   hookSeconds?: number
+  /** Cold Opener: Zieldauer des Vorspanns in Sekunden (0 = aus); wirkt nur bei Clips mit `coldOpen`-Vorschlag. */
+  coldOpenSec?: number
   quality?: QualityTier
   encoder?: 'auto' | 'cpu' | 'gpu'
   signal?: AbortSignal
@@ -57,16 +59,41 @@ export interface ExportOptions {
 export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number; captionEngine: 'tscaps' | 'ass' | 'remotion' | 'none'; /** Titel musste weggelassen werden (Grund). */ titleDropped?: string }
 
 /** Reine Planung eines Clips: Pausenschnitte, Zeitachse, Stücke, Wörter auf der gekürzten Zeitleiste. */
-export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = [], wordEdits: Record<number, string> = {}) {
+export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = [], wordEdits: Record<number, string> = {}, coldOpenSec = 0) {
   const range: Interval = [clip.start, clip.end]
   const words = t.words.slice(clip.firstWord, clip.lastWord + 1)
   const cuts = mergeIntervals([...(removePauses ? planPauseCuts(range, words, signals.silences, t.speech) : []), ...extraCuts.filter((c) => c[1] > range[0] && c[0] < range[1])])
-  const map = new TimeMap(keepsFromCuts(range, cuts))
+  const main = keepsFromCuts(range, cuts)
+  const tagByWord = new Map(clip.tags.map((g) => [g.word, g.kind]))
+  const wordObjs = words.map((w, i) => ({ w: wordEdits[clip.firstWord + i] ?? w.w, start: w.start, end: w.end, tag: tagByWord.get(clip.firstWord + i) }))
+  const mainWords: CapWord[] = new TimeMap(main).words(wordObjs)
+  // Cold Opener: Vorspann-Stück vorn, danach der Clip unverändert (Ausgabezeit um die Vorspannlänge verschoben); Untertitel/Bild/Ton folgen derselben Zeitachse
+  const teaser = coldOpenSec > 0 ? coldOpenSpan(clip, wordObjs, coldOpenSec) : null
+  const L = teaser ? teaser[1] - teaser[0] : 0
+  const keeps = teaser ? [{ src0: teaser[0], src1: teaser[1], out0: 0 }, ...main.map((k) => ({ ...k, out0: k.out0 + L }))] : main
+  const map = new TimeMap(keeps)
   const fallback: ShortmeShot = { start: 0, end: clip.end - clip.start, layout: 'fixed', cx: 0.5, zoom: 1 }
   const pieces = buildPieces(map, clip.shots?.length ? mergeShortShots(clip.shots) : [fallback], clip.start)
-  const tagByWord = new Map(clip.tags.map((g) => [g.word, g.kind]))
-  const capWords: CapWord[] = map.words(words.map((w, i) => ({ w: wordEdits[clip.firstWord + i] ?? w.w, start: w.start, end: w.end, tag: tagByWord.get(clip.firstWord + i) })))
-  return { map, pieces, cuts, words: capWords, duration: map.duration }
+  const capWords: CapWord[] = teaser
+    ? [...wordObjs.filter((w) => w.start >= teaser[0] - 0.02 && w.end <= teaser[1] + 0.02).map((w) => ({ ...w, start: w.start - teaser[0], end: Math.min(L, w.end - teaser[0]) })), ...mainWords.map((w) => ({ ...w, start: w.start + L, end: w.end + L }))]
+    : mainWords
+  return { map, pieces, cuts, words: capWords, duration: map.duration, coldOpen: teaser }
+}
+
+/**
+ * Vorspann aus `clip.coldOpen`, auf die Zieldauer gekürzt – an Wortgrenzen (Wortgrenze hat Vorrang vor der genauen Dauer, ±1 s Spielraum).
+ * null, wenn kein Vorschlag existiert oder er außerhalb des Clips liegt.
+ */
+export function coldOpenSpan(clip: Pick<ShortmeClip, 'start' | 'end' | 'coldOpen'>, words: Array<{ start: number; end: number }>, targetSec: number): Interval | null {
+  const c = clip.coldOpen
+  if (!c || !(targetSec > 0) || c.start < clip.start - 0.01 || c.end > clip.end + 0.01 || c.end - c.start < 0.5) return null
+  const inside = words.filter((w) => w.start >= c.start - 0.02 && w.end <= c.end + 0.02)
+  if (!inside.length) return [c.start, Math.min(c.end, c.start + targetSec)]
+  const a = inside[0].start
+  // letztes Wortende, das höchstens 1 s über das Ziel hinausgeht; mindestens das erste Wort
+  const ends = inside.map((w) => w.end).filter((e) => e - a <= targetSec + 1)
+  const b = ends.length ? ends.reduce((best, e) => (Math.abs(e - a - targetSec) < Math.abs(best - a - targetSec) ? e : best)) : inside[0].end
+  return [a, Math.max(b, a + 0.3)]
 }
 
 /** Überlappende/angrenzende Schnitte zusammenfassen (sortiert). */
@@ -95,7 +122,7 @@ export const filterPath = (p: string): string => p.replace(/\\/g, '/').replace(/
 
 export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transcript, signals: Signals, opts: ExportOptions): Promise<ExportResult> {
   const report = opts.onProgress ?? (() => undefined)
-  const plan = planExport(clip, t, signals, opts.removePauses ?? true, opts.extraCuts ?? [], opts.wordEdits ?? {})
+  const plan = planExport(clip, t, signals, opts.removePauses ?? true, opts.extraCuts ?? [], opts.wordEdits ?? {}, opts.coldOpenSec ?? 0)
   if (plan.pieces.length === 0) throw new Error('Clip enthält nichts zu exportieren')
   await mkdir(opts.outDir, { recursive: true })
   const style: StylePreset = opts.style ?? BUILTIN_PRESETS[0]

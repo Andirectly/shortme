@@ -1,8 +1,7 @@
 // Pflichtvoraussetzungen der Engine 4 (keine stille Rückstufung): Python-Umgebungen, Embedding-Modell, MiniCPM-o, YAMNet, LLM für die Sprach-Lane.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { assets, hardware } from '../../../../engines'
-import { macWorkerExe } from '../mac/sound'
+import { assets } from '../../../../engines'
 import { dataRoot } from '../../../../engines/paths'
 import { CATALOG } from '../../../../engines/catalog'
 import { avRuntimeStatus, runtimeStatus } from '../v3/runtime'
@@ -30,20 +29,3 @@ export async function v4MissingModels(): Promise<Array<{ id: string; name: strin
   return out
 }
 
-/** Mac-Engine: Mac-Python-Umgebungen (PyTorch/MPS für die Bildsuche, MLX für Gemma 4), Bildsuche, Gemma 4, Swift-Helfer, LLM für die Sprach-Lane. */
-export async function macMissingModels(): Promise<Array<{ id: string; name: string; sizeBytes: number }>> {
-  const out: Array<{ id: string; name: string; sizeBytes: number }> = []
-  if (process.platform !== 'darwin' || process.arch !== 'arm64') out.push({ id: 'engine-mac-platform', name: 'Die Mac-Engine läuft nur auf einem Mac mit Apple Silicon', sizeBytes: 0 })
-  if (!existsSync(macWorkerExe())) out.push({ id: 'engine-mac-worker', name: 'Mac-Helfer (shortme-mac-worker) fehlt im Programm', sizeBytes: 0 })
-  const rt = await runtimeStatus()
-  if (rt.state !== 'ready') out.push({ id: V3_PYTHON_ASSET, name: `Python-Laufzeit (Bildsuche, Apple-GPU) – ${rt.detail}`, sizeBytes: 0 })
-  const av = await avRuntimeStatus()
-  if (av.state !== 'ready') out.push({ id: V3_AV_ASSET, name: `AV-Laufzeit (Gemma 4, MLX) – ${av.detail}`, sizeBytes: 0 })
-  const llm = (await hardware()).recommendedLlm
-  for (const id of ['qwen3-vl-embedding-2b', 'gemma-4-e4b-it', 'llama-server', llm]) {
-    const sp = CATALOG.find((c) => c.id === id)
-    if (!sp) { out.push({ id, name: id, sizeBytes: 0 }); continue }
-    if (!(await assets.isInstalled(id))) out.push({ id, name: sp.name, sizeBytes: sp.files.reduce((n, f) => n + f.size, 0) })
-  }
-  return out
-}

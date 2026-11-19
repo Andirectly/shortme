@@ -108,6 +108,67 @@ const ALL: AssetSpec[] = [
     platform: 'darwin'
   },
   {
+    id: 'lfm3-omni-2b',
+    name: 'LFM3-Omni 2B (Engine Mac, Bild + Ton, MLX)',
+    kind: 'vision',
+    note: 'Engine Mac: sieht und hört jeden Kandidaten und den fertigen Clip (Bilder + separat zugeführter Ton) · Liquid AI, LFM Open License v1.0 (private Nutzung) · 8-bit MLX · ca. 2,9 GB, gemessen ~3,2 GB Speicher',
+    // Revision fest gebunden; alle Dateien mit SHA-256 (große Dateien gegen die LFS-Prüfsumme der Hugging-Face-API abgeglichen, scripts/catalog-entry.py)
+    files: [
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/LICENSE`, name: 'LICENSE', size: 10574, sha256: '4d28ca14dedc0b3d0fcc2b3339f0e79931faa33874f3d24f522183a8fc70068c' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/README.md`, name: 'README.md', size: 5458, sha256: 'd47467d6217e65050ff4df5e49b5999dddb481cd4c9a10fb716aa896ef8bff78' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/audio_tokenizer/config.json`, name: 'audio_tokenizer/config.json', size: 512, sha256: '04d24ad70085288c0c10a8788e470fabd0a786c27b772bfd90ea1cde1cf3ac6d' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/audio_tokenizer/model.safetensors`, name: 'audio_tokenizer/model.safetensors', size: 147143540, sha256: '45984a872fdcf0b94cd0ec68822bbf26f0c6fcb580cfaba0f7fa3ee60355137f' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/chat_template.jinja`, name: 'chat_template.jinja', size: 13527, sha256: '8533df07040707cfc576ddd88d82683ed768b4cbeea0d946d87f26979f52f7ec' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/config.json`, name: 'config.json', size: 7941, sha256: '4e2803b6c2738b3a3d5081bf29282a4533c2c414ca0ace6ae2ef2b9831286a27' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/configuration_lfm3.py`, name: 'configuration_lfm3.py', size: 6113, sha256: '176cced35657aedfea7d7002221360582d1c05fcaca882c21508bc3a73b282e5' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/configuration_lfm3_omni.py`, name: 'configuration_lfm3_omni.py', size: 14598, sha256: '9eccce3925353022c9a4d1cf59111830bbb2694e8c8d12ea439304e48a173c6a' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/configuration_lfm3_vl.py`, name: 'configuration_lfm3_vl.py', size: 9158, sha256: '249e980a0b0ebd355be18bc0119b33809fa618b777c46f5424445a196c5cbc2e' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/configuration_liquid_codec.py`, name: 'configuration_liquid_codec.py', size: 5401, sha256: 'ad89deb17164b8ae9a59d9c86545fd01ad281786c8702850aff9042e5f94a463' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/feature_extraction_lfm3_omni.py`, name: 'feature_extraction_lfm3_omni.py', size: 8935, sha256: 'bafd4bcf85d17c0bbf5cf213633935a6b03c731e55a348e70b0ecaf5a876ef5e' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/generation_config.json`, name: 'generation_config.json', size: 392, sha256: '5f069cac2df137d9ac81bdd7aee88d48052a3897f9761cc9ba2f357f93405b85' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/image_processing_lfm3_vl.py`, name: 'image_processing_lfm3_vl.py', size: 12036, sha256: '57db0cfa668bf89a6ff898874e1321e78c257d200f25c98e0ea52b30b8740088' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/lfm3_conv.py`, name: 'lfm3_conv.py', size: 8532, sha256: '80d4a985382a22774212759248a6b4c737bfbf9c2a47b3dd7f797dda748e4bb4' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/model.safetensors`, name: 'model.safetensors', size: 2713590678, sha256: '3a6b0836c6c84caa6e479ce650389bea27cb4dba2f56e593e4f78f294bdeba97' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/model.safetensors.index.json`, name: 'model.safetensors.index.json', size: 80412, sha256: 'b358abc8010ac593d58cf89ee63a130b748db8db7597ed2b7c85f616182056bc' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/modeling_lfm3.py`, name: 'modeling_lfm3.py', size: 42359, sha256: 'e8cd5254ea99ce6bd731b57b10908c2e8b5010ce8315341f895a38484885eeab' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/modeling_lfm3_omni.py`, name: 'modeling_lfm3_omni.py', size: 98277, sha256: '9872e64112f9e255fba43212771226772af521e93f99c1984ecba1049664c465' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/modeling_lfm3_vl.py`, name: 'modeling_lfm3_vl.py', size: 45019, sha256: '06d98684d2f4322bf65140f206f0bf194d14f6587387cd354ad580c12585ff28' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/modeling_liquid_codec.py`, name: 'modeling_liquid_codec.py', size: 17884, sha256: '5ca87e1b6e0549b40dc90fad5ee9d55620e9defb78c67e19c5937208c8e14f74' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/processing_lfm3_omni.py`, name: 'processing_lfm3_omni.py', size: 39031, sha256: '07f97f35ccd0262b586c8878251f46c6a84e1e15ed92b0072a3acd3a63d2de5f' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/processing_lfm3_vl.py`, name: 'processing_lfm3_vl.py', size: 12152, sha256: 'd770011e71c8b8e94ea9436d4f6768b42db60c5db70145d47f326f5d76f633f6' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/processor_config.json`, name: 'processor_config.json', size: 2089, sha256: 'd7475adcb748c70c08af13cbfc64305c34eca5f3af18d4018f73a9d50a8c702c' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/tokenizer.json`, name: 'tokenizer.json', size: 17908634, sha256: '41927bd314d17d7d7fadb44e10cd0919f7b71528d7741596d8cbd15c6945ec44' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/tokenizer_config.json`, name: 'tokenizer_config.json', size: 674, sha256: 'ee4860abad5b84284f816d2812fc23a7477ce827ed6b4708af9a02c68ed00c7c' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/video_preprocessor_config.json`, name: 'video_preprocessor_config.json', size: 706, sha256: '1ed75befc55ce0eda07fdcd7ad02c08605a973fcb1aebfbd0b86bb5221ae7c97' },
+      { url: `${HF}/LiquidAI/LFM3-Omni-2B-MLX-8bit/resolve/5901d16cbc5f1774243db907cd407f825591f743/video_processing_lfm3_vl.py`, name: 'video_processing_lfm3_vl.py', size: 17161, sha256: '9a6b7804c520b59ae6a20bff4814196c187ef5b3ed8c93cbd7d0a9a66c413478' }
+    ],
+    expect: ['model.safetensors', 'config.json', 'tokenizer.json', 'processor_config.json', 'audio_tokenizer/model.safetensors'],
+    platform: 'darwin'
+  },
+  {
+    id: 'qwen3.5-9b-mlx',
+    name: 'Qwen3.5 9B (Engine Mac, Redaktion, MLX)',
+    kind: 'llm',
+    note: 'Engine Mac: Sprachsuche, Schnittplan, Titel, Rangfolge und Inhaltsprüfung des fertigen Clips · Apache-2.0 · 4-bit MLX (mlx-community) · ca. 6 GB',
+    // Revision fest gebunden; alle Dateien mit SHA-256 (große Dateien gegen die LFS-Prüfsumme der Hugging-Face-API abgeglichen, scripts/catalog-entry.py)
+    files: [
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/README.md`, name: 'README.md', size: 666, sha256: '1407e3e3337063c280b2fe1a63724908a5051cfbf26cd8b98f247432b0382537' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/chat_template.jinja`, name: 'chat_template.jinja', size: 7756, sha256: 'a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/config.json`, name: 'config.json', size: 3331, sha256: 'a96942cb6a8a1d3f1d17514d81a1925d04362a6a3233b389d13012211baaa9f8' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/model-00001-of-00002.safetensors`, name: 'model-00001-of-00002.safetensors', size: 5349771222, sha256: 'a68b87558c6ef43f74c2bd63ce7e9092ceddc3101f3def0030774bae5f42aadd' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/model-00002-of-00002.safetensors`, name: 'model-00002-of-00002.safetensors', size: 600449850, sha256: 'b0a770bf8469c7f3f18756a0e0283f1c1174344a83e059a4e483f6af4907352d' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/model.safetensors.index.json`, name: 'model.safetensors.index.json', size: 123592, sha256: 'dd023913fb87cfdae27fb11dcf695117c925833796ccac3c64117d6652d8ff1e' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/preprocessor_config.json`, name: 'preprocessor_config.json', size: 390, sha256: '27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/processor_config.json`, name: 'processor_config.json', size: 1300, sha256: '14932921ca485d458a04dafd8069fbb0a4505622a48208d19ed247115801385b' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/tokenizer.json`, name: 'tokenizer.json', size: 19989343, sha256: '87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/tokenizer_config.json`, name: 'tokenizer_config.json', size: 1139, sha256: 'e98f1901ac6f0adff67b1d540bfa0c36ac1a0cf59eb72ed78146ef89aafa1182' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/video_preprocessor_config.json`, name: 'video_preprocessor_config.json', size: 385, sha256: '7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13' },
+      { url: `${HF}/mlx-community/Qwen3.5-9B-4bit/resolve/8b2b98c00a6b4d291155e4890773ca8f769aee53/vocab.json`, name: 'vocab.json', size: 6722759, sha256: 'ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003' }
+    ],
+    expect: ['model-00001-of-00002.safetensors', 'model-00002-of-00002.safetensors', 'config.json', 'tokenizer.json'],
+    platform: 'darwin'
+  },
+  {
     id: 'minicpm-o-4_5',
     name: 'MiniCPM-o 4.5 (Engine 3, Video + Audio, PyTorch)',
     kind: 'vision',

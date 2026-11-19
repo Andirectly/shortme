@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "planId": "shortme-mac-lfm-qwen35-2026-11-18",
+  "kind": "integration-plan-not-runtime-config",
+  "target": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "referenceChip": "M1 Pro",
+    "unifiedMemoryGiB": 16
+  },
+  "inference": {
+    "offlineAfterModelInstallation": true,
+    "largeModelsConcurrent": 1,
+    "keepLoadedWithinPhase": true,
+    "pinTestedRevisions": true
+  },
+  "models": {
+    "observer": {
+      "modelId": "LiquidAI/LFM3-Omni-2B-MLX-8bit",
+      "backend": "mlx-vlm",
+      "role": [
+        "candidate-observation",
+        "render-observation"
+      ],
+      "license": "LFM Open License v1.0"
+    },
+    "director": {
+      "modelId": "mlx-community/Qwen3.5-9B-4bit",
+      "backend": "mlx",
+      "role": [
+        "speech-discovery",
+        "edit-planning",
+        "titles",
+        "semantic-output-check"
+      ],
+      "license": "Apache-2.0"
+    },
+    "fallback": {
+      "useExistingGemmaE4BAdapter": true,
+      "onlyForSpecificUnresolvedMediaQuestions": true
+    },
+    "transcription": {
+      "useExistingParakeetV3Adapter": true
+    },
+    "visualRetrieval": {
+      "useExistingQwenVLEmbeddingAdapter": true
+    }
+  },
+  "sourceAnalysis": {
+    "preserveFourLanes": true,
+    "initialSpeechWindowSeconds": 180,
+    "initialSpeechOverlapSeconds": 30,
+    "enforceTokenBudget": true,
+    "rankAfterCollectingAllWindows": true,
+    "dedupeByOverlapAndEvent": true
+  },
+  "observation": {
+    "initialFrameBudget": 8,
+    "preferredAudioPacketMs": 30000,
+    "splitLongAudio": true,
+    "requireCompleteOutputAudioCoverage": true,
+    "maximumInitialContextExtensions": 1
+  },
+  "coldOpener": {
+    "defaultTargetDurationMs": 0,
+    "uiMinimumMs": 0,
+    "uiMaximumMs": 5000,
+    "zeroMeansDisabled": true,
+    "preserveWordBoundaries": true,
+    "replayMainClipFromNormalStart": true
+  },
+  "output": {
+    "preserveExistingEditorAndRenderer": true,
+    "preserveSourcePts": true,
+    "checkRenderedFile": true,
+    "maximumInitialRepairRounds": 1,
+    "unknownIsNotPass": true,
+    "bindAuditToRenderHash": true
+  },
+  "goals": {
+    "tenMinuteSourceWithThreeToFourClipsMinutes": [
+      8,
+      15
+    ],
+    "twentyMinuteSourceApproximateMinutes": 30,
+    "status": "development-targets-not-measured"
+  },
+  "initialCandidateExamples": [
+    {
+      "sourceMinutes": 2,
+      "desiredClips": [
+        1,
+        2
+      ],
+      "investigate": [
+        2,
+        4
+      ]
+    },
+    {
+      "sourceMinutes": 10,
+      "desiredClips": [
+        3,
+        4
+      ],
+      "investigate": [
+        5,
+        7
+      ]
+    },
+    {
+      "sourceMinutes": 20,
+      "desiredClips": [
+        5,
+        6
+      ],
+      "investigate": [
+        8,
+        12
+      ]
+    }
+  ],
+  "runtimeControl": {
+    "ruleFile": "05_LAUFZEITREGELN.md",
+    "initialMaximumInvestigationsPerDesiredClip": 2,
+    "maximumAdditionalEventGroups": 4,
+    "maximumGemmaFallbackQuestionsPerRun": 2,
+    "softRunBudgetMs": 1800000,
+    "reserveTimeForRenderingAndCompleteAudit": true,
+    "requestTimeoutMs": 120000,
+    "modelLoadTimeoutMs": 120000,
+    "renderStallTimeoutMs": 120000,
+    "timeoutsMustCancelRealWorker": true,
+    "estimateFromQueuedWorkAndMeasuredThroughput": true,
+    "unknownFuturePhaseDurationIsNotZero": true,
+    "softBudgetMayStopExtraSearchButNeverWaiveRequiredChecks": true,
+    "countAllRequiredInitialMediaPackets": true,
+    "maximumAdditionalContextOrSchemaRetryRequestsPerCandidate": 1
+  },
+  "deliveryContract": {
+    "scope": "complete-production-mac-engine-replacement",
+    "activation": "new-default-for-normal-mac-runs",
+    "replaceCurrentActiveMacOrchestration": true,
+    "reuseWorkingBasicAdapters": true,
+    "realMlxInferenceRequired": true,
+    "realRenderingAndAuditRequired": true,
+    "wireRuntimePoliciesIntoScheduler": true,
+    "preserveExistingEditorProjectsAndWindows": true,
+    "noSilentFallbackToWholeLegacyMacEngine": true,
+    "disabledExperimentalPathIsNotCompletion": true,
+    "helperTestsAloneAreNotAcceptance": true,
+    "actualMacExecutionMustBeReportedTruthfully": true,
+    "completionContractFile": "08_IMPLEMENTIERUNG_UND_ABNAHME.md"
+  }
+}

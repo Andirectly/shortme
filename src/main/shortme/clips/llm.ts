@@ -24,6 +24,10 @@ export interface ChatJsonOptions<T> {
   maxTokens?: number
   temperature?: number
   signal?: AbortSignal
+  /** Modellname im Request (mlx_vlm.server erwartet ihn; llama-server ignoriert ihn). */
+  model?: string
+  /** Zeitlimit je Anfrage (bricht die HTTP-Anfrage ab). */
+  timeoutMs?: number
 }
 
 /** OpenAI-kompatibler Aufruf an llama-server mit erzwungenem JSON-Schema; ungültige Antworten werden 1× wiederholt. */
@@ -34,8 +38,9 @@ export async function chatJson<T>(baseUrl: string, prompt: Prompt, opts: ChatJso
     const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      signal: opts.signal,
+      signal: opts.timeoutMs ? AbortSignal.any([...(opts.signal ? [opts.signal] : []), AbortSignal.timeout(opts.timeoutMs)]) : opts.signal,
       body: JSON.stringify({
+        ...(opts.model ? { model: opts.model } : {}),
         messages: [{ role: 'system', content: prompt.system }, { role: 'user', content: prompt.user + (lastError ? `\n\n(Vorherige Antwort war ungültig: ${lastError}. Antworte exakt im Schema.)` : '') }],
         temperature: (opts.temperature ?? 0.3) + attempt * 0.2,
         max_tokens: opts.maxTokens ?? 1500,

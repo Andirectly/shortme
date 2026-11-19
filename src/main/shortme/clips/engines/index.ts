@@ -6,7 +6,8 @@ import { selectClips, type CandTrace, type SelectInput, type SelectOptions } fro
 import type { ModalityStatus, RunInfo, SelectionEngineId, V3Profile } from '../../../../shared/engine'
 import { v2Revisions } from './v2/revisions'
 import { v3Revisions } from './v3/revisions'
-import { macRevisions, v4Revisions } from './v4/revisions'
+import { v4Revisions } from './v4/revisions'
+import { mac2Revisions } from './mac2/revisions'
 
 export interface SelectionOutcome {
   clips: ShortmeClip[]
@@ -52,7 +53,7 @@ async function selectLegacy(req: SelectionRequest): Promise<SelectionOutcome> {
 
 /** Modell-/Prompt-/Algorithmusversionen der Engine für den Eingabefingerabdruck (Legacy: keine, sein Ergebnis hängt nicht an solchen Revisionen). */
 export function engineRevisions(engine: SelectionEngineId, profile: V3Profile = 'balanced'): string[] {
-  return engine === 'multimodal-v2' ? v2Revisions() : engine === 'adaptive-v3' ? v3Revisions(profile) : engine === 'engine4' ? v4Revisions(profile) : engine === 'engine-mac' ? macRevisions(profile) : []
+  return engine === 'multimodal-v2' ? v2Revisions() : engine === 'adaptive-v3' ? v3Revisions(profile) : engine === 'engine4' ? v4Revisions(profile) : engine === 'engine-mac' ? mac2Revisions() : []
 }
 
 export async function runSelection(req: SelectionRequest): Promise<SelectionOutcome> {
@@ -70,9 +71,9 @@ export async function runSelection(req: SelectionRequest): Promise<SelectionOutc
     return selectV4(req)
   }
   if (req.engine === 'engine-mac') {
-    // Gleiche Pipeline wie Engine 4 mit Mac-Bausteinen (Apple SoundAnalysis, Bildsuche auf MPS, Gemma 4 über MLX)
-    const { selectV4, MAC_FLAVOR } = await import('./v4')
-    return selectV4(req, MAC_FLAVOR)
+    // Standard auf dem Mac: eigener Ablauf (LFM3-Omni beobachtet, Qwen3.5 plant und prüft); keine Weiterleitung an Engine 4
+    const { selectMac2 } = await import('./mac2')
+    return selectMac2(req)
   }
   return selectLegacy(req)
 }

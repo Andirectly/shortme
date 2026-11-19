@@ -34,16 +34,16 @@ export function evenWindows(lane: CoverageWindow['lane'], duration: number, step
 }
 
 // -------------------------------------------------------------------------------------------------------------------------------- speech
-export async function speechLane(url: string, sentences: Sentence[], o: { duration: number; query?: string; asrModel: string; max: number; tracer: Tracer; signal?: AbortSignal; onProgress?: (f: number) => void }): Promise<LaneResult> {
+export async function speechLane(url: string, sentences: Sentence[], o: { duration: number; query?: string; asrModel: string; max: number; tracer: Tracer; signal?: AbortSignal; onProgress?: (f: number) => void; /** Engine Mac 2: Qwen3.5 über mlx_vlm.server */ model?: string; modelLabel?: string; timeoutMs?: number }): Promise<LaneResult> {
   // ASR lief über die ganze Tonspur (vorhandenes Transkript); Textsuche läuft in Fenstern darüber
   const coverage = evenWindows('speech', o.duration, 60, `asr:${o.asrModel}`)
   if (!sentences.length) return { lane: 'speech', seeds: [], evidence: [], coverage: coverage.map((w) => ({ ...w, reason: 'keine erkannte Sprache' })), diag: { sentences: 0, note: 'kein Transkript-Text: Lane liefert nichts (keine erfundenen Worte)' } }
   const t0 = Date.now()
   let r: Awaited<ReturnType<typeof textSearch>>
   try {
-    r = await textSearch(url, sentences, { query: o.query, modelRev: 'v4-speech', signal: o.signal, onProgress: o.onProgress })
+    r = await textSearch(url, sentences, { query: o.query, modelRev: 'v4-speech', signal: o.signal, onProgress: o.onProgress, model: o.model, timeoutMs: o.timeoutMs })
   } catch (e) {
-    await o.tracer.record({ role: 'speech_lane', modelRevision: 'qwen3-14b', realInputModalities: ['speech'], actualMediaWindowIds: [], success: false, validatedOutput: false, wallClockMs: Date.now() - t0, status: 'failed', error: String(e).slice(0, 300), input: { sentences: sentences.length } })
+    await o.tracer.record({ role: 'speech_lane', modelRevision: o.modelLabel ?? 'qwen3-14b', realInputModalities: ['speech'], actualMediaWindowIds: [], success: false, validatedOutput: false, wallClockMs: Date.now() - t0, status: 'failed', error: String(e).slice(0, 300), input: { sentences: sentences.length } })
     throw e
   }
   const wins = textWindows(sentences)
@@ -52,7 +52,7 @@ export async function speechLane(url: string, sentences: Sentence[], o: { durati
     const failed = r.failedRanges.some(([x, y]) => x < b && y > a)
     coverage.push({ lane: 'speech', startSeconds: a, endSeconds: b, status: failed ? 'failed' : 'inspected', source: 'speech-lane-llm', ...(failed ? { reason: 'Modellantwort ungültig' } : {}) })
   }
-  await o.tracer.record({ role: 'speech_lane', modelRevision: 'qwen3-14b-q4_k_m (llama-server)', promptRevision: 'v2/text-search', realInputModalities: ['speech'], actualMediaWindowIds: wins.map((w) => `S${w.from}-S${w.to}`), success: true, validatedOutput: true, wallClockMs: Date.now() - t0, status: `windows ${r.windows}, failed ${r.failedWindows}`, input: { sentences: sentences.length, windows: r.windows }, output: { proposals: r.proposals.length } })
+  await o.tracer.record({ role: 'speech_lane', modelRevision: o.modelLabel ?? 'qwen3-14b-q4_k_m (llama-server)', promptRevision: 'v2/text-search', realInputModalities: ['speech'], actualMediaWindowIds: wins.map((w) => `S${w.from}-S${w.to}`), success: true, validatedOutput: true, wallClockMs: Date.now() - t0, status: `windows ${r.windows}, failed ${r.failedWindows}`, input: { sentences: sentences.length, windows: r.windows }, output: { proposals: r.proposals.length } })
   return { lane: 'speech', seeds: toSeeds('speech', r.proposals, o.max), evidence: r.evidence, coverage, diag: { windows: r.windows, failedWindows: r.failedWindows, proposals: r.proposals.length } }
 }
 
