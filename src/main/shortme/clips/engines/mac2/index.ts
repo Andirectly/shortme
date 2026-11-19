@@ -51,6 +51,17 @@ import { ensureProxy, needsProxy } from './proxy'
 import { MAC2_MODELS, MAC2_PIPELINE_VERSION, mac2Revisions } from './revisions'
 
 /** Laufzeit-Grenzen (05_LAUFZEITREGELN): weiches Zielbudget, Gemma-Rückfragen, Reparaturen. */
+/**
+ * Entscheidung für Engine Mac: wie v4 `decide`, aber „nicht eigenständig“ allein lehnt nicht ab (Vlog-Ausschnitte setzen fast immer etwas Kontext voraus;
+ * gemessen Lauf 5: 5 von 9 Ablehnungen nur wegen hook/standalone). Ablehnung bei fehlender Pointe, fehlendem Kernereignis oder ≥ 3 Kernfehlern.
+ */
+export function decideMac2(crit: Criterion[]): ReturnType<typeof decide> {
+  const core = ['hook', 'standalone', 'payoff', 'natural-end', 'essential-event']
+  const st = (id: string): string | undefined => crit.find((c) => c.id === id)?.state
+  if (st('payoff') === 'fail' || st('essential-event') === 'fail' || core.filter((id) => st(id) === 'fail').length >= 3) return 'reject'
+  return decide(crit.map((c) => (c.id === 'standalone' && c.state === 'fail' ? { ...c, state: 'unknown' as const } : c)))
+}
+
 export const MAC2_LIMITS = { softRunBudgetMs: 30 * 60_000, gemmaQuestions: 2, repairRounds: 1, extraRequestsPerCandidate: 1, observePadSec: 12, maxObserveSec: 30 } as const
 
 const sleep0 = (): Promise<void> => new Promise((r) => setImmediate(r))
@@ -117,6 +128,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
   await save('manifest.json', manifest)
   const finish = async (status: string): Promise<void> => { if (status === 'completed' || status === 'partial') await writeFileAtomic(ratesFile, JSON.stringify(L.rates())).catch(() => undefined); manifest.status = status; manifest.finishedAt = new Date().toISOString(); manifest.tasks = L.summary(); await save('manifest.json', manifest); await save('tasks.json', L.tasks) }
 
+  let specStop = false // Reserve-Renders: bei Ende/Fehler nicht mehr starten
   try {
     // AV1/VP9: einmal ein 720p-H.264-Proxy für alle Bildschritte (Original nur fürs Rendern); Zeit zählt zur Laufzeit
     const vcodec = src.streams.find((x) => x.type === 'video')?.codec
@@ -258,6 +270,28 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     const viewed = cands.filter((c) => c.obs.length || c.gemma)
     const observed = viewed.map((c, i) => ({ c, i, k: strength(c) })).sort((a, b) => b.k - a.k || a.i - b.i).slice(0, wanted + 4).map((x) => x.c)
     await tracer.log('scheduler.jsonl', { plannedCandidates: observed.map((c) => c.id), skippedForPlanBudget: viewed.filter((c) => !observed.includes(c)).map((c) => ({ id: c.id, strength: strength(c) })) })
+    // ------------------------------------------------------------------------------------------------ F Rendern
+    interface Out { plan: ClipPlan; cut: CutCandidate; rendered: Rendered | null; obs: PacketObs[]; criteria: Criterion[]; decision: 'acceptable' | 'needs-review' | 'reject'; titleFinal: string; round: number; history: Array<{ round: number; sha256: string; decision: string; failure?: string }> }
+    const mkOut = (p: ClipPlan): Out => ({ plan: p, cut: { id: `${p.candidateId}-cut`, startEdgeId: p.startEdge, endEdgeId: p.endEdge, span: p.span, prefilter: 0 }, rendered: null, obs: [], criteria: [], decision: 'needs-review', titleFinal: p.title, round: 0, history: [] })
+    const renderOne = async (o: Out, i: number, n: number, trims: Array<{ start: number; end: number }>, reason: 'initial' | 'repair'): Promise<void> => {
+      if (reason === 'repair') say('compare', 0.4 * (i / Math.max(1, n)), `Clip ${i + 1} von ${n} rendern (Reparatur)`)
+      const clip = clipFor(`${req.runId}-${o.plan.candidateId}-r${o.round}`, o.cut, t, trims, { title: o.titleFinal, runId: req.runId, engine: 'engine-mac', ...(o.plan.coldOpen ? { coldOpen: o.plan.coldOpen } : {}) })
+      o.rendered = await L.run(reason === 'repair' ? 'repair-render' : 'render', `${o.plan.candidateId} rendern`, { candidate: o.plan.candidateId, reason, units: o.cut.span.end - o.cut.span.start }, () => renderVariant(meta, t, req.input.signals, req.input.cuts, clip, join(runDir, 'previews', `${o.plan.candidateId}-r${o.round}`), signal))
+    }
+    // Vorab-Rendern: jeder fertige Schnittplan wird sofort im Hintergrund gerendert (CPU/VideoToolbox), während Qwen auf der GPU weiterplant.
+    // Gemessen Lauf 4: Rendern begann erst nach der Rangfolge (13 min Render+Prüfung). Nicht gebrauchte Reservepläne dienen als Nachrücker; der Rest wird am Ende übersprungen.
+    const outOf = new Map<string, Out>()
+    const ready0 = new Map<Out, Promise<void>>()
+    const needed = new Set<Out>()
+    let specTail: Promise<void> = Promise.resolve()
+    const preRender = (p: ClipPlan): void => {
+      const o = mkOut(p)
+      outOf.set(p.candidateId, o)
+      const job = specTail.then(() => (specStop && !needed.has(o) ? undefined : renderOne(o, 0, 1, [], 'initial')))
+        .catch((e) => { if (signal?.aborted) throw e; fail(`render ${p.candidateId} r0`, e); o.rendered = null })
+      job.catch(() => undefined) // nicht gebrauchte Reserve wird nie abgewartet
+      ready0.set(o, job); specTail = job.catch(() => undefined)
+    }
     const plans: ClipPlan[] = []
     let rankOrder: string[] = []
     L.set('plan', observed.length)
@@ -276,7 +310,8 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
             candidateId: c.id, prompt: planPrompt({ contentType: req.contentType, hint: c.group.seeds.map((x) => x.summary).filter(Boolean).slice(0, 3).join(' / ') || 'auffälliger Moment', observations: c.obs.length ? obsText(c.obs, (x) => `${x.toFixed(1)}s`) : `Rückfrage Gemma 4: ${c.gemma}`, sentences: winSentences, minSec, maxSec, query: req.options.query }),
             sentences: winSentences, edges, minSec, maxSec, mayRetry: () => retries < 1, onRetry: () => { retries++; L.book({ kind: 'plan', label: `${c.id} Korrektur`, candidate: c.id, reason: 'schema-retry', model: MAC_QWEN.id, ms: 0, ok: true, units: 0 }) }, signal
           }))
-          plans.push({ ...r.plan, coldOpen: coldOpenFromObs(c.obs, r.plan.span) })
+          const plan = { ...r.plan, coldOpen: coldOpenFromObs(c.obs, r.plan.span) }
+          plans.push(plan); preRender(plan)
           await tracer.log('plans.jsonl', { candidate: c.id, attempts: r.attempts, ms: r.ms, usage: r.usage, plan: r.plan, raw: r.raw.slice(0, 2000) })
         } catch (e) { if (signal?.aborted) throw e; fail(`plan ${c.id}`, e) }
       }
@@ -295,16 +330,10 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       if (winners.some((w) => overlapRatio(w.span, p.span) > 0.3)) continue
       winners.push(p)
     }
+    const outs: Out[] = winners.map((p) => outOf.get(p.candidateId)!)
+    for (const o of outs) needed.add(o)
+    L.set('render', plans.reduce((n, p) => n + (p.span.end - p.span.start), 0)); L.set('audit-packet', outs.reduce((n, o) => n + packetsFor('x', o.plan.span).length, 0)); L.set('audit-judge', outs.length)
 
-    // ------------------------------------------------------------------------------------------------ F Rendern
-    interface Out { plan: ClipPlan; cut: CutCandidate; rendered: Rendered | null; obs: PacketObs[]; criteria: Criterion[]; decision: 'acceptable' | 'needs-review' | 'reject'; titleFinal: string; round: number; history: Array<{ round: number; sha256: string; decision: string; failure?: string }> }
-    const outs: Out[] = winners.map((p) => ({ plan: p, cut: { id: `${p.candidateId}-cut`, startEdgeId: p.startEdge, endEdgeId: p.endEdge, span: p.span, prefilter: 0 }, rendered: null, obs: [], criteria: [], decision: 'needs-review', titleFinal: p.title, round: 0, history: [] }))
-    L.set('render', outs.reduce((n, o) => n + (o.plan.span.end - o.plan.span.start), 0)); L.set('audit-packet', outs.reduce((n, o) => n + packetsFor('x', o.plan.span).length, 0)); L.set('audit-judge', outs.length)
-    const renderOne = async (o: Out, i: number, n: number, trims: Array<{ start: number; end: number }>, reason: 'initial' | 'repair'): Promise<void> => {
-      say('compare', 0.4 * (i / Math.max(1, n)), `Clip ${i + 1} von ${n} rendern${reason === 'repair' ? ' (Reparatur)' : ''}`)
-      const clip = clipFor(`${req.runId}-${o.plan.candidateId}-r${o.round}`, o.cut, t, trims, { title: o.titleFinal, runId: req.runId, engine: 'engine-mac', ...(o.plan.coldOpen ? { coldOpen: o.plan.coldOpen } : {}) })
-      o.rendered = await L.run(reason === 'repair' ? 'repair-render' : 'render', `${o.plan.candidateId} rendern`, { candidate: o.plan.candidateId, reason, units: o.cut.span.end - o.cut.span.start }, () => renderVariant(meta, t, req.input.signals, req.input.cuts, clip, join(runDir, 'previews', `${o.plan.candidateId}-r${o.round}`), signal))
-    }
     // Rendern läuft nacheinander im Hintergrund (CPU/VideoToolbox, keine GPU-Sperre); die LFM-Prüfung beginnt mit jedem fertigen Clip (Überlappung statt Wartezeit)
     const renderChain = (list: Out[], run: (o: Out, i: number) => Promise<void>): Map<Out, Promise<void>> => {
       const ready = new Map<Out, Promise<void>>()
@@ -316,7 +345,6 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       return ready
     }
     const t0Render = Date.now()
-    const ready0 = renderChain(outs, (o, i) => renderOne(o, i, outs.length, [], 'initial'))
 
     // ------------------------------------------------------------------------------------------------ G+H Prüfung der fertigen Dateien (LFM beobachtet, Qwen prüft)
     const audit = async (list: Out[], label: string, ready: Map<Out, Promise<void>>): Promise<void> => {
@@ -365,7 +393,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
           // unvollständig gesehene/gehörte Ausgabe kann inhaltlich nicht bestehen: Modellurteile → unknown
           if (!cov.complete) model = model.map((c) => (c.state === 'pass' ? { ...c, state: 'unknown' as const, reason: `Ausgabe nicht vollständig beobachtet (${cov.covered.toFixed(0)}/${r.durationSeconds.toFixed(0)} s)` } : c))
           o.criteria = [...model, ...m.criteria]
-          o.decision = decide(o.criteria)
+          o.decision = decideMac2(o.criteria)
           o.history.push({ round: o.round, sha256: r.sha256, decision: o.decision, failure: firstRepairable(o.criteria) ?? undefined })
           await tracer.log('audits.jsonl', { candidate: o.plan.candidateId, round: o.round, sha256: r.sha256, coverage: cov, criteria: o.criteria, decision: o.decision, title: o.titleFinal })
         }
@@ -373,6 +401,25 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     }
     await audit(outs, 'r0', ready0)
     phaseSec['render+audit-observe overlap'] = Math.round((Date.now() - t0Render) / 100) / 10
+
+    // ------------------------------------------------------------------------------------------------ H2 Nachrücken (eine Runde): abgelehnte Plätze mit den nächsten Reserveplänen der Rangfolge füllen, solange das Budget reicht
+    const good = (): Out[] => outs.filter((o) => o.rendered && o.decision !== 'reject')
+    const backfill: Out[] = []
+    const perClipMs = (((L.secondsPerUnit('audit-packet') ?? 17) * 2) + (L.secondsPerUnit('audit-judge') ?? 25)) * 1000
+    for (const id of rankOrder) {
+      if (good().length + backfill.length >= wanted) break
+      const o = outOf.get(id)
+      if (!o || outs.includes(o)) continue
+      if ([...good(), ...backfill].some((w) => overlapRatio(w.plan.span, o.plan.span) > 0.3)) continue
+      if (L.elapsedMs() + (backfill.length + 1) * perClipMs + 60_000 > MAC2_LIMITS.softRunBudgetMs) { await tracer.log('scheduler.jsonl', { backfillStopped: 'Zeitbudget', candidate: id }); break }
+      backfill.push(o); needed.add(o)
+    }
+    if (backfill.length) {
+      await tracer.log('scheduler.jsonl', { backfill: backfill.map((o) => o.plan.candidateId) })
+      await audit(backfill, 'b1', ready0)
+      outs.push(...backfill)
+    }
+    specStop = true
 
     // ------------------------------------------------------------------------------------------------ I höchstens eine Reparatur je Clip
     const repair: Out[] = []
@@ -382,7 +429,8 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     for (const o of outs) {
       if (!o.rendered || o.decision === 'acceptable') continue
       const failure = firstRepairable(o.criteria)
-      if (!failure) continue
+      // nur mechanisch behebbare Fehler (gemessen Lauf 5: 4 von 4 Reparaturen wegen „standalone“ blieben abgelehnt, kosteten 5,5 min)
+      if (failure !== 'natural-end' && failure !== 'dead-air') continue
       // nur reparieren, wenn höchstens 2 Kernkriterien durchfallen (gemessen: mit 3–4 Fehlern blieb jede Reparatur „reject“, kostete aber je ~1 min)
       const coreFails = o.criteria.filter((c) => ['hook', 'standalone', 'payoff', 'natural-end', 'essential-event'].includes(c.id) && c.state === 'fail').length
       if (coreFails > 2) { await tracer.log('repairs.jsonl', { candidate: o.plan.candidateId, failure, op: 'skip', reason: `${coreFails} Kernkriterien durchgefallen – Plan ungeeignet, Reparatur aussichtslos` }); continue }
@@ -411,7 +459,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     // ------------------------------------------------------------------------------------------------ Ergebnis
     const rankIdx = (id: string): number => { const k = rankOrder.indexOf(id); return k < 0 ? 999 : k }
     const order = { acceptable: 0, 'needs-review': 1, reject: 2 }
-    const kept = outs.filter((o) => o.rendered && o.decision !== 'reject').sort((a, b) => order[a.decision] - order[b.decision] || rankIdx(a.plan.candidateId) - rankIdx(b.plan.candidateId))
+    const kept = outs.filter((o) => o.rendered && o.decision !== 'reject').sort((a, b) => order[a.decision] - order[b.decision] || rankIdx(a.plan.candidateId) - rankIdx(b.plan.candidateId)).slice(0, wanted)
     const st = (o: Out, id: string): number => ({ pass: 5, unknown: 3, 'not-applicable': 3, fail: 1 }[o.criteria.find((c) => c.id === id)?.state ?? 'unknown'] ?? 3)
     const clips: ShortmeClip[] = kept.map((o, rank) => {
       const r = o.rendered!
@@ -430,6 +478,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       } as ShortmeClip
     })
     await save('selection.json', { wanted, winners: winners.map((w) => w.candidateId), results: outs.map((o) => ({ candidate: o.plan.candidateId, title: o.titleFinal, decision: o.decision, round: o.round, output: o.rendered?.path ?? null, sha256: o.rendered?.sha256 ?? null, history: o.history, coldOpen: o.plan.coldOpen })), chosen: clips.map((c) => c.id) })
+    await specTail // übersprungene Reserve-Renders sind sofort fertig
     await save('evidence.json', [...evidence.values()])
     const partial = errors.length > 0
     await finish(partial ? 'partial' : 'completed')
@@ -442,6 +491,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     await finish(signal?.aborted ? 'cancelled' : 'failed').catch(() => undefined)
     throw e
   } finally {
+    specStop = true
     // kein Modellprozess bleibt nach Ende/Abbruch geladen
     await vram.releaseAll().catch(() => undefined)
     await rm(join(runDir, 'tmp'), { recursive: true, force: true }).catch(() => undefined)

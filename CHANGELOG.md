@@ -6,6 +6,15 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.44.0] - 2026-11-19
+
+### Changed
+
+- Engine Mac: Schnittpläne aus ganzen Sätzen (Satznummern statt Zeitstempel), das Ende reicht bis zur Mitte der Pause – kein angeschnittenes Wort vom nächsten Satz.
+- Engine Mac: Clips werden schon während der Schnittplanung im Hintergrund gerendert; lehnt die Prüfung Clips ab, rücken die nächsten geplanten Clips der Rangfolge nach (eine Runde, im Zeitbudget).
+- Engine Mac: „nicht eigenständig verständlich“ allein lehnt einen Clip nicht mehr ab, er wird zum Prüfen markiert. Abgelehnt wird bei fehlender Pointe, fehlendem Kernereignis oder drei Kernfehlern.
+- Engine Mac: Reparaturen nur noch für Ende und Leerlauf (andere Reparaturen haben im Test nie geholfen und kosteten Minuten).
+
 ## [0.43.1] - 2026-11-19
 
 ### Changed

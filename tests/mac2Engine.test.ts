@@ -102,3 +102,14 @@ describe('Engine Mac 2 – Text für die Inhaltsprüfung', () => {
     expect(spokenBlocks([{ w: 'Das', start: 0.2 }, { w: 'Brot', start: 1 }, { w: 'ist', start: 6.1 }, { w: 'trocken.', start: 12 }])).toBe('[0–5 s] Das Brot\n[5–10 s] ist\n[10–15 s] trocken.')
   })
 })
+
+describe('decideMac2', () => {
+  const c = (m: Record<string, string>) => ['hook', 'standalone', 'payoff', 'natural-end', 'essential-event'].map((id) => ({ id, state: (m[id] ?? 'pass') as 'pass', reason: '', evidenceIds: [] }))
+  it('standalone allein → prüfen, Pointe fehlt → ablehnen, 3 Kernfehler → ablehnen', async () => {
+    const { decideMac2 } = await import('../src/main/shortme/clips/engines/mac2')
+    expect(decideMac2(c({}))).toBe('acceptable')
+    expect(decideMac2(c({ standalone: 'fail', hook: 'fail' }))).toBe('needs-review')
+    expect(decideMac2(c({ payoff: 'fail' }))).toBe('reject')
+    expect(decideMac2(c({ hook: 'fail', standalone: 'fail', 'natural-end': 'fail' }))).toBe('reject')
+  })
+})
