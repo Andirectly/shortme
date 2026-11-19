@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { LogReportButton } from './LogReport'
 import { motion } from 'motion/react'
 import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { baseState, canRedo, canUndo, editWindow, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
@@ -362,6 +363,7 @@ export function EditorScreen(): React.JSX.Element {
         <Button variant="ghost" aria-label="Wiederholen (Strg+Y)" disabled={!canRedo(log)} onClick={redo}><Redo2 size={16} /></Button>
         {exportJob?.state === 'done' && exportJob.message.includes('exportiert nach') && <small role="status" title={exportJob.message} style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exportJob.message}</small>}
         {exportJob?.state === 'error' && <small role="alert" style={{ color: 'var(--warn)', maxWidth: 260 }} title={exportJob.error}>Export fehlgeschlagen: {exportJob.error}</small>}
+        {exportJob?.state === 'error' && <LogReportButton label="Fehlerbericht senden" />}
         <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportNow()}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
       </div>
 

@@ -25,6 +25,12 @@ const saveCfg = (c: SyncConfig): Promise<void> => writeFileAtomic(cfgFile(), JSO
 export const loadCatalog = async (): Promise<CatalogEntries> => parseCatalog(await readJson<unknown>(learnFile(FILE), null))
 const saveCatalog = (e: CatalogEntries): Promise<void> => writeFileAtomic(learnFile(FILE), JSON.stringify({ version: 1, entries: e }, null, 1))
 
+/** Repo + Token des Bewertungskatalogs (auch für den Log-Upload); null = nicht eingerichtet. */
+export async function catalogTarget(): Promise<{ repo: string; token: string } | null> {
+  const [cfg, token] = await Promise.all([loadCfg(), secretGet(TOKEN_TARGET)])
+  return cfg.repo && token ? { repo: cfg.repo, token } : null
+}
+
 export async function catalogStatus(): Promise<CatalogStatus> {
   const [cfg, cat, token] = await Promise.all([loadCfg(), loadCatalog(), secretGet(TOKEN_TARGET)])
   const rated = Object.values(cat).filter((e) => e.level)
