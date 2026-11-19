@@ -97,9 +97,11 @@ export async function observePacket(s: MlxSession, o: { video: string; audio: st
 }
 
 /** Beobachtungen als kompakter Text für Qwen (Quellzeiten bzw. Clipzeiten, Segment-IDs als Belege). */
-export function obsText(obs: PacketObs[], timeLabel: (t: number) => string): string {
+export function obsText(obs: PacketObs[], timeLabel: (t: number) => string, maxSeg = 110): string {
+  // Segmenttexte gekürzt (wiederholen oft Hintergrund/Kleidung); Ereignisse vollständig – sie tragen die Belege
+  const cut = (x: string, n: number): string => (x.length > n ? `${x.slice(0, n - 1)}…` : x) || '–'
   return obs.flatMap((o) => [
-    ...o.segments.map((s) => `[${s.id}] ${timeLabel(s.span.start)}–${timeLabel(s.span.end)} | Bild: ${s.visual || '–'} | Ton: ${s.audio || '–'}`),
+    ...o.segments.map((s) => `[${s.id}] ${timeLabel(s.span.start)}–${timeLabel(s.span.end)} | Bild: ${cut(s.visual, maxSeg)} | Ton: ${cut(s.audio, Math.round(maxSeg * 0.6))}`),
     ...o.events.map((e) => `  Ereignis ${e.role} (${e.state}) in ${e.segmentIds.join(',')}: ${e.description}`)
   ]).join('\n')
 }

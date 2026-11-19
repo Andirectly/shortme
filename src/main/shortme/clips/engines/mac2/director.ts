@@ -5,7 +5,7 @@ import { EVENT_KINDS, type EventKind } from '../../../../../shared/engineV2'
 import type { CutEdge, Criterion, CritState, Span } from '../v4/core'
 import { mlxJson, type MlxSession } from './mlxServer'
 
-export const DIRECTOR_PROMPT_REVISION = 'mac2-director-4'
+export const DIRECTOR_PROMPT_REVISION = 'mac2-director-6'
 export const DIRECTOR_TIMEOUT_MS = 120_000
 
 export interface ClipPlan { candidateId: string; decision: 'use' | 'reject'; reason: string; kind: EventKind; startEdge: string; endEdge: string; span: Span; title: string; summary: string; coldOpen: Span | null }
@@ -19,73 +19,62 @@ export function contentGuide(contentType: string | null | undefined): string {
   return 'Vlog: Ein sichtbarer Moment (z. B. erster Biss, Reaktion, Überraschung) oder eine vollständige, eigenständige Aussage/Bewertung.'
 }
 
-/** Kanten im Fenster, nach Nähe zum Kandidaten, je Richtung begrenzt (kompakter Prompt, Schema-Enum). */
-export function edgesNear(edges: CutEdge[], span: Span, pad: number, max: number): CutEdge[] {
-  const a = span.start - pad, b = span.end + pad
-  const ok = edges.filter((e) => e.t >= a && e.t <= b && e.kind !== 'manual')
-  // bevorzugt sprachnahe Kanten (Satzende, Pause), dann Bild/Ton; gleichmäßig über das Fenster
-  const rank = (e: CutEdge): number => (e.kind === 'sentence' ? 0 : e.kind === 'pause' ? 1 : e.kind === 'source-boundary' ? 1 : 2)
-  return [...ok].sort((x, y) => rank(x) - rank(y) || x.t - y.t).slice(0, max).sort((x, y) => x.t - y.t)
-}
+export interface PlanSentence { index: number; start: number; end: number; text: string }
 
-export function planPrompt(o: { contentType?: string | null; hint: string; observations: string; transcript: string; starts: CutEdge[]; ends: CutEdge[]; minSec: number; maxSec: number; query?: string }): string {
-  // kompakt (Prompt-Token kosten fast die ganze Zeit: gemessen ~165 Token/s Einlesen, Antwort 2–3 s): „E12@61.2s/Satz“
-  const KIND: Record<string, string> = { sentence: 'Satz', pause: 'Pause', shot: 'Bild', speaker: 'Sprecher', 'source-boundary': 'Rand', action: 'Aktion', reaction: 'Reaktion', 'audio-phrase': 'Ton' }
-  const fmt = (e: CutEdge): string => `${e.id}@${e.t.toFixed(1)}s/${KIND[e.kind] ?? e.kind}`
-  // Gleicher Regelteil zuerst, wechselnde Daten danach: der MLX-Server (APC) rechnet den gemeinsamen Anfang nur einmal je Lauf
+export function planPrompt(o: { contentType?: string | null; hint: string; observations: string; sentences: PlanSentence[]; minSec: number; maxSec: number; query?: string }): string {
+  // Gleicher Regelteil zuerst, wechselnde Daten danach: der MLX-Server (APC) rechnet den gemeinsamen Anfang nur einmal je Lauf.
+  // Auswahl über Satznummern statt Kanten-IDs (Sprachmodelle wählen Sätze zuverlässiger; Einrasten auf gemessene Kanten macht der Host).
   return [
-    'Du bist Redakteur für Kurzvideos (9:16, 15–75 s). Aus diesem langen Video sollen mehrere Shorts entstehen; der Abschnitt unten ist einer der Kandidaten.',
-    'Baue daraus die BESTE eigenständige Version: Start so früh, dass man versteht, worum es geht (z. B. wo das Thema/das Essen/die Situation eingeführt wird), Ende nach dem Urteil, der Pointe oder der Reaktion. Nutze dafür das ganze Fenster – erweitere lieber, als abzulehnen.',
-    'Ein Teil aus einer Reihe (z. B. eine von mehreren Bewertungen) ist ein guter Short, wenn Vorstellung und Urteil drin sind.',
+    'Du bist Redakteur für Kurzvideos (9:16). Aus diesem langen Video sollen mehrere Shorts entstehen; der Abschnitt unten ist einer der Kandidaten.',
+    'Baue daraus die BESTE eigenständige Version: startSentence = der Satz, mit dem man versteht, worum es geht (wo Thema/Essen/Situation eingeführt wird); endSentence = der Satz nach dem Urteil, der Pointe oder der Reaktion – nie ein Satz mitten in einem Gedanken.',
+    'Ein Teil aus einer Reihe (z. B. eine von mehreren Bewertungen) ist ein guter Short, wenn Vorstellung und Urteil drin sind. Lieber vollständig als kurz.',
     contentGuide(o.contentType),
     o.query ? `Der Nutzer sucht besonders: ${o.query}` : '',
-    `Regeln: Länge zwischen ${o.minSec} und ${o.maxSec} s. Der Clip muss mit dem Satz beginnen, der den Moment verständlich macht, und nach der Pointe/Reaktion bzw. dem Satzende aufhören – nicht mitten im Satz.`,
-    'Wähle Start/Ende NUR aus den erlaubten Kanten-IDs. decision=reject NUR, wenn auch mit allen erlaubten Kanten kein verständlicher Clip möglich ist (reiner Übergang, nichts passiert oder gesagt); dann trotzdem gültige Kanten angeben.',
-    'title: Titel in der Sprache des Clips, 3–7 Wörter, konkret aus dem Inhalt (z. B. was passiert oder gesagt wird), keine erfundenen Superlative, keine Platzhalter.',
-    'summary: ein Satz, worum es geht.',
+    `Länge zwischen ${o.minSec} und ${o.maxSec} s (die Sekunden stehen bei jedem Satz). Ob der Clip genommen wird, entscheiden später der Vergleich und die Prüfung des fertigen Clips – du baust nur die beste Version.`,
+    'title: Titel in der Sprache des Clips, 3–7 Wörter, konkret aus dem Inhalt, keine erfundenen Superlative, keine Platzhalter. summary: ein Satz, worum es geht und was den Moment trägt.',
     '--- Kandidat ---',
     `Hinweis der Suche (kann falsch sein): ${o.hint}`,
-    'Beobachtungen (Bild + Ton, vom lokalen Prüfmodell, mit Beleg-IDs):', o.observations || '(keine)',
-    'Transkript (Satznummer, Quellzeit, Originalwortlaut):', o.transcript || '(keine Sprache)',
-    `Erlaubte START-Kanten (Quellzeit): ${o.starts.map(fmt).join(', ')}`,
-    `Erlaubte END-Kanten (Quellzeit): ${o.ends.map(fmt).join(', ')}`
+    'Beobachtungen (Bild + Ton, vom lokalen Prüfmodell):', o.observations || '(keine)',
+    'Transkript (Satznummer, Quellzeit, Originalwortlaut):',
+    o.sentences.map((x) => `S${x.index} ${x.start.toFixed(1)}s: ${x.text}`).join('\n') || '(keine Sprache)'
   ].filter(Boolean).join('\n')
 }
 
-export function validatePlan(x: { decision: string; reason: string; kind: string; startEdge: string; endEdge: string; title: string; summary: string }, o: { candidateId: string; edges: Map<string, CutEdge>; minSec: number; maxSec: number; starts?: CutEdge[]; ends?: CutEdge[] }): ClipPlan {
-  const s = o.edges.get(x.startEdge)
-  let e = o.edges.get(x.endEdge)
-  if (!s || !e) throw new Error('Kante unbekannt')
-  // Länge durch den Host auf die nächste erlaubte Kante korrigieren (Modell entscheidet Inhalt, das Programm die Regeln): zu kurz → spätere Endkante, zu lang → frühere
-  const d0 = e.t - s.t
-  if ((d0 < o.minSec - 1 || d0 > o.maxSec + 2) && o.ends?.length) {
-    const fit = o.ends.filter((k) => k.t - s.t >= o.minSec - 1 && k.t - s.t <= o.maxSec + 2)
-    if (fit.length) { const target = d0 < o.minSec ? fit[0] : fit[fit.length - 1]; e = target; x = { ...x, endEdge: target.id, reason: `${x.reason} (Ende auf ${target.id} korrigiert: Länge)` } }
-  }
-  const span = { start: s.t, end: e.t }
-  const d = span.end - span.start
-  if (d < o.minSec - 1 || d > o.maxSec + 2) throw new Error(`Länge ${d.toFixed(1)} s außerhalb ${o.minSec}–${o.maxSec} s`)
+/**
+ * Satzwahl → Clip: Start am Satzanfang, Ende am Satzende; Länge korrigiert der Host satzweise (zu kurz → nächste Sätze dazu, zu lang → Ende früher).
+ * Kanten-IDs für Reparaturen: nächstgelegene gemessene Kante (±1,5 s), sonst Satzgrenze.
+ */
+export function planFromSentences(x: { kind: string; startSentence: string; endSentence: string; title: string; summary: string }, o: { candidateId: string; sentences: PlanSentence[]; edges: CutEdge[]; minSec: number; maxSec: number }): ClipPlan {
+  const byId = (id: string): number => o.sentences.findIndex((q) => `S${q.index}` === id)
+  let a = byId(x.startSentence), b = byId(x.endSentence)
+  if (a < 0 || b < 0) throw new Error('Satz unbekannt')
+  if (b < a) [a, b] = [b, a]
+  let note = ''
+  while (b < o.sentences.length - 1 && o.sentences[b].end - o.sentences[a].start < o.minSec) { b++; note = ' (Ende satzweise verlängert: Länge)' }
+  while (b > a && o.sentences[b].end - o.sentences[a].start > o.maxSec) { b--; note = ' (Ende satzweise gekürzt: Länge)' }
+  const t0 = Math.max(0, o.sentences[a].start - 0.15), t1 = o.sentences[b].end + 0.15
+  if (t1 - t0 < o.minSec - 1 || t1 - t0 > o.maxSec + 2) throw new Error(`Länge ${(t1 - t0).toFixed(1)} s außerhalb ${o.minSec}–${o.maxSec} s`)
   const title = x.title.replace(/\s+/g, ' ').replace(/^["„“']+|["„“']+$/g, '').trim()
   if (title.length < 3 || title.length > 80 || PLACEHOLDER.test(title)) throw new Error(`Titel unbrauchbar: „${title}“`)
-  // Cold Opener setzt der Host aus beobachteten Ereignissen (coldOpenFromObs); gemessen: Qwen wählte als „Moment“ immer den Clipanfang
-  const coldOpen: Span | null = null
-  return { candidateId: o.candidateId, decision: x.decision === 'use' ? 'use' : 'reject', reason: x.reason.trim().slice(0, 300), kind: (EVENT_KINDS as readonly string[]).includes(x.kind) ? (x.kind as EventKind) : 'sonstiges', startEdge: x.startEdge, endEdge: x.endEdge, span, title, summary: x.summary.trim().slice(0, 300), coldOpen }
+  const near = (t: number): CutEdge | undefined => o.edges.filter((e) => Math.abs(e.t - t) <= 1.5).sort((p, q) => Math.abs(p.t - t) - Math.abs(q.t - t))[0]
+  const se = near(t0), ee = near(t1)
+  return { candidateId: o.candidateId, decision: 'use', reason: `S${o.sentences[a].index}–S${o.sentences[b].index}${note}`, kind: (EVENT_KINDS as readonly string[]).includes(x.kind) ? (x.kind as EventKind) : 'sonstiges', startEdge: se?.id ?? `S${o.sentences[a].index}`, endEdge: ee?.id ?? `S${o.sentences[b].index}`, span: { start: t0, end: t1 }, title, summary: x.summary.trim().slice(0, 300), coldOpen: null }
 }
 
-/** Schnittplan; höchstens eine Korrekturanfrage (gemeinsames Zusatzbudget), danach Fehler. */
-export async function planCandidate(s: MlxSession, o: { candidateId: string; prompt: string; starts: CutEdge[]; ends: CutEdge[]; edges: Map<string, CutEdge>; minSec: number; maxSec: number; mayRetry: () => boolean; onRetry: () => void; signal?: AbortSignal }): Promise<{ plan: ClipPlan; raw: string; attempts: number; ms: number; usage?: { prompt_tokens?: number; completion_tokens?: number } }> {
+/** Schnittplan über Satznummern; höchstens eine Korrekturanfrage (gemeinsames Zusatzbudget), danach Fehler. */
+export async function planCandidate(s: MlxSession, o: { candidateId: string; prompt: string; sentences: PlanSentence[]; edges: CutEdge[]; minSec: number; maxSec: number; mayRetry: () => boolean; onRetry: () => void; signal?: AbortSignal }): Promise<{ plan: ClipPlan; raw: string; attempts: number; ms: number; usage?: { prompt_tokens?: number; completion_tokens?: number } }> {
+  const ids = o.sentences.map((x) => `S${x.index}`)
   const schema = {
-    type: 'object', additionalProperties: false, required: ['decision', 'reason', 'kind', 'startEdge', 'endEdge', 'title', 'summary'],
+    type: 'object', additionalProperties: false, required: ['kind', 'startSentence', 'endSentence', 'title', 'summary'],
     properties: {
-      decision: { type: 'string', enum: ['use', 'reject'] }, reason: { type: 'string', maxLength: 160 }, kind: { type: 'string', enum: [...EVENT_KINDS] },
-      startEdge: { type: 'string', enum: o.starts.map((e) => e.id) }, endEdge: { type: 'string', enum: o.ends.map((e) => e.id) },
+      kind: { type: 'string', enum: [...EVENT_KINDS] }, startSentence: { type: 'string', enum: ids }, endSentence: { type: 'string', enum: ids },
       title: { type: 'string', maxLength: 80 }, summary: { type: 'string', maxLength: 160 }
     }
   }
   let err = ''
   for (let attempt = 0; ; attempt++) {
-    const r = await mlxJson<Parameters<typeof validatePlan>[0]>(s, { content: attempt ? `${o.prompt}\n\nDeine letzte Antwort war ungültig: ${err}. Korrigiere genau das.` : o.prompt, schema, maxTokens: 450, timeoutMs: DIRECTOR_TIMEOUT_MS, temperature: attempt ? 0.3 : 0, signal: o.signal })
-    try { return { plan: validatePlan(r.value, { ...o, starts: o.starts, ends: o.ends }), raw: r.raw, attempts: attempt + 1, ms: r.ms, usage: r.usage } } catch (e) {
+    const r = await mlxJson<Parameters<typeof planFromSentences>[0]>(s, { content: attempt ? `${o.prompt}\n\nDeine letzte Antwort war ungültig: ${err}. Korrigiere genau das.` : o.prompt, schema, maxTokens: 260, timeoutMs: DIRECTOR_TIMEOUT_MS, temperature: attempt ? 0.3 : 0, signal: o.signal })
+    try { return { plan: planFromSentences(r.value, o), raw: r.raw, attempts: attempt + 1, ms: r.ms, usage: r.usage } } catch (e) {
       err = e instanceof Error ? e.message : String(e)
       if (!o.mayRetry()) throw new Error(`Schnittplan ungültig: ${err}`, { cause: e })
       o.onRetry()

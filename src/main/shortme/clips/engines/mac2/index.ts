@@ -43,7 +43,7 @@ import { parseModelJson, validateInvestigator } from '../v4/core'
 import { analyzeSound, musicWindows, probeMac, soundEvents, soundProposals, SOUND_REVISION, type SoundWindow } from '../mac/sound'
 import { MAC_LFM, MAC_QWEN, withLfm, withQwen, type MlxSession } from './mlxServer'
 import { coldOpenFromObs, coverageOf, obsText, observePacket, packetsFor, type Packet, type PacketObs } from './observe'
-import { edgesNear, judgeRender, planCandidate, planPrompt, rankPlans, type ClipPlan } from './director'
+import { judgeRender, planCandidate, planPrompt, rankPlans, type ClipPlan } from './director'
 import { candidateLimits, decideExtraInvestigation, mayRequestInspection } from './runtimePolicy'
 import { etaText, Ledger } from './ledger'
 import { mac2MissingModels } from './models'
@@ -251,7 +251,6 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
 
     // ------------------------------------------------------------------------------------------------ E Qwen3.5: Schnittplan + Rangfolge
     const edges: CutEdge[] = buildEdges({ duration: dur, words: t.words, silences: hasAudio ? req.input.signals.silences : [], shots: req.input.cuts, actions: scan ? actionEdges(scan.times, frameDiffs(scan.frames), Math.max(20, Math.round(dur / 15))) : [], audioPhrases: [] })
-    const edgeMap = new Map(edges.map((e) => [e.id, e]))
     await save('cut_edges.json', { count: edges.length, edges })
     // Schnittpläne nur für die aussichtsreichsten (Wunschzahl + 4): zuerst belegte Kernereignisse (Reaktion, Pointe, Aussage, Handlung), dann Suchrang
     // (gemessen: 35 s je Plan; 18 Pläne für 10 Wunsch-Clips kosteten 11 min). Nicht geplante Kandidaten werden protokolliert.
@@ -259,7 +258,6 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     const viewed = cands.filter((c) => c.obs.length || c.gemma)
     const observed = viewed.map((c, i) => ({ c, i, k: strength(c) })).sort((a, b) => b.k - a.k || a.i - b.i).slice(0, wanted + 4).map((x) => x.c)
     await tracer.log('scheduler.jsonl', { plannedCandidates: observed.map((c) => c.id), skippedForPlanBudget: viewed.filter((c) => !observed.includes(c)).map((c) => ({ id: c.id, strength: strength(c) })) })
-    const sentenceText = (sp: Span): string => sentences.filter((s) => s.end > sp.start && s.start < sp.end).map((s) => `S${s.index} ${s.start.toFixed(1)}s: ${s.text}`).join('\n').slice(0, 5000)
     const plans: ClipPlan[] = []
     let rankOrder: string[] = []
     L.set('plan', observed.length)
@@ -268,22 +266,21 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       for (let i = 0; i < observed.length; i++) {
         const c = observed[i]
         say('snap', i / Math.max(1, observed.length), `Schnitt planen ${i + 1} von ${observed.length}`)
-        // ±45 s Kontext: genug Raum, um Einführung und Ausgang einzuschließen (gemessen: bei ±25 s lehnte Qwen fast alles als „aus dem Zusammenhang“ ab)
+        // ±40 s Kontext als Sätze: genug Raum für Einführung und Ausgang
         const win = { start: Math.max(0, c.span.start - 40), end: Math.min(dur, c.span.end + 40) }
-        const near = edgesNear(edges, c.span, 40, 36) // 40 Kanten: weniger Prompt-Token (Planung kostete 35 s je Aufruf)
-        const starts = near.filter((e) => e.t <= c.span.end - minSec + 2), ends = near.filter((e) => e.t >= c.span.start + minSec - 2)
-        if (!starts.length || !ends.length) { fail(`plan ${c.id}`, new Error('keine passenden Schnittkanten im Fenster')); continue }
+        const winSentences = sentences.filter((x) => x.end > win.start && x.start < win.end).map((x) => ({ index: x.index, start: x.start, end: x.end, text: x.text }))
+        if (!winSentences.length) { fail(`plan ${c.id}`, new Error('keine Sätze im Fenster')); continue }
         let retries = 0
         try {
           const r = await L.run('plan', `${c.id} Schnittplan`, { candidate: c.id, model: MAC_QWEN.id }, () => planCandidate(s, {
-            candidateId: c.id, prompt: planPrompt({ contentType: req.contentType, hint: c.group.seeds.map((x) => x.summary).filter(Boolean).slice(0, 3).join(' / ') || 'auffälliger Moment', observations: c.obs.length ? obsText(c.obs, (x) => `${x.toFixed(1)}s`) : `Rückfrage Gemma 4: ${c.gemma}`, transcript: sentenceText(win), starts, ends, minSec, maxSec, query: req.options.query }),
-            starts, ends, edges: edgeMap, minSec, maxSec, mayRetry: () => retries < 1, onRetry: () => { retries++; L.book({ kind: 'plan', label: `${c.id} Korrektur`, candidate: c.id, reason: 'schema-retry', model: MAC_QWEN.id, ms: 0, ok: true, units: 0 }) }, signal
+            candidateId: c.id, prompt: planPrompt({ contentType: req.contentType, hint: c.group.seeds.map((x) => x.summary).filter(Boolean).slice(0, 3).join(' / ') || 'auffälliger Moment', observations: c.obs.length ? obsText(c.obs, (x) => `${x.toFixed(1)}s`) : `Rückfrage Gemma 4: ${c.gemma}`, sentences: winSentences, minSec, maxSec, query: req.options.query }),
+            sentences: winSentences, edges, minSec, maxSec, mayRetry: () => retries < 1, onRetry: () => { retries++; L.book({ kind: 'plan', label: `${c.id} Korrektur`, candidate: c.id, reason: 'schema-retry', model: MAC_QWEN.id, ms: 0, ok: true, units: 0 }) }, signal
           }))
           plans.push({ ...r.plan, coldOpen: coldOpenFromObs(c.obs, r.plan.span) })
           await tracer.log('plans.jsonl', { candidate: c.id, attempts: r.attempts, ms: r.ms, usage: r.usage, plan: r.plan, raw: r.raw.slice(0, 2000) })
         } catch (e) { if (signal?.aborted) throw e; fail(`plan ${c.id}`, e) }
       }
-      const usable = plans.filter((p) => p.decision === 'use')
+      const usable = plans
       if (usable.length) {
         const r = await L.run('rank', 'Rangfolge', { model: MAC_QWEN.id }, () => rankPlans(s, usable.map((p) => ({ id: p.candidateId, title: p.title, summary: p.summary, kind: p.kind, durationSec: p.span.end - p.span.start, evidence: (observed.find((c) => c.id === p.candidateId)?.obs ?? []).flatMap((o) => o.events.filter((e) => e.state === 'observed').map((e) => `${e.role}: ${e.description}`)).slice(0, 4).join('; ') || 'keine beobachteten Ereignisse' })), { contentType: req.contentType, signal }))
         rankOrder = r.order
@@ -386,6 +383,9 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       if (!o.rendered || o.decision === 'acceptable') continue
       const failure = firstRepairable(o.criteria)
       if (!failure) continue
+      // nur reparieren, wenn höchstens 2 Kernkriterien durchfallen (gemessen: mit 3–4 Fehlern blieb jede Reparatur „reject“, kostete aber je ~1 min)
+      const coreFails = o.criteria.filter((c) => ['hook', 'standalone', 'payoff', 'natural-end', 'essential-event'].includes(c.id) && c.state === 'fail').length
+      if (coreFails > 2) { await tracer.log('repairs.jsonl', { candidate: o.plan.candidateId, failure, op: 'skip', reason: `${coreFails} Kernkriterien durchgefallen – Plan ungeeignet, Reparatur aussichtslos` }); continue }
       const sil = (await measuredCriteria(o.rendered, wav, hasAudio, edges, signal).catch(() => ({ silences: [] as Array<[number, number]> }))).silences
       const plan = planRepair(failure, o.cut, edges, o.rendered, sil, { minSec, maxSec })
       if (!plan) { await tracer.log('repairs.jsonl', { candidate: o.plan.candidateId, failure, op: 'stop', reason: 'keine begründete Änderung möglich' }); continue }
@@ -424,7 +424,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
         // ehrliche Zahl: bestandene Kriterien, unbekannte halb, nicht „90–100 für alles“
         score: Math.round((100 * (passes + 0.5 * unknown)) / Math.max(1, o.criteria.length)),
         criteria: { hook: st(o, 'hook'), payoff: st(o, 'payoff'), quotable: st(o, 'standalone'), standalone: st(o, 'standalone'), density: st(o, 'dead-air') },
-        reason: `${o.decision === 'acceptable' ? 'Freigegeben' : 'Prüfen'} – geprüft am fertigen Clip (${passes}/${o.criteria.length} bestanden, ${unknown} unklar). ${o.plan.reason}`.slice(0, 400),
+        reason: `${o.decision === 'acceptable' ? 'Freigegeben' : 'Prüfen'} – geprüft am fertigen Clip (${passes}/${o.criteria.length} bestanden, ${unknown} unklar). ${o.plan.summary}`.slice(0, 400),
         ...(o.plan.coldOpen ? { coldOpen: o.plan.coldOpen } : {}),
         v2: { eventId: cand.id, variantId: `${o.plan.candidateId}-r${o.round}`, kind: o.plan.kind, summary: o.plan.summary, verification: o.decision === 'acceptable' ? 'verified' : 'needs-review', evidenceIds: [...new Set(cand.obs.flatMap((x) => x.segments.map((s) => s.id)))].slice(0, 40), modalities: [...new Set(cand.group.lanes.map((l) => (l === 'speech' ? 'text' : l === 'cross-modal' ? 'visual' : l)))] as Array<'text' | 'audio' | 'visual'>, eventNote: `Engine Mac · Suchwege ${cand.group.lanes.join('+')} · LFM3 ${cand.obs.length} Pakete · Rang ${rankIdx(o.plan.candidateId) + 1} · Ausgabe ${r.sha256.slice(0, 12)}${o.round ? ' · repariert' : ''}`, uncertainty: weak.map((c) => `${c.id}: ${c.state} – ${c.reason}`).slice(0, 6) }
       } as ShortmeClip

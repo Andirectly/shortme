@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => '/tmp', getVersion: () => 'test' } }))
 import { coldOpenFromObs, coverageOf, packetsFor } from '../src/main/shortme/clips/engines/mac2/observe'
-import { validatePlan, edgesNear } from '../src/main/shortme/clips/engines/mac2/director'
+import { planFromSentences } from '../src/main/shortme/clips/engines/mac2/director'
 import { candidateLimits, decideExtraInvestigation, mayRequestInspection } from '../src/main/shortme/clips/engines/mac2/runtimePolicy'
 import { Ledger, etaText } from '../src/main/shortme/clips/engines/mac2/ledger'
 import { spokenBlocks, typeQueries } from '../src/main/shortme/clips/engines/mac2'
@@ -25,39 +25,39 @@ describe('Engine Mac 2 – Pakete und Abdeckung', () => {
   })
 })
 
-describe('Engine Mac 2 – Schnittplan', () => {
+describe('Engine Mac 2 – Schnittplan über Satznummern', () => {
   const e = (id: string, t: number, kind: CutEdge['kind'] = 'sentence'): CutEdge => ({ id, t, kind, isMeasured: true, evidenceIds: [] })
-  const edges = new Map([e('E1', 10), e('E2', 40), e('E3', 120), e('E4', 20), e('E5', 24)].map((x) => [x.id, x]))
-  const base = { decision: 'use', reason: 'gut', kind: 'witz', startEdge: 'E1', endEdge: 'E2', title: 'Brot ist zu trocken', summary: 's', coldOpenStart: 'none', coldOpenEnd: 'none' }
-  const o = { candidateId: 'k1', edges, minSec: 15, maxSec: 75 }
-  it('gültiger Plan: Spanne aus gemessenen Kanten', () => {
-    expect(validatePlan(base, o)).toMatchObject({ span: { start: 10, end: 40 }, title: 'Brot ist zu trocken', coldOpen: null })
+  const sentences = [{ index: 1, start: 10, end: 14, text: 'a' }, { index: 2, start: 14.5, end: 20, text: 'b' }, { index: 3, start: 20.5, end: 30, text: 'c.' }, { index: 4, start: 31, end: 100, text: 'lang' }]
+  const edges = [e('E1', 9.8), e('E2', 30.1), e('E3', 70)]
+  const base = { kind: 'witz', startSentence: 'S1', endSentence: 'S3', title: 'Brot ist zu trocken', summary: 's' }
+  const o = { candidateId: 'k1', sentences, edges, minSec: 15, maxSec: 75 }
+  it('Satzanfang bis Satzende, Kanten-IDs der nächsten gemessenen Kante', () => {
+    const p = validate(base)
+    expect(p.span.start).toBeCloseTo(9.85, 2); expect(p.span.end).toBeCloseTo(30.15, 2)
+    expect([p.startEdge, p.endEdge]).toEqual(['E1', 'E2'])
   })
-  it('korrigiert die Länge auf die nächste erlaubte Endkante statt abzulehnen', () => {
-    const ends = [e('E4', 20), e('E5', 24), e('E2', 40), e('E3', 120)]
-    // 10 → 20 s ist zu kurz (min 15, 1 s Spielraum): Ende auf die erste passende Kante (E5 bei 24 s = 14 s)
-    expect(validatePlan({ ...base, endEdge: 'E4' }, { ...o, ends }).span).toEqual({ start: 10, end: 24 })
-    // 10 → 120 s zu lang: letzte passende Kante
-    expect(validatePlan({ ...base, endEdge: 'E3' }, { ...o, ends }).span).toEqual({ start: 10, end: 40 })
+  it('zu kurz → Ende satzweise verlängert; vertauschte Sätze werden sortiert', () => {
+    expect(validate({ ...base, endSentence: 'S2' }).span.end).toBeCloseTo(30.15, 2) // S1–S2 = 10 s < 15 → bis S3
+    expect(validate({ ...base, startSentence: 'S3', endSentence: 'S1' }).span.start).toBeCloseTo(9.85, 2)
   })
-  it('lehnt zu lange Clips und Platzhalter-Titel ab', () => {
-    expect(() => validatePlan({ ...base, endEdge: 'E3' }, o)).toThrow(/Länge/)
-    expect(() => validatePlan({ ...base, title: 'Kurzer deutscher Titel' }, o)).toThrow(/Titel/)
-    expect(() => validatePlan({ ...base, title: '<3–7 Wörter>' }, o)).toThrow(/Titel/)
+  it('zu lang → Ende früher; Platzhalter-Titel und unbekannte Sätze abgelehnt', () => {
+    expect(validate({ ...base, endSentence: 'S4' }).span.end).toBeCloseTo(30.15, 2) // S1–S4 = 90 s > 75 → S3
+    expect(() => validate({ ...base, title: 'Kurzer deutscher Titel' })).toThrow(/Titel/)
+    expect(() => validate({ ...base, startSentence: 'S9' })).toThrow(/Satz/)
   })
-  it('Cold Opener aus beobachteten Ereignissen: Reaktion vor Handlung, ≥ 3 s nach Start, ≤ 6 s', () => {
+  function validate(x: typeof base) { return planFromSentences(x, o) }
+})
+
+describe('Engine Mac 2 – Cold Opener', () => {
+  it('aus beobachteten Ereignissen: Reaktion vor Handlung, ≥ 3 s nach Start, ≤ 6 s', () => {
     const p = packetsFor('k1', { start: 100, end: 130 })
     const obs = [{ packet: p[0], segments: p[0].segments.map((s) => ({ id: s.id, span: s.span, visual: '', audio: '' })), ms: 0, frames: [], audioSec: 30, events: [
       { role: 'action' as const, segmentIds: ['k1.p1.s2'], state: 'observed' as const, description: 'beißt ab' },
       { role: 'reaction' as const, segmentIds: ['k1.p1.s3'], state: 'observed' as const, description: 'lacht' },
       { role: 'reaction' as const, segmentIds: ['k1.p1.s1'], state: 'observed' as const, description: 'am Anfang' } ] }]
     expect(coldOpenFromObs(obs, { start: 100, end: 130 })).toEqual({ start: 120, end: 126 })
-    expect(coldOpenFromObs(obs, { start: 100, end: 119 })).toEqual({ start: 110, end: 116 }) // Reaktion außerhalb → Handlung
+    expect(coldOpenFromObs(obs, { start: 100, end: 119 })).toEqual({ start: 110, end: 116 })
     expect(coldOpenFromObs([{ ...obs[0], events: obs[0].events.map((e) => ({ ...e, state: 'inferred' as const })) }], { start: 100, end: 130 })).toBeNull()
-  })
-  it('Kanten nahe am Kandidaten, Satz-/Pausenkanten bevorzugt', () => {
-    const list = [e('a', 5, 'shot'), e('b', 6), e('c', 50), e('d', 200)]
-    expect(edgesNear(list, { start: 10, end: 40 }, 15, 2).map((x) => x.id)).toEqual(['b', 'c'])
   })
 })
 
