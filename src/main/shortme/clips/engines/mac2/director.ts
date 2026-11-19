@@ -5,7 +5,7 @@ import { EVENT_KINDS, type EventKind } from '../../../../../shared/engineV2'
 import type { CutEdge, Criterion, CritState, Span } from '../v4/core'
 import { mlxJson, type MlxSession } from './mlxServer'
 
-export const DIRECTOR_PROMPT_REVISION = 'mac2-director-2'
+export const DIRECTOR_PROMPT_REVISION = 'mac2-director-3'
 export const DIRECTOR_TIMEOUT_MS = 120_000
 
 export interface ClipPlan { candidateId: string; decision: 'use' | 'reject'; reason: string; kind: EventKind; startEdge: string; endEdge: string; span: Span; title: string; summary: string; coldOpen: Span | null }
@@ -44,11 +44,11 @@ export function planPrompt(o: { contentType?: string | null; hint: string; obser
     `Regeln: Länge zwischen ${o.minSec} und ${o.maxSec} s. Der Clip muss mit dem Satz beginnen, der den Moment verständlich macht, und nach der Pointe/Reaktion bzw. dem Satzende aufhören – nicht mitten im Satz.`,
     'Wähle Start/Ende NUR aus den erlaubten Kanten-IDs. decision=reject NUR, wenn auch mit allen erlaubten Kanten kein verständlicher Clip möglich ist (reiner Übergang, nichts passiert oder gesagt); dann trotzdem gültige Kanten angeben.',
     'title: Titel in der Sprache des Clips, 3–7 Wörter, konkret aus dem Inhalt (z. B. was passiert oder gesagt wird), keine erfundenen Superlative, keine Platzhalter.',
-    'summary: ein Satz, worum es geht. coldOpenStart/coldOpenEnd: optional der stärkste 1–6-s-Moment INNERHALB des Clips (nicht am Anfang), der vorangestellt neugierig macht – sonst "none".'
+    'summary: ein Satz, worum es geht.'
   ].filter(Boolean).join('\n')
 }
 
-export function validatePlan(x: { decision: string; reason: string; kind: string; startEdge: string; endEdge: string; title: string; summary: string; coldOpenStart: string; coldOpenEnd: string }, o: { candidateId: string; edges: Map<string, CutEdge>; minSec: number; maxSec: number; starts?: CutEdge[]; ends?: CutEdge[] }): ClipPlan {
+export function validatePlan(x: { decision: string; reason: string; kind: string; startEdge: string; endEdge: string; title: string; summary: string }, o: { candidateId: string; edges: Map<string, CutEdge>; minSec: number; maxSec: number; starts?: CutEdge[]; ends?: CutEdge[] }): ClipPlan {
   const s = o.edges.get(x.startEdge)
   let e = o.edges.get(x.endEdge)
   if (!s || !e) throw new Error('Kante unbekannt')
@@ -63,25 +63,19 @@ export function validatePlan(x: { decision: string; reason: string; kind: string
   if (d < o.minSec - 1 || d > o.maxSec + 2) throw new Error(`Länge ${d.toFixed(1)} s außerhalb ${o.minSec}–${o.maxSec} s`)
   const title = x.title.replace(/\s+/g, ' ').replace(/^["„“']+|["„“']+$/g, '').trim()
   if (title.length < 3 || title.length > 80 || PLACEHOLDER.test(title)) throw new Error(`Titel unbrauchbar: „${title}“`)
-  let coldOpen: Span | null = null
-  if (x.coldOpenStart !== 'none' && x.coldOpenEnd !== 'none') {
-    const a = o.edges.get(x.coldOpenStart), b = o.edges.get(x.coldOpenEnd)
-    // nur innerhalb des Clips, 1–8 s, nicht schon am Anfang (sonst nichts vorzuziehen); sonst verworfen statt Fehler
-    if (a && b && a.t >= span.start + 3 && b.t <= span.end + 0.01 && b.t - a.t >= 1 && b.t - a.t <= 8) coldOpen = { start: a.t, end: b.t }
-  }
+  // Cold Opener setzt der Host aus beobachteten Ereignissen (coldOpenFromObs); gemessen: Qwen wählte als „Moment“ immer den Clipanfang
+  const coldOpen: Span | null = null
   return { candidateId: o.candidateId, decision: x.decision === 'use' ? 'use' : 'reject', reason: x.reason.trim().slice(0, 300), kind: (EVENT_KINDS as readonly string[]).includes(x.kind) ? (x.kind as EventKind) : 'sonstiges', startEdge: x.startEdge, endEdge: x.endEdge, span, title, summary: x.summary.trim().slice(0, 300), coldOpen }
 }
 
 /** Schnittplan; höchstens eine Korrekturanfrage (gemeinsames Zusatzbudget), danach Fehler. */
 export async function planCandidate(s: MlxSession, o: { candidateId: string; prompt: string; starts: CutEdge[]; ends: CutEdge[]; edges: Map<string, CutEdge>; minSec: number; maxSec: number; mayRetry: () => boolean; onRetry: () => void; signal?: AbortSignal }): Promise<{ plan: ClipPlan; raw: string; attempts: number }> {
-  const all = [...new Set([...o.starts, ...o.ends].map((e) => e.id))]
   const schema = {
-    type: 'object', additionalProperties: false, required: ['decision', 'reason', 'kind', 'startEdge', 'endEdge', 'title', 'summary', 'coldOpenStart', 'coldOpenEnd'],
+    type: 'object', additionalProperties: false, required: ['decision', 'reason', 'kind', 'startEdge', 'endEdge', 'title', 'summary'],
     properties: {
       decision: { type: 'string', enum: ['use', 'reject'] }, reason: { type: 'string', maxLength: 160 }, kind: { type: 'string', enum: [...EVENT_KINDS] },
       startEdge: { type: 'string', enum: o.starts.map((e) => e.id) }, endEdge: { type: 'string', enum: o.ends.map((e) => e.id) },
-      title: { type: 'string', maxLength: 80 }, summary: { type: 'string', maxLength: 160 },
-      coldOpenStart: { type: 'string', enum: ['none', ...all] }, coldOpenEnd: { type: 'string', enum: ['none', ...all] }
+      title: { type: 'string', maxLength: 80 }, summary: { type: 'string', maxLength: 160 }
     }
   }
   let err = ''
@@ -134,7 +128,7 @@ export async function judgeRender(s: MlxSession, o: { title: string; durationSec
   const schema = {
     type: 'object', additionalProperties: false, required: ['criteria', 'titleOk', 'betterTitle'],
     properties: {
-      criteria: { type: 'array', minItems: 5, maxItems: 5, items: { type: 'object', additionalProperties: false, required: ['id', 'state', 'reason', 'evidenceIds'], properties: { id: { type: 'string', enum: [...MODEL_CRITERIA] }, state: { type: 'string', enum: ['pass', 'fail', 'unknown'] }, reason: { type: 'string', maxLength: 200 }, evidenceIds: { type: 'array', maxItems: 4, items: { type: 'string', enum: ev } } } } },
+      criteria: { type: 'array', minItems: 5, maxItems: 5, items: { type: 'object', additionalProperties: false, required: ['id', 'state', 'reason', 'evidenceIds'], properties: { id: { type: 'string', enum: [...MODEL_CRITERIA] }, state: { type: 'string', enum: ['pass', 'fail', 'unknown'] }, reason: { type: 'string', maxLength: 120 }, evidenceIds: { type: 'array', maxItems: 4, items: { type: 'string', enum: ev } } } } },
       titleOk: { type: 'boolean' }, betterTitle: { type: 'string', maxLength: 80 }
     }
   }

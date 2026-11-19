@@ -181,6 +181,10 @@ describe('Export-Planung', () => {
     expect(p.words[2].start).toBeCloseTo(1 + (10 - 9.9), 6)
     expect(p.words[4].start).toBeCloseTo(1 + (14 - 9.9), 6)
     expect(p.words[1].end).toBeLessThanOrEqual(1)
+    // erstes Clipwort beginnt eine neue Untertitelzeile (sonst hängt es an der Vorspann-Zeile)
+    expect(p.words[2].breakBefore).toBe(true)
+    expect(buildSrt(p.words, 4).split('\n\n')[0]).toContain('Neu hier.')
+    expect(buildSrt(p.words, 4).split('\n\n')[0]).not.toContain('Hallo')
   })
   it('Cold Opener außerhalb des Clips oder ohne Vorschlag wird ignoriert', () => {
     expect(planExport({ ...clip, coldOpen: { start: 20, end: 22 } } as ShortmeClip, t, { silences: [] }, false, [], {}, 3).coldOpen).toBeNull()

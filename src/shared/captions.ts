@@ -145,7 +145,7 @@ export function groupWords<T extends CaptionWord>(words: T[], s: CaptionStyle): 
   let cur: T[] = []
   for (const w of words) {
     const prev = cur[cur.length - 1]
-    const pause = prev && w.start - prev.end > 0.45
+    const pause = (prev && w.start - prev.end > 0.45) || (w as { breakBefore?: boolean }).breakBefore === true
     if (cur.length && (!fits([...cur, w]) || cur.length >= maxWords || pause)) { groups.push(cur); cur = [] }
     cur.push(w)
     const full = (widthEm(cur) * fontPx) / usablePx
@@ -156,7 +156,7 @@ export function groupWords<T extends CaptionWord>(words: T[], s: CaptionStyle): 
   for (let i = groups.length - 1; i > 0; i--) {
     const g = groups[i]
     const before = groups[i - 1]
-    if (g.length === 1 && g[0].w.length <= 4 && before.length < maxWords && !SENTENCE_END.test(before[before.length - 1].w) && g[0].start - before[before.length - 1].end < 0.3 && fits([...before, g[0]])) { before.push(g[0]); groups.splice(i, 1) }
+    if (g.length === 1 && g[0].w.length <= 4 && !(g[0] as { breakBefore?: boolean }).breakBefore && before.length < maxWords && !SENTENCE_END.test(before[before.length - 1].w) && g[0].start - before[before.length - 1].end < 0.3 && fits([...before, g[0]])) { before.push(g[0]); groups.splice(i, 1) }
   }
   return groups
 }

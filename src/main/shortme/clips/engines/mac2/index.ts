@@ -42,7 +42,7 @@ import { cutAv } from '../v4/media'
 import { parseModelJson, validateInvestigator } from '../v4/core'
 import { analyzeSound, musicWindows, probeMac, soundEvents, soundProposals, SOUND_REVISION, type SoundWindow } from '../mac/sound'
 import { MAC_LFM, MAC_QWEN, withLfm, withQwen, type MlxSession } from './mlxServer'
-import { coverageOf, obsText, observePacket, packetsFor, type Packet, type PacketObs } from './observe'
+import { coldOpenFromObs, coverageOf, obsText, observePacket, packetsFor, type Packet, type PacketObs } from './observe'
 import { edgesNear, judgeRender, planCandidate, planPrompt, rankPlans, type ClipPlan } from './director'
 import { candidateLimits, decideExtraInvestigation, mayRequestInspection } from './runtimePolicy'
 import { etaText, Ledger } from './ledger'
@@ -173,7 +173,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
       const run = async (p: Packet, reason: 'initial' | 'context' | 'schema-retry'): Promise<boolean> => {
         say('rate', idx / total, `Kandidat ${idx + 1} von ${total} ansehen und anhören (Paket ${p.id.split('.p')[1]}/${c.packets.length})`)
         try {
-          const o = await L.run('observe-packet', `${c.id} ${p.id}`, { candidate: c.id, reason, model: MAC_LFM.id }, () => observePacket(s, { video, audio: hasAudio ? wav : null, packet: p, mode: 'candidate', transcript: wordsIn(p.span), hint, signal }))
+          const o = await L.run('observe-packet', `${c.id} ${p.id}`, { candidate: c.id, reason, model: MAC_LFM.id }, () => observePacket(s, { video, audio: hasAudio ? wav : null, packet: p, mode: 'candidate', transcript: wordsIn(p.span), hint, temperature: reason === 'schema-retry' ? 0.3 : 0, signal }))
           c.obs.push(o)
           return true
         } catch (e) {
@@ -258,7 +258,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
         say('snap', i / Math.max(1, observed.length), `Schnitt planen ${i + 1} von ${observed.length}`)
         // ±45 s Kontext: genug Raum, um Einführung und Ausgang einzuschließen (gemessen: bei ±25 s lehnte Qwen fast alles als „aus dem Zusammenhang“ ab)
         const win = { start: Math.max(0, c.span.start - 45), end: Math.min(dur, c.span.end + 45) }
-        const near = edgesNear(edges, c.span, 45, 70)
+        const near = edgesNear(edges, c.span, 45, 40) // 40 Kanten: weniger Prompt-Token (Planung kostete 35 s je Aufruf)
         const starts = near.filter((e) => e.t <= c.span.end - minSec + 2), ends = near.filter((e) => e.t >= c.span.start + minSec - 2)
         if (!starts.length || !ends.length) { fail(`plan ${c.id}`, new Error('keine passenden Schnittkanten im Fenster')); continue }
         let retries = 0
@@ -267,7 +267,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
             candidateId: c.id, prompt: planPrompt({ contentType: req.contentType, hint: c.group.seeds.map((x) => x.summary).filter(Boolean).slice(0, 3).join(' / ') || 'auffälliger Moment', observations: c.obs.length ? obsText(c.obs, (x) => `${x.toFixed(1)}s`) : `Rückfrage Gemma 4: ${c.gemma}`, transcript: sentenceText(win), starts, ends, minSec, maxSec, query: req.options.query }),
             starts, ends, edges: edgeMap, minSec, maxSec, mayRetry: () => retries < 1, onRetry: () => { retries++; L.book({ kind: 'plan', label: `${c.id} Korrektur`, candidate: c.id, reason: 'schema-retry', model: MAC_QWEN.id, ms: 0, ok: true, units: 0 }) }, signal
           }))
-          plans.push(r.plan)
+          plans.push({ ...r.plan, coldOpen: coldOpenFromObs(c.obs, r.plan.span) })
           await tracer.log('plans.jsonl', { candidate: c.id, attempts: r.attempts, plan: r.plan, raw: r.raw.slice(0, 2000) })
         } catch (e) { if (signal?.aborted) throw e; fail(`plan ${c.id}`, e) }
       }

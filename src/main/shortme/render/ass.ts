@@ -2,7 +2,7 @@ import { cueTimes, glowColorOf, groupWords } from '@shared/captions'
 import type { CaptionStyle } from '@shared/preset'
 import type { ClipTagKind } from '@shared/shortme'
 
-export interface CapWord { w: string; start: number; end: number; tag?: ClipTagKind }
+export interface CapWord { w: string; start: number; end: number; tag?: ClipTagKind; /** neue Untertitelzeile vor diesem Wort (z. B. erstes Wort nach dem Cold Opener) */ breakBefore?: boolean }
 
 /** `#RRGGBB` → ASS `&HBBGGRR&`. */
 export const assColor = (hex: string, alpha = 0): string => {

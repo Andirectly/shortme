@@ -55,7 +55,7 @@ const schemaFor = (p: Packet): object => {
   return {
     type: 'object', additionalProperties: false, required: ['segments', 'events'],
     properties: {
-      segments: { type: 'array', minItems: ids.length, maxItems: ids.length, items: { type: 'object', additionalProperties: false, required: ['id', 'visual', 'audio'], properties: { id: { type: 'string', enum: ids }, visual: { type: 'string', maxLength: 200 }, audio: { type: 'string', maxLength: 120 } } } },
+      segments: { type: 'array', minItems: ids.length, maxItems: ids.length, items: { type: 'object', additionalProperties: false, required: ['id', 'visual', 'audio'], properties: { id: { type: 'string', enum: ids }, visual: { type: 'string', maxLength: 160 }, audio: { type: 'string', maxLength: 100 } } } },
       events: { type: 'array', maxItems: 4, items: { type: 'object', additionalProperties: false, required: ['role', 'segmentIds', 'state', 'description'], properties: { role: { type: 'string', enum: [...OBS_ROLES] }, segmentIds: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string', enum: ids } }, state: { type: 'string', enum: ['observed', 'inferred', 'unknown'] }, description: { type: 'string', maxLength: 200 } } } }
     }
   }
@@ -67,7 +67,7 @@ const SYSTEM = 'Answer questions about the provided images and audio. Base every
  * Ein Paket beobachten: 8 Bilder (gleichmäßig, Zeitpunkte im Prompt) + Ton des Pakets (separat, 16 kHz mono).
  * `mode: 'render'` = fertige Ausgabedatei (keine Begründung der Auswahl im Prompt, damit die Prüfung unabhängig bleibt).
  */
-export async function observePacket(s: MlxSession, o: { video: string; audio: string | null; packet: Packet; mode: 'candidate' | 'render'; transcript?: string; hint?: string; signal?: AbortSignal }): Promise<PacketObs> {
+export async function observePacket(s: MlxSession, o: { video: string; audio: string | null; packet: Packet; mode: 'candidate' | 'render'; transcript?: string; hint?: string; temperature?: number; signal?: AbortSignal }): Promise<PacketObs> {
   const p = o.packet
   const len = p.span.end - p.span.start
   const times = Array.from({ length: FRAMES_PER_PACKET }, (_, i) => p.span.start + (len * (i + 0.5)) / FRAMES_PER_PACKET)
@@ -87,7 +87,7 @@ export async function observePacket(s: MlxSession, o: { video: string; audio: st
     'Do not invent anything. If something is unclear, say so.'
   ].filter(Boolean).join('\n')
   const content: ContentPart[] = [{ type: 'text', text: intro }, ...frames.map((b) => ({ type: 'image_url' as const, image_url: { url: `data:image/jpeg;base64,${b.toString('base64')}` } })), ...(wav ? [{ type: 'input_audio' as const, input_audio: { data: `data:audio/wav;base64,${wav.toString('base64')}`, format: 'wav' as const } }] : []), { type: 'text', text: ask }]
-  const r = await mlxJson<{ segments: Array<{ id: string; visual: string; audio: string }>; events: EventObs[] }>(s, { system: SYSTEM, content, schema: schemaFor(p), maxTokens: 600, timeoutMs: OBSERVE_TIMEOUT_MS, signal: o.signal })
+  const r = await mlxJson<{ segments: Array<{ id: string; visual: string; audio: string }>; events: EventObs[] }>(s, { system: SYSTEM, content, schema: schemaFor(p), maxTokens: 1000, temperature: o.temperature ?? 0, timeoutMs: OBSERVE_TIMEOUT_MS, signal: o.signal })
   // Schema sichert IDs/Rollen; zusätzlich: jedes Segment genau einmal
   const segIds = p.segments.map((x) => x.id)
   const seen = new Set(r.value.segments.map((x) => x.id))
@@ -102,4 +102,20 @@ export function obsText(obs: PacketObs[], timeLabel: (t: number) => string): str
     ...o.segments.map((s) => `[${s.id}] ${timeLabel(s.span.start)}–${timeLabel(s.span.end)} | Bild: ${s.visual || '–'} | Ton: ${s.audio || '–'}`),
     ...o.events.map((e) => `  Ereignis ${e.role} (${e.state}) in ${e.segmentIds.join(',')}: ${e.description}`)
   ]).join('\n')
+}
+
+/**
+ * Cold Opener aus Beobachtungen: erste beobachtete Reaktion/Pointe (sonst Handlung) im Clip, mindestens 3 s nach dem Start, höchstens 6 s lang.
+ * Wortgrenzen setzt der Export (coldOpenSpan). null, wenn nichts Belegtes vorziehbar ist.
+ */
+export function coldOpenFromObs(obs: PacketObs[], clip: Span): Span | null {
+  const segs = new Map(obs.flatMap((o) => o.segments.map((s) => [s.id, s.span] as const)))
+  for (const roles of [['reaction', 'payoff'], ['action']]) {
+    const hits = obs.flatMap((o) => o.events).filter((e) => e.state === 'observed' && roles.includes(e.role))
+      .map((e) => e.segmentIds.map((id) => segs.get(id)).filter((x): x is Span => !!x).sort((a, b) => a.start - b.start)[0])
+      .filter((sp): sp is Span => !!sp && sp.start >= clip.start + 3 && sp.start < clip.end - 1)
+      .sort((a, b) => a.start - b.start)
+    if (hits.length) return { start: hits[0].start, end: Math.min(hits[0].end, hits[0].start + 6, clip.end) }
+  }
+  return null
 }

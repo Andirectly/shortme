@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 vi.mock('electron', () => ({ app: { isPackaged: false, getPath: () => '/tmp', getVersion: () => 'test' } }))
-import { coverageOf, packetsFor } from '../src/main/shortme/clips/engines/mac2/observe'
+import { coldOpenFromObs, coverageOf, packetsFor } from '../src/main/shortme/clips/engines/mac2/observe'
 import { validatePlan, edgesNear } from '../src/main/shortme/clips/engines/mac2/director'
 import { candidateLimits, decideExtraInvestigation, mayRequestInspection } from '../src/main/shortme/clips/engines/mac2/runtimePolicy'
 import { Ledger, etaText } from '../src/main/shortme/clips/engines/mac2/ledger'
@@ -45,10 +45,15 @@ describe('Engine Mac 2 – Schnittplan', () => {
     expect(() => validatePlan({ ...base, title: 'Kurzer deutscher Titel' }, o)).toThrow(/Titel/)
     expect(() => validatePlan({ ...base, title: '<3–7 Wörter>' }, o)).toThrow(/Titel/)
   })
-  it('Cold Opener nur innerhalb des Clips, nicht am Anfang, 1–8 s', () => {
-    expect(validatePlan({ ...base, coldOpenStart: 'E4', coldOpenEnd: 'E5' }, o).coldOpen).toEqual({ start: 20, end: 24 })
-    expect(validatePlan({ ...base, coldOpenStart: 'E1', coldOpenEnd: 'E4' }, o).coldOpen).toBeNull() // beginnt am Clipanfang
-    expect(validatePlan({ ...base, coldOpenStart: 'E4', coldOpenEnd: 'E3' }, o).coldOpen).toBeNull() // außerhalb
+  it('Cold Opener aus beobachteten Ereignissen: Reaktion vor Handlung, ≥ 3 s nach Start, ≤ 6 s', () => {
+    const p = packetsFor('k1', { start: 100, end: 130 })
+    const obs = [{ packet: p[0], segments: p[0].segments.map((s) => ({ id: s.id, span: s.span, visual: '', audio: '' })), ms: 0, frames: [], audioSec: 30, events: [
+      { role: 'action' as const, segmentIds: ['k1.p1.s2'], state: 'observed' as const, description: 'beißt ab' },
+      { role: 'reaction' as const, segmentIds: ['k1.p1.s3'], state: 'observed' as const, description: 'lacht' },
+      { role: 'reaction' as const, segmentIds: ['k1.p1.s1'], state: 'observed' as const, description: 'am Anfang' } ] }]
+    expect(coldOpenFromObs(obs, { start: 100, end: 130 })).toEqual({ start: 120, end: 126 })
+    expect(coldOpenFromObs(obs, { start: 100, end: 119 })).toEqual({ start: 110, end: 116 }) // Reaktion außerhalb → Handlung
+    expect(coldOpenFromObs([{ ...obs[0], events: obs[0].events.map((e) => ({ ...e, state: 'inferred' as const })) }], { start: 100, end: 130 })).toBeNull()
   })
   it('Kanten nahe am Kandidaten, Satz-/Pausenkanten bevorzugt', () => {
     const list = [e('a', 5, 'shot'), e('b', 6), e('c', 50), e('d', 200)]

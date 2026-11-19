@@ -75,7 +75,7 @@ export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signa
   const fallback: ShortmeShot = { start: 0, end: clip.end - clip.start, layout: 'fixed', cx: 0.5, zoom: 1 }
   const pieces = buildPieces(map, clip.shots?.length ? mergeShortShots(clip.shots) : [fallback], clip.start)
   const capWords: CapWord[] = teaser
-    ? [...wordObjs.filter((w) => w.start >= teaser[0] - 0.02 && w.end <= teaser[1] + 0.02).map((w) => ({ ...w, start: w.start - teaser[0], end: Math.min(L, w.end - teaser[0]) })), ...mainWords.map((w) => ({ ...w, start: w.start + L, end: w.end + L }))]
+    ? [...wordObjs.filter((w) => w.start >= teaser[0] - 0.02 && w.end <= teaser[1] + 0.02).map((w) => ({ ...w, start: w.start - teaser[0], end: Math.min(L, w.end - teaser[0]) })), ...mainWords.map((w, i) => ({ ...w, start: w.start + L, end: w.end + L, ...(i === 0 ? { breakBefore: true } : {}) }))]
     : mainWords
   return { map, pieces, cuts, words: capWords, duration: map.duration, coldOpen: teaser }
 }
@@ -110,8 +110,12 @@ export function mergeIntervals(iv: Interval[]): Interval[] {
 const srtTime = (t: number): string => { const ms = Math.round(t * 1000); const p = (n: number, l = 2): string => String(n).padStart(l, '0'); return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}` }
 export function buildSrt(words: CapWord[], perLine = 4): string {
   let out = ''
-  for (let i = 0, n = 1; i < words.length; i += perLine, n++) {
-    const g = words.slice(i, i + perLine)
+  for (let i = 0, n = 1; i < words.length; n++) {
+    // bis zu perLine Wörter, neue Zeile bei breakBefore (Cold Opener → Clip)
+    let k = i + 1
+    while (k < words.length && k - i < perLine && !words[k].breakBefore) k++
+    const g = words.slice(i, k)
+    i = k
     out += `${n}\n${srtTime(g[0].start)} --> ${srtTime(g[g.length - 1].end + 0.1)}\n${g.map((w) => w.w).join(' ')}\n\n`
   }
   return out
