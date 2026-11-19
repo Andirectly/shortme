@@ -144,7 +144,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     // ganze Restarbeit von Anfang an in der Warteschlange (Schätzmengen, später durch die echten Mengen ersetzt) – keine Phase zählt als 0 s
     const speechWins = textWindows(sentences).length, embedWins = Math.ceil(dur / P.embed.hopSec)
     L.plan('model-load', 6); L.set('speech-window', speechWins); L.set('embed-window', embedWins)
-    L.set('observe-packet', 2 * wanted * 2); L.set('plan', 2 * wanted); L.set('rank', 1); L.set('render', wanted * 40); L.set('audit-packet', wanted * 2); L.set('audit-judge', wanted)
+    L.set('observe-packet', (wanted + 4) * 2); L.set('plan', wanted + 4); L.set('rank', 1); L.set('render', wanted * 40); L.set('audit-packet', wanted * 2); L.set('audit-judge', wanted)
     const speech: LaneResult = await phase('lane-speech', () => withQwen(async (s) => {
       bookLoad(s, 'Sprachsuche')
       return L.run('speech-window', 'Sprachsuche', { model: MAC_QWEN.id, units: speechWins }, () => speechLane(s.url, sentences, { duration: dur, query: req.options.query, asrModel: t.model ?? 'parakeet', max: 24, tracer, signal, model: s.model, modelLabel: `${MAC_QWEN.repo} (mlx_vlm.server)`, timeoutMs: 120_000, onProgress: (f) => say('candidates', 0.3 * f, `Sprachsuche (Qwen3.5), Fenster ${Math.min(speechWins, Math.floor(f * speechWins) + 1)} von ${speechWins}`) }))
@@ -185,7 +185,9 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     // (gemessen: 4 von 20 Kandidaten lagen auf demselben 7:00–8:10-Abschnitt)
     const distinct: SeedGroup[] = []
     for (const g of ranked) { const c = mkCand(g, 0); if (!distinct.some((d) => overlapRatio(mkCand(d, 0).span, c.span) > 0.5)) distinct.push(g) }
-    const cands: Candidate[] = distinct.slice(0, limits.initialMaximum).map(mkCand)
+    // nur so viele ansehen, wie geplant werden (gemessen Lauf 7: 20 angesehen, 14 geplant, die 6 übrigen hatten dieselbe Stärke → 2,5 min umsonst)
+    const observeMax = Math.min(limits.initialMaximum, wanted + 4)
+    const cands: Candidate[] = distinct.slice(0, observeMax).map(mkCand)
     L.set('observe-packet', cands.reduce((n, c) => n + c.packets.length, 0))
     const observeCand = async (s: MlxSession, c: Candidate, idx: number, total: number): Promise<void> => {
       const hint = c.group.seeds.map((x) => x.summary).filter(Boolean).slice(0, 2).join(' / ') || 'auffälliger Moment'
@@ -233,6 +235,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     await phase('observe', () => lfmPhase(cands, 'Kandidaten'))
     // Zusatzkandidaten nur, wenn Restbudget und gemessene Reserve für Rendern + vollständige Prüfung reichen
     for (const g of distinct.slice(cands.length)) {
+      if (cands.filter((c) => c.obs.length).length >= observeMax) break // Zusatzkandidaten nur als Ersatz für gescheiterte Beobachtungen
       const perPacket = L.secondsPerUnit('observe-packet'), perRender = L.secondsPerUnit('render')
       const d = decideExtraInvestigation({ elapsedMs: L.elapsedMs(), softBudgetMs: MAC2_LIMITS.softRunBudgetMs, nextTaskEstimateMs: perPacket === null ? null : perPacket * 2 * 1000, reservedCompletionMs: perPacket === null || perRender === null ? null : wanted * (perRender * 40 + perPacket * 2 + 30) * 1000, startedCandidates: cands.length, maximumCandidates: limits.totalMaximum })
       await tracer.log('scheduler.jsonl', { extraCandidate: g.id, decision: d })
@@ -262,7 +265,8 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     for (const c of cands) for (const o of c.obs) for (const sg of o.segments) evidence.set(sg.id, { id: sg.id, modality: hasAudio ? 'audio' : 'visual', state: 'observed', source: MAC_LFM.id, start: sg.span.start, end: sg.span.end, observation: `Bild: ${sg.visual} | Ton: ${sg.audio}`.slice(0, 600), modelRev: MAC_LFM.revision })
 
     // ------------------------------------------------------------------------------------------------ E Qwen3.5: Schnittplan + Rangfolge
-    const edges: CutEdge[] = buildEdges({ duration: dur, words: t.words, silences: hasAudio ? req.input.signals.silences : [], shots: req.input.cuts, actions: scan ? actionEdges(scan.times, frameDiffs(scan.frames), Math.max(20, Math.round(dur / 15))) : [], audioPhrases: [] })
+    const shotCuts = req.input.cutsLater ? await phase('shots-wait', () => req.input.cutsLater!) : req.input.cuts // parallel gestartet (analysis.ts)
+    const edges: CutEdge[] = buildEdges({ duration: dur, words: t.words, silences: hasAudio ? req.input.signals.silences : [], shots: shotCuts, actions: scan ? actionEdges(scan.times, frameDiffs(scan.frames), Math.max(20, Math.round(dur / 15))) : [], audioPhrases: [] })
     await save('cut_edges.json', { count: edges.length, edges })
     // Schnittpläne nur für die aussichtsreichsten (Wunschzahl + 4): zuerst belegte Kernereignisse (Reaktion, Pointe, Aussage, Handlung), dann Suchrang
     // (gemessen: 35 s je Plan; 18 Pläne für 10 Wunsch-Clips kosteten 11 min). Nicht geplante Kandidaten werden protokolliert.
@@ -276,13 +280,13 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     const renderOne = async (o: Out, i: number, n: number, trims: Array<{ start: number; end: number }>, reason: 'initial' | 'repair'): Promise<void> => {
       if (reason === 'repair') say('compare', 0.4 * (i / Math.max(1, n)), `Clip ${i + 1} von ${n} rendern (Reparatur)`)
       const clip = clipFor(`${req.runId}-${o.plan.candidateId}-r${o.round}`, o.cut, t, trims, { title: o.titleFinal, runId: req.runId, engine: 'engine-mac', ...(o.plan.coldOpen ? { coldOpen: o.plan.coldOpen } : {}) })
-      o.rendered = await L.run(reason === 'repair' ? 'repair-render' : 'render', `${o.plan.candidateId} rendern`, { candidate: o.plan.candidateId, reason, units: o.cut.span.end - o.cut.span.start }, () => renderVariant(meta, t, req.input.signals, req.input.cuts, clip, join(runDir, 'previews', `${o.plan.candidateId}-r${o.round}`), signal))
+      o.rendered = await L.run(reason === 'repair' ? 'repair-render' : 'render', `${o.plan.candidateId} rendern`, { candidate: o.plan.candidateId, reason, units: o.cut.span.end - o.cut.span.start }, () => renderVariant(meta, t, req.input.signals, shotCuts, clip, join(runDir, 'previews', `${o.plan.candidateId}-r${o.round}`), signal))
     }
     // Vorab-Rendern: jeder fertige Schnittplan wird sofort im Hintergrund gerendert (CPU/VideoToolbox), während Qwen auf der GPU weiterplant.
     // Gemessen Lauf 4: Rendern begann erst nach der Rangfolge (13 min Render+Prüfung). Nicht gebrauchte Reservepläne dienen als Nachrücker; der Rest wird am Ende übersprungen.
     // Warteschlange mit Vorrang (gemessen Lauf 7: Prüfung wartete 5 min auf Renders in Planungsreihenfolge): nach der Rangfolge zuerst Gewinner in Rangfolge,
-    // dann Reserve in Rangfolge; zwei Renders gleichzeitig (CPU/VideoToolbox, die GPU nutzt nur das Sprachmodell).
-    const RENDER_WORKERS = 2
+    // dann Reserve in Rangfolge.
+    const RENDER_WORKERS = 1 // gemessen: 2 gleichzeitig → Render 34 → 61 s, LFM-Paket 10,6 → 18 s (CPU geteilt), kein Gewinn
     const outOf = new Map<string, Out>()
     const ready0 = new Map<Out, Promise<void>>()
     const needed = new Set<Out>()

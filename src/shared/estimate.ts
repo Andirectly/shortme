@@ -57,6 +57,12 @@ export function estimateStages(durationSec: number, wanted?: number, scale = 1, 
       if (v3Profile === 'deep') s.snap *= 1.4
     }
   }
+  if (engine === 'engine-mac') {
+    // Gemessen M1 Pro 16 GB (Nov. 2026): 26-min-Video in ~1 min transkribiert; Kamerawechsel laufen parallel zur Engine (keine eigene Wartezeit);
+    // Engine Mac: Sprachsuche ~27 s je 150 s Video, Ansehen ~25 s je Kandidat (Wunsch + 4), Plan ~18 s je Kandidat, Render+Prüfung ~45 s je Clip, Modellwechsel ~60 s
+    s.audio = 3 + 0.002 * dur; s.asr = 10 + 0.04 * dur; s.gaps = 0.002 * dur; s.finalize = 3; s.signals = 5; s.shots = 0
+    s.topics = 0; s.candidates = 0.18 * dur + 30; s.rate = (n + 4) * 25; s.snap = (n + 4) * 18 + 25; s.compare = n * 45 + 60; s.proofread = 0; s.layout = 10 + 3 * n
+  }
   for (const k of STAGES) s[k] *= scale
   return s
 }

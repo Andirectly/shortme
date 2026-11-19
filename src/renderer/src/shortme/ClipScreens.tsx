@@ -11,7 +11,7 @@ import { Button, Pill, Score } from './ui'
 import { useSprings } from './motion'
 import { EngineBadge, EngineBar } from './EngineSwitch'
 import { V4ProvenancePanel } from './V4Provenance'
-import { estimateStages, fmtEta, fractionOf, remainingSec, spans, totalSec } from '@shared/estimate'
+import { estimateStages, fmtEta, fractionOf, remainingSec, ROW_OF, spans, totalSec } from '@shared/estimate'
 import { getSpeed, saveSpeed } from './speed'
 
 const STAGES = [
@@ -208,6 +208,14 @@ export function ProjectsScreen(): React.JSX.Element {
 }
 
 const ROWS = ['Transkribieren', 'Analysieren', 'Clips finden']
+// shortcut: Restzeit der Engine Mac steckt als Text in der Jobmeldung („ · noch ca. 1 Std 5 Min“); als eigenes Jobfeld führen, wenn weitere Engines sie liefern
+const ETA_RE = / · noch (?:ca\. (?:(\d+) Std )?(\d+) Min|unter 1 Min)$/
+function engineEtaOf(msg: string | undefined): number | null {
+  const m = msg ? ETA_RE.exec(msg) : null
+  if (!m) return null
+  return m[2] === undefined ? 30 : (Number(m[1] ?? 0) * 60 + Number(m[2])) * 60
+}
+const ROW_OF_STAGE = (stage: string | undefined): number => (stage && stage in ROW_OF ? ROW_OF[stage as keyof typeof ROW_OF] : -1)
 /** Start und letzter Stand je Job (außerhalb von React, damit Neuzeichnen nichts zurücksetzt). */
 const runs = new Map<string, { at: number; f0: number; last: number; saved: boolean }>()
 
@@ -245,13 +253,16 @@ function RealProcessing(): React.JSX.Element {
   useEffect(() => { const tick = (): void => setNow(Date.now()); tick(); const i = setInterval(tick, 5000); return () => clearInterval(i) }, [])
   const refSec = totalSec(est)
   useEffect(() => trackRun(job.id, total, job.state === 'done', engineSel && engineSel !== 'legacy' ? 0 : refSec), [job.id, job.state, total, refSec])
-  const eta = remainingSec(est, total, run?.f0 ?? total, run ? (now - run.at) / 1000 : 0, engineSel && engineSel !== 'legacy' ? 1 : getSpeed())
+  const eta0 = remainingSec(est, total, run?.f0 ?? total, run ? (now - run.at) / 1000 : 0, engineSel && engineSel !== 'legacy' ? 1 : getSpeed())
+  // Engine Mac rechnet ihre Restzeit selbst aus gemessenen Aufgaben (Ledger) und hängt sie an die Meldung: während „Clips finden“ gilt diese, plus Rest (Bildausschnitt)
+  const engineEta = engineEtaOf(job.message)
+  const eta = engineEta !== null && ROW_OF_STAGE(job.stage) === 2 ? engineEta + est.layout : eta0
+  const message = engineEta !== null ? job.message.replace(ETA_RE, '') : job.message
   const busy = job.state === 'running' || job.state === 'queued'
   const title = job.state === 'done' ? 'Clips gefunden' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : 'Transkribiert …'
-  const later = ['Rendern']
   return (
     <div className="sm-wrap" style={{ display: 'grid', gap: 24, paddingTop: 12 }}>
-      <div><h1>{title}</h1>{engineSel && <div style={{ margin: '6px 0' }}><EngineBadge engine={engineSel} prefix="Engine: " /></div>}<small>{job.title} · {job.message}</small>{busy && total < 1 && <small style={{ display: 'block', marginTop: 4 }}>Noch {fmtEta(eta)}{total < 0.05 ? ' (Schätzung)' : ''}</small>}</div>
+      <div><h1>{title}</h1>{engineSel && <div style={{ margin: '6px 0' }}><EngineBadge engine={engineSel} prefix="Engine: " /></div>}<small>{job.title} · {message}</small>{busy && total < 1 && <small style={{ display: 'block', marginTop: 4 }}>Noch {fmtEta(eta)}{total < 0.05 ? ' (Schätzung)' : ''}</small>}</div>
       <div className="sm-glass" style={{ padding: 22, display: 'grid', gap: 18 }}>
         {ROWS.map((label, i) => {
           const [a, b] = sp.row[i]
@@ -266,11 +277,6 @@ function RealProcessing(): React.JSX.Element {
             </div>
           )
         })}
-        {later.map((l) => (
-          <div key={l} style={{ display: 'grid', gridTemplateColumns: '28px 160px 1fr', alignItems: 'center', gap: 12, opacity: 0.4 }}>
-            <span /><span>{l}</span><small>folgt in einem späteren Meilenstein</small>
-          </div>
-        ))}
         {job.error && <small style={{ color: 'var(--warn)' }}>{job.error}</small>}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           {job.state === 'running' && <Button variant="secondary" onClick={() => void pause()}><Pause size={15} /> Pausieren</Button>}

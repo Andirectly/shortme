@@ -85,10 +85,12 @@ describe('Umschalter-Entscheidung im Main-Prozess', () => {
     const { switchEngine } = await import('../src/main/shortme/clips/engines/control')
     const { loadState } = await import('../src/main/shortme/clips/engines/state')
     const d = deps({ missingModels: async () => [{ id: 'qwen3-vl-4b', name: 'Qwen3-VL', sizeBytes: 1 }] })
-    const r = await switchEngine({ hash: HASH, engine: 'multimodal-v2' }, d)
+    const { enginesFor } = await import('../src/shared/engine')
+    const e = enginesFor(process.platform).at(-1)! // Mac: nur Engine Mac wählbar
+    const r = await switchEngine({ hash: HASH, engine: e }, d)
     expect(r.kind).toBe('needs-models')
     expect(d.started).toBe(0)
-    expect((await loadState(HASH)).selected).toBe('multimodal-v2') // Wahl bleibt, Anzeige bleibt beim bisherigen Ergebnis
+    expect((await loadState(HASH)).selected).toBe(e) // Wahl bleibt, Anzeige bleibt beim bisherigen Ergebnis
   })
   it('läuft ein Job oder ein zweiter Klick kommt gleichzeitig: genau ein Start', async () => {
     const { switchEngine } = await import('../src/main/shortme/clips/engines/control')

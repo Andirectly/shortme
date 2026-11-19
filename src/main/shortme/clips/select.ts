@@ -24,6 +24,8 @@ export interface SelectInput {
   durationSec: number
   signals: Signals
   cuts: number[]
+  /** Engine Mac: Kamerawechsel laufen parallel weiter und werden erst bei Bedarf abgewartet (`cuts` ist dann leer). */
+  cutsLater?: Promise<number[]>
 }
 
 export interface CandTrace { start: number; end: number; criteria: ShortmeClip['criteria']; title: string; fate: 'rated' | 'finalist' | 'overlap' | 'selected'; /** aus einer Signal-Spitze statt vom Sprachmodell */ peak?: boolean }

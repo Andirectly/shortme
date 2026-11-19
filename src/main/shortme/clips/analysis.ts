@@ -167,8 +167,13 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   if (!t) throw new Error('Transkript fehlt – erst transkribieren')
   report('signals', 0, 'Signale berechnen …')
   const signals = await ensureSignals(meta)
-  report('shots', 0, 'Kamerawechsel erkennen …')
-  const cuts = await ensureShots(meta, opts.signal, (f) => report('shots', f, 'Kamerawechsel erkennen …'))
+  // Engine Mac braucht Kamerawechsel erst für Schnittkanten/Render (nach Sprachsuche und Beobachtung): TransNetV2 (CPU, ~5 min bei 26 min Video)
+  // läuft parallel zu den GPU-Schritten statt davor
+  const lateShots = opts.engine === 'engine-mac'
+  if (!lateShots) report('shots', 0, 'Kamerawechsel erkennen …')
+  const shotsP = ensureShots(meta, opts.signal, lateShots ? undefined : (f) => report('shots', f, 'Kamerawechsel erkennen …'))
+  shotsP.catch(() => undefined) // Fehler kommt beim Abwarten an
+  let cuts = lateShots ? [] : await shotsP
   const heat = await loadHeat(meta.hash)
   report('signals', 0.5, 'Audio-Ereignisse erkennen (Lachen, Applaus, Pausen) …')
   const profile = await loadProfile(opts.contentType)
@@ -180,7 +185,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   const events = chat?.laughs.length ? [...(events0 ?? []), ...chat.laughs].sort((a, b) => a.start - b.start) : events0
   if (chat) report('signals', 1, `Chat-Signal gefunden (${chat.messages} Nachrichten) – fließt ins Ranking ein`)
   if (heat) report('signals', 1, 'Most-replayed-Kurve gefunden – fließt ins Ranking ein')
-  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat, events, chat: chat?.heat ?? null, weights: profile.ranking }
+  const input = { words: t.words, durationSec: meta.durationSec, signals, cuts, heat, events, chat: chat?.heat ?? null, weights: profile.ranking, ...(lateShots ? { cutsLater: shotsP } : {}) }
   const sel = { query: [profile.prompt, opts.query].filter(Boolean).join(' ') || undefined, wanted: opts.wanted, signal: opts.signal, report, topicsCache: { load: (n: number) => loadTopics(meta.hash, n), save: (m: TopicMap) => saveTopics(meta.hash, m) } }
 
   // Engine und Lauf stehen ab hier fest. Legacy schreibt wie bisher nach clips.json, die neue Engine in ihren eigenen Lauf-Ordner.
@@ -203,6 +208,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   try {
     const out = await runSelection({ engine, runId, input, options: sel, noLlm: opts.noLlm, profile: v3Profile, contentType: opts.contentType ?? null, signal: opts.signal, report, project: { hash: meta.hash, sourcePath: meta.sourcePath, durationSec: meta.durationSec, hasAudio: meta.hasAudio } })
     clips = out.clips; mode = out.mode; trace = out.trace ?? []; runPatch = out.run
+    if (lateShots) cuts = await shotsP
   } catch (e) {
     if (engine !== 'legacy') await patchRun(meta.hash, runId, { status: opts.signal?.aborted ? 'stopped' : 'failed', error: e instanceof Error ? e.message : String(e), finishedAt: new Date().toISOString() })
     throw e
