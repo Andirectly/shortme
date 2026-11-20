@@ -15,6 +15,7 @@ describe('Ehrlicher Fortschritt', () => {
     expect(etaRange(Number.NaN)).toBe('Wird ermittelt')
     expect(etaRange(30)).toBe('unter 1 Min')
     expect(etaRange(20 * 60)).toBe('ca. 16–25 Min')
+    expect(etaRange(57 * 60)).toBe('ca. 45 Min – 1 Std 15 Min') // über die Stundengrenze nicht „45–1 Std“
     expect(etaRange(5 * 60)).toBe('ca. 4–7 Min')
     expect(etaRange(70)).toBe('unter 2 Min')
   })

@@ -54,7 +54,11 @@ export class Ledger {
   /** Restzeit aus der Warteschlange; null = „Zeit wird ermittelt“ (eine Art ohne Messung hat offene Arbeit). */
   remainingSeconds(extra: RemainingWork[] = []): number | null {
     const work: RemainingWork[] = [...this.queued.entries()].filter(([, u]) => u > 0).map(([k, u]) => ({ units: Math.ceil(u), measuredSecondsPerUnit: this.secondsPerUnit(k) }))
-    return estimateRemainingSeconds([...work, ...extra])
+    const all = estimateRemainingSeconds([...work, ...extra])
+    if (all === null) return null
+    // Rendern läuft parallel zu Planung und Prüfung (Vorab-Render-Warteschlange) → nur der Teil zählt, der darüber hinausgeht
+    const sec = (k: TaskKind): number => (this.queued.get(k) ?? 0) * (this.secondsPerUnit(k) ?? 0)
+    return all - Math.min(sec('render'), sec('plan') + sec('rank') + sec('audit-packet') + sec('audit-judge'))
   }
 
   elapsedMs(): number { return Date.now() - this.t0 }

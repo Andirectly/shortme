@@ -106,7 +106,7 @@ function ClipCard({ c, selected, onSelect, onOpen, pct, info }: { c: Clip; selec
   const [prov, setProv] = useState(false)
   return (
     <>
-    {prov && c.v4RunId && <V4ProvenancePanel runId={c.v4RunId} clipId={c.id} onClose={() => setProv(false)} />}
+    {prov && c.v4RunId && <V4ProvenancePanel runId={c.v4RunId} clipId={c.id} label={c.v4Label ?? 'Engine 4'} onClose={() => setProv(false)} />}
     <motion.div className="sm-card" style={{ position: 'relative', overflow: 'visible', contentVisibility: 'auto', containIntrinsicSize: '260px 520px', outline: selected ? '2px solid var(--accent)' : 'none', ...(c.pending ? { opacity: 0.45, pointerEvents: 'none', filter: 'grayscale(0.8)' } : {}) }} whileTap={reduced ? undefined : { scale: 0.97 }} transition={base} onHoverStart={() => { setHover(true); setHoveredClip(c.id) }} onHoverEnd={() => { setHover(false); setPop(false); setHoveredClip(null) }}>
       <div onClick={onOpen} style={{ aspectRatio: '9/16', borderRadius: 'var(--r-card) var(--r-card) 0 0', overflow: 'hidden', position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover', transform: hover && !reduced ? 'scale(1.08)' : 'scale(1)', transition: 'transform 2.4s linear' }} />
@@ -125,7 +125,7 @@ function ClipCard({ c, selected, onSelect, onOpen, pct, info }: { c: Clip; selec
       </div>
       <AnimatePresence>
         {pop && (
-          <motion.div initial={{ opacity: 0, scale: 0.92, filter: 'blur(6px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 0.92 }} transition={base} className="sm-glass" style={{ position: 'absolute', top: 40, left: 8, zIndex: 20, width: 240, padding: 14, transformOrigin: 'top left', background: 'rgba(24,24,32,0.95)', borderRadius: 16, display: 'grid', gap: 8 }}>
+          <motion.div initial={{ opacity: 0, scale: 0.92, filter: 'blur(6px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 0.92 }} transition={base} className="sm-glass" style={{ position: 'absolute', top: 40, left: 8, right: 8, bottom: 8, overflowY: 'auto', overflowWrap: 'anywhere', gridTemplateColumns: 'minmax(0, 1fr)', zIndex: 20, padding: 14, alignContent: 'start', transformOrigin: 'top left', background: 'rgba(24,24,32,0.95)', borderRadius: 16, display: 'grid', gap: 8 }}>
             {c.criteria.map((k) => (
               <div key={k.label} style={{ display: 'grid', gridTemplateColumns: '1fr 28px', gap: 8, alignItems: 'center', fontSize: 12 }}>
                 <div style={{ display: 'grid', gap: 3 }}>{k.label}<div className="sm-bar" style={{ height: 4 }}><i style={{ width: `${(k.value / 20) * 100}%` }} /></div></div>
@@ -134,7 +134,7 @@ function ClipCard({ c, selected, onSelect, onOpen, pct, info }: { c: Clip; selec
             ))}
             {c.notes?.map((n, i) => <small key={i} style={{ color: 'var(--text-2)' }}>{n}</small>)}
             <small style={{ color: 'var(--text-1)' }}>{c.reason}</small>
-            {c.v4RunId && <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setProv(true); setPop(false) }}>Herkunft (Engine 4)</Button>}
+            {c.v4RunId && <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setProv(true); setPop(false) }}>Herkunft ({c.v4Label ?? 'Engine 4'})</Button>}
           </motion.div>
         )}
       </AnimatePresence>
@@ -302,7 +302,7 @@ function RealProcessing(): React.JSX.Element {
               {done ? <Check size={18} aria-label="erledigt" /> : active && busy ? <Loader2 size={18} className="sm-spin" aria-label="läuft" /> : <span aria-label="ausstehend" style={{ width: 10, height: 10, borderRadius: 5, border: '1.5px solid var(--text-3)', justifySelf: 'center' }} />}
               <span>{label}</span>
               {step ? <div className="sm-bar" title="gemessener Teilschritt"><i style={{ width: `${(step.done / step.total) * 100}%` }} /></div> : <small style={{ color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active ? message.replace(/\s*…$/, '') : ''}</small>}
-              <small style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{done ? 'erledigt' : step ? `${step.done} von ${step.total}` : active ? 'läuft' : 'ausstehend'}</small>
+              <small style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{done ? 'erledigt' : step ? `${step.done} von ${step.total}` : active ? (busy ? 'läuft' : job.state === 'paused' ? 'pausiert' : job.state === 'error' ? 'Fehler' : 'gestoppt') : 'ausstehend'}</small>
             </div>
           )
         })}

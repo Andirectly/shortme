@@ -6,6 +6,20 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.48.0] - 2026-11-20
+
+### Changed
+
+- Exportieren im Editor öffnet immer einen kurzen Bestätigungsdialog mit den Prüfhinweisen (vorher startete ein Klick sofort den Export).
+- Restzeit: Startschätzung und Restzeit während der Verarbeitung passen zusammen (Engine Mac zählt das parallele Rendern nicht doppelt und eine gespeicherte Bildsuche nicht mit); über die Stundengrenze steht „ca. 45 Min – 1 Std 15 Min“.
+- Engine Mac: aktuelle Beschreibung im Erstellen-Dialog.
+
+### Fixed
+
+- Ein gestoppter oder pausierter Lauf zeigte bei „Clips finden“ weiter „läuft“.
+- Score-Details auf der Clipkarte wurden abgeschnitten und nannten bei Engine-Mac-Clips „Engine 4“.
+- Zeitleiste im Editor: überlappende Beschriftungen bei vielen kurzen Kameraeinstellungen.
+
 ## [0.47.0] - 2026-11-20
 
 ### Added

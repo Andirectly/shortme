@@ -108,14 +108,14 @@ th { background: #f0f0f0; }
 <li><b>Wonach suchen?</b> Freitext, z. B. „lustige Momente“.</li>
 <li><b>Erweitert:</b> Sprache, Transkriptionsmodell, Sprecher unterscheiden.</li>
 </ul>
-<p>Unten stehen „Dauer etwa 25 Min“, „Abbrechen“ und „Clips finden“.</p>
+<p>Unten stehen „Dauer etwa 40 Min“ (aus gemessenen Werten dieses Rechners), „Abbrechen“ und „Clips finden“.</p>
 <figure><img src="img/Start-Erstellen-Dialog-unten.jpg"><figcaption>Erstellen-Dialog, unterer Teil (Untertitel-Stile, Cold Opener, Anzahl, Workflow).</figcaption></figure>
 
 <h2 class="pb">4. Verarbeitung</h2>
 <figure><img src="img/Verarbeitung.jpg"><figcaption>Verarbeitung: drei Phasen mit Status statt Prozentbalken, Detailzeile der Engine, „Transkript bereit“.</figcaption></figure>
 <ul>
 <li>Überschrift „Clips werden erstellt …“, eine Marke für die Engine, Videotitel und -länge.</li>
-<li>„Läuft seit X Min · Restzeit ca. A–B“: die Restzeit als Spanne.</li>
+<li>„Läuft seit X Min · Restzeit ca. 30–45 Min“: die Restzeit als Spanne. Während „Clips finden“ rechnet die Engine selbst aus der echten Restarbeit.</li>
 <li>Drei Phasen (Transkribieren, Analysieren, Clips finden), jeweils erledigt, läuft oder ausstehend. Bei Clips finden steht eine Detailzeile, z. B. „Sprachsuche (Qwen3.5), Fenster 2 von 11“ oder „Clip 3 von 8 rendern“.</li>
 <li>Zwischenstände als Chips: „Transkript bereit“ und vorläufige Clips, sobald sie vorliegen.</li>
 <li>Knöpfe: Pausieren, Beenden mit Ergebnissen, Verwerfen (mit Rückfrage), Fortsetzen.</li>
@@ -182,7 +182,7 @@ th { background: #f0f0f0; }
   <li>Freigabestatus („Offen“)</li>
   <li>Layout-Schnellwahl: Smart, Fest, Vollbild, Split</li>
   <li>Lernbewertung, „Gespeichert“, Rückgängig/Wiederholen (Strg+Z/Y)</li>
-  <li><b>Exportieren</b>: startet sofort und zeigt den Fortschritt im Knopf</li>
+  <li><b>Exportieren</b>: öffnet einen kurzen Dialog mit Prüfhinweisen und startet erst nach Bestätigung; der Fortschritt steht dann im Knopf</li>
   </ul>
 </li>
 <li><b>Links – Transkript:</b> Das aktuelle Wort ist hervorgehoben, außerhalb des Clips ist der Text grau. Es gibt „Text ändern“ (korrigiert den Untertitel) und „Herausschneiden“ (Wörter markieren, um Stellen aus dem Clip zu schneiden).</li>
@@ -214,11 +214,12 @@ th { background: #f0f0f0; }
   <li>Filmstreifen und Wellenform des Quellvideos; darauf der Clipbereich mit Griffen und Einstellungs-Segmenten (Layout je Kameraeinstellung)</li>
   </ul>
 </li>
-<li>Vor dem Export läuft eine Prüfung: fehlende Quelle, Einstellungen ohne Person (mit Sprung zur Stelle), Länge, fehlende Untertitel, verworfener Clip.</li>
+<li>Der Export-Dialog prüft: fehlende Quelle, Einstellungen ohne Person (mit Sprung zur Stelle), Länge, fehlende Untertitel, verworfener Clip, KI-Hinweise.</li>
 </ul>
 <figure><img src="img/Editor-Animation.jpg"><figcaption>Reiter Animation.</figcaption></figure>
 <figure><img src="img/Editor-Titel.jpg"><figcaption>Reiter Titel.</figcaption></figure>
-<figure><img src="img/Editor-Bildausschnitt.jpg"><figcaption>Reiter Bildausschnitt; oben läuft gerade ein Export (32 %).</figcaption></figure>
+<figure><img src="img/Editor-Bildausschnitt.jpg"><figcaption>Reiter Bildausschnitt.</figcaption></figure>
+<figure><img src="img/Editor-Export-Dialog.jpg"><figcaption>Export-Dialog mit Prüfhinweis.</figcaption></figure>
 
 <h2 class="pb">9. Exporte &amp; Upload</h2>
 <figure><img src="img/Exporte___Upload.jpg"><figcaption>Liste der exportierten Clips, Ziel TikTok, YouTube oder Instagram, Text und Beschreibung, Verbinden mit eigenen API-Schlüsseln, Entwürfe hochladen.</figcaption></figure>
@@ -271,15 +272,10 @@ th { background: #f0f0f0; }
 <figure><img src="img/Einstellungen-Konten___Dienste.jpg"><figcaption>Konten &amp; Dienste.</figcaption></figure>
 <figure><img src="img/Einstellungen-System.jpg"><figcaption>System.</figcaption></figure>
 
-<h2 class="pb">14. Bekannte Schwachstellen (Beobachtungen beim Erstellen dieses Dokuments)</h2>
+<h2 class="pb">14. Bekannte Schwachstellen</h2>
+<p class="sub">Schon behoben (nach der ersten Fassung dieses Dokuments): widersprüchliche Restzeiten, „läuft“ bei gestopptem Lauf, Export ohne Bestätigung, abgeschnittenes Score-Popup mit falscher Engine, veraltete Engine-Beschreibung, überlappende Beschriftungen in der Zeitleiste.</p>
 <ul>
 <li><b>Wartezeit:</b> Ein Lauf dauert 25–35 min, die ersten Clips sieht man erst am Ende.</li>
-<li class="issue"><b>Restzeiten widersprechen sich:</b> Der Erstellen-Dialog sagt „Dauer etwa 25 Min“, die Verarbeitung kurz danach „Restzeit ca. 45 Min–1 Std 15 Min“. Der tatsächliche letzte Lauf dauerte 35 min.</li>
-<li class="issue"><b>Gestoppter Lauf:</b> Bei „Clips finden“ steht „Gestoppt“, rechts aber weiter „läuft“.</li>
-<li class="issue"><b>Exportieren:</b> Der Knopf startet sofort ohne Dialog (Format, Ziel und Qualität kommen aus den Einstellungen). Ein versehentlicher Klick erzeugt direkt eine Datei.</li>
-<li class="issue"><b>Score-Popup:</b> Es wird am Kartenrand abgeschnitten und zeigt „Herkunft (Engine 4)“, obwohl der Clip von Engine Mac kommt.</li>
-<li class="issue"><b>Engine-Beschreibung im Erstellen-Dialog veraltet:</b> Dort steht „Gemma 4 sieht und hört jeden Kandidaten“. Heute arbeiten LFM3-Omni und Qwen3.5.</li>
-<li class="issue"><b>Zeitleiste:</b> Bei vielen kurzen Kameraeinstellungen überlappen die Segment-Beschriftungen („Vc S Smart Sn …“).</li>
 <li><b>KI-Prüfung bei Vlogs:</b> Fast jeder Clip ist „bitte prüfen“, weil die KI „nicht eigenständig verständlich“ oft anmerkt. Das schwächt die Marke als Signal.</li>
 <li><b>Viele Regler:</b> Untertitel (Schrift, Farben, Kontur, Schatten, Glow, Box, Animation) gibt es doppelt, in Vorlagen und im Editor.</li>
 <li><b>Mehrere Bewertungsebenen:</b> Score, KI-Prüfung, Freigabe und Lernbewertung stehen nebeneinander. Das ist mächtig, aber erklärungsbedürftig.</li>

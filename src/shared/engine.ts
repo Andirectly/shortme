@@ -13,7 +13,7 @@ export const ENGINE_BLURB: Record<SelectionEngineId, string> = {
   'multimodal-v2': 'Prüft Bild und Ton mit lokalen Modellen (Qwen3-VL, Voxtral) und vergleicht fertig geschnittene Varianten.',
   'adaptive-v3': 'Durchsucht das ganze Video semantisch (Bild-Embeddings), dazu Ton und Text, und prüft die Treffer wie Engine 2.',
   engine4: 'Eigene Pipeline: vier unabhängige Suchwege, Nachuntersuchung mit Bild+Ton, Schnitte nur an gemessenen Kanten, prüft den fertig gerenderten Clip und repariert ihn gezielt.',
-  'engine-mac': 'Wie Engine 4, gebaut für Apple Silicon: Apple-Tonanalyse (Lachen, Jubel), Bildsuche auf der Mac-GPU, Gemma 4 sieht und hört jeden Kandidaten; Modelle laufen nacheinander, damit 16 GB reichen.'
+  'engine-mac': 'Für Apple Silicon: Qwen3.5 durchsucht das Transkript und plant Schnitte an Satzgrenzen, LFM3-Omni sieht und hört jeden Kandidaten, dazu Apple-Tonanalyse (Lachen, Jubel) und Bildsuche; jeder fertige Clip wird noch einmal geprüft.'
 }
 /** Engine 4: Manifest (Spezifikation 03). Pipeline-Version 4.0, eigener Dispatcher. */
 export const V4_ENGINE_VERSION = '4.0'
