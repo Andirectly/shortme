@@ -32,11 +32,36 @@ const Color = ({ label, value, onCommit }: { label: string; value: string; onCom
 )
 
 /** Untertitel-Stil: Schrift, Größe, Farben, Kontur, Schatten, Glow, Box, Position, Wortgruppierung. */
-export function CaptionControls({ value, onLive, onCommit, fonts, onImportFonts, hasApi }: ControlProps & { fonts: string[]; onImportFonts: () => void; hasApi: boolean }): React.JSX.Element {
+/** `compact` (Editor): zuerst die häufigen Regler (Größe, Position, Hervorhebung), alles Übrige unter „Erweitert“ – nichts entfällt. Stil-Studio zeigt alles offen. */
+const ADV_KEY = 'sm.captionAdvanced'
+const advancedOpen = (): boolean => { try { return localStorage.getItem(ADV_KEY) === '1' } catch { return false } }
+const rememberAdvanced = (open: boolean): void => { try { localStorage.setItem(ADV_KEY, open ? '1' : '0') } catch { /* nur Komfort */ } }
+
+export function CaptionControls({ value, onLive, onCommit, fonts, onImportFonts, hasApi, compact = false }: ControlProps & { fonts: string[]; onImportFonts: () => void; hasApi: boolean; compact?: boolean }): React.JSX.Element {
   const c = value.caption
   const set = (p: Partial<StylePreset['caption']> | Record<string, unknown>): void => onCommit({ caption: p as PresetPatch['caption'] })
   const live = (p: Record<string, unknown>): void => onLive({ caption: p as PresetPatch['caption'] })
   const families = [...new Set([...BUILTIN_FONTS, ...fonts])]
+  const quick = (
+    <>
+      <Row label="Größe und Position">
+        <div style={{ display: 'grid', gap: 8 }}>
+          <Lv label="Größe (px)" value={c.sizePx} min={40} max={120} onLive={(v) => live({ sizePx: v })} onCommit={(v) => set({ sizePx: v })} />
+          <Lv label="Position" value={c.y * 100} min={10} max={90} onLive={(v) => live({ y: v / 100 })} onCommit={(v) => set({ y: v / 100 })} />
+        </div>
+      </Row>
+      <Row label="Hervorhebung"><Color label="Farbe des aktiven Worts" value={c.highlight} onCommit={(v) => set({ highlight: v })} /></Row>
+    </>
+  )
+  if (compact) return (
+    <div>
+      {quick}
+      <details className="sm-advanced" open={advancedOpen()} onToggle={(e) => rememberAdvanced((e.currentTarget as HTMLDetailsElement).open)}>
+        <summary>Erweitert</summary>
+        <CaptionControls value={value} onLive={onLive} onCommit={onCommit} fonts={fonts} onImportFonts={onImportFonts} hasApi={hasApi} />
+      </details>
+    </div>
+  )
   return (
     <div>
       <Row label="Schrift">

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { ToolsScreen } from './ToolsScreen'
 import { ReviewScreen } from './ReviewScreen'
 import { Shell } from './Shell'
 import { useStore } from './store'
@@ -40,6 +41,7 @@ export default function ShortmeApp(): React.JSX.Element {
       {screen === 'learn' && <LearnScreen />}
       {screen === 'compare' && <CompareScreen />}
       {screen === 'review' && <ReviewScreen />}
+      {screen === 'tools' && <ToolsScreen />}
       {screen === 'settings' && <SettingsScreen />}
       <SetupWizard />
       <PatchNotesAfterUpdate />

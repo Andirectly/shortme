@@ -15,6 +15,8 @@ export interface JobInfo {
   progress: number
   message: string
   error?: string
+  /** Beginn der aktuellen Ausführung (ms seit 1970) – für „vergangen“ in der Oberfläche. */
+  startedAt?: number
 }
 
 export interface JobContext { signal: AbortSignal; report: (stage: string, progress: number, message: string) => void; /** Bisher gemessene Dauer des Jobs, je gemeldeter Stufe. */ timing: () => RunTiming }
@@ -81,7 +83,7 @@ export class JobQueue extends EventEmitter {
   private async execute(e: Entry): Promise<void> {
     const ac = new AbortController()
     e.ac = ac
-    this.set(e, { state: 'running', error: undefined })
+    this.set(e, { state: 'running', error: undefined, startedAt: Date.now() })
     try {
       const clock = stageClock()
       const done = await e.run({ signal: ac.signal, report: (stage, progress, message) => { clock.mark(stage); this.set(e, { stage, progress, message }) }, timing: clock.timing })

@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { blocks, needsConfirm, preflight, type PreflightIssue } from '@shared/preflight'
+import { clipRevision, qualityOf } from '@shared/review'
 import { LogReportButton } from './LogReport'
 import { motion } from 'motion/react'
 import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, SkipBack, SkipForward, Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -87,22 +89,6 @@ export function EditorScreen(): React.JSX.Element {
   }, [log, loaded, persist])
 
   const commit = useCallback((op: Op): void => setLog((l) => push(l, op)), [])
-  // ---------- Review-Kontext: Rücksprung, Nachbar-Clips ----------
-  const returnTo = useStore((s) => s.returnTo)
-  const openClipById = useStore((s) => s.openClip)
-  const review = useProject((s) => s.review)
-  const order = useMemo(() => (allReal ?? []).filter((c) => !c.pending).sort((a, b) => b.score - a.score).map((c) => c.id), [allReal])
-  /** Nachbar in Listenreihenfolge; `openOnly` = nur noch nicht entschiedene (offen / zur Prüfung). */
-  const neighbour = (dir: 1 | -1, openOnly: boolean): string | null => {
-    const i = order.indexOf(clipId)
-    for (let k = 1; k < order.length; k++) {
-      const id = order[(i + dir * k + order.length * k) % order.length]
-      const st = review[id]?.status ?? 'offen'
-      if (id !== clipId && (!openOnly || st === 'offen' || st === 'zur_pruefung')) return id
-    }
-    return null
-  }
-  const switchTo = async (id: string | null): Promise<void> => { if (!id) return; videoRef.current?.pause(); await persist(logRef.current); if (hash) void useProject.getState().loadReview(hash); openClipById(id) }
   const undo = useCallback((): void => setLog((l) => undoLog(l)), [])
   const redo = useCallback((): void => setLog((l) => redoLog(l)), [])
 
@@ -335,7 +321,32 @@ export function EditorScreen(): React.JSX.Element {
   // Beim Öffnen zum Clipbeginn scrollen (das Transkript zeigt auch den Puffer davor)
   useEffect(() => { const id = setTimeout(() => wordRef.current?.scrollIntoView({ block: 'center' }), 400); return () => clearTimeout(id) }, [clipId])
 
-  const exportNow = async (): Promise<void> => { await persist(logRef.current); await exportClips([clipId], st.caption.presetId, false) }
+  // ---------- Review-Kontext: Rücksprung, Nachbar-Clips ----------
+  const returnTo = useStore((s) => s.returnTo)
+  const openClipById = useStore((s) => s.openClip)
+  const review = useProject((s) => s.review)
+  const order = useMemo(() => (allReal ?? []).filter((c) => !c.pending).sort((a, b) => b.score - a.score).map((c) => c.id), [allReal])
+  /** Nachbar in Listenreihenfolge; `openOnly` = nur noch nicht entschiedene (offen / zur Prüfung). */
+  const neighbour = (dir: 1 | -1, openOnly: boolean): string | null => {
+    const i = order.indexOf(clipId)
+    for (let k = 1; k < order.length; k++) {
+      const id = order[(i + dir * k + order.length * k) % order.length]
+      const st = review[id]?.status ?? 'offen'
+      if (id !== clipId && (!openOnly || st === 'offen' || st === 'zur_pruefung')) return id
+    }
+    return null
+  }
+  const switchTo = async (id: string | null): Promise<void> => { if (!id) return; videoRef.current?.pause(); await persist(logRef.current); if (hash) void useProject.getState().loadReview(hash); openClipById(id) }
+  const exportNow = async (): Promise<void> => { setPreIssues(null); await persist(logRef.current); await exportClips([clipId], st.caption.presetId, false) }
+  // Vorabprüfung: nur messbare Befunde; Warnungen/Fehler zeigen eine kurze Liste, Hinweise exportieren direkt
+  const [preIssues, setPreIssues] = useState<PreflightIssue[] | null>(null)
+  const [srcBroken, setSrcBroken] = useState(false)
+  const checkAndExport = (): void => {
+    const v = review[clipId]
+    const issues = preflight({ hasSource: !!srcUrl && !srcBroken, plan, captions: true, words: words.filter((w) => w.t >= trim[0] - 0.01 && w.e <= trim[1] + 0.05 && !cut.includes(w.g)).length,
+      quality: real ? qualityOf(real, !!v?.revision && v.revision !== clipRevision(real, null)) : undefined, review: v ? { status: v.status, changedSinceApproval: v.changedSinceApproval } : undefined })
+    if (needsConfirm(issues)) setPreIssues(issues); else void exportNow()
+  }
   const applyAll = async (): Promise<void> => {
     const others = (allReal ?? []).map((c) => c.id).filter((id) => id !== clipId)
     if (hasApi && hash) await window.cutawan.shortme.applyAll(hash, others, { presetId: st.caption.presetId, style: st.caption.style, resetStyle: true, highlight: st.caption.highlight })
@@ -369,6 +380,24 @@ export function EditorScreen(): React.JSX.Element {
 
   return (
     <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) 262px', gap: 12, height: 'calc(100vh - 60px)', paddingTop: 4 }}>
+      {preIssues && (
+        <div role="dialog" aria-label="Vor dem Export prüfen" onClick={() => setPreIssues(null)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center', padding: 16 }}>
+          <div className="sm-glass" onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 100%)', padding: 20, display: 'grid', gap: 12, background: 'rgba(22,22,28,0.97)' }}>
+            <h3>Vor dem Export</h3>
+            {preIssues.map((x) => (
+              <div key={x.id} style={{ display: 'grid', gridTemplateColumns: '78px 1fr auto', gap: 10, alignItems: 'center' }}>
+                <span className="sm-badge">{x.level === 'fehler' ? 'Fehler' : x.level === 'warnung' ? 'Warnung' : 'Hinweis'}</span>
+                <small style={{ color: 'var(--text-1)' }}>{x.text}</small>
+                {x.at !== undefined ? <Button variant="secondary" onClick={() => { seek(x.at! - origStart); setPreIssues(null) }}>Zur Stelle</Button> : <span />}
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button variant="secondary" onClick={() => setPreIssues(null)}>Abbrechen</Button>
+              <Button variant="primary" disabled={blocks(preIssues)} onClick={() => void exportNow()}>Trotzdem exportieren</Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Button variant="ghost" aria-label={returnTo === 'review' ? 'Zurück zum Review' : 'Zurück'} title={returnTo === 'review' ? 'Zurück zum Review' : 'Zurück zur Clipliste'} onClick={() => { videoRef.current?.pause(); void persist(logRef.current).then(() => { if (hash) void useProject.getState().loadReview(hash) }); go(returnTo === 'review' ? 'review' : 'clips') }}><ArrowLeft size={18} /></Button>
         <Button variant="ghost" aria-label="Vorheriger Clip" title="Vorheriger Clip" disabled={!neighbour(-1, false)} onClick={() => void switchTo(neighbour(-1, false))}><ChevronLeft size={16} /></Button>
@@ -384,7 +413,7 @@ export function EditorScreen(): React.JSX.Element {
         {exportJob?.state === 'done' && exportJob.message.includes('exportiert nach') && <small role="status" title={exportJob.message} style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exportJob.message}</small>}
         {exportJob?.state === 'error' && <small role="alert" style={{ color: 'var(--warn)', maxWidth: 260 }} title={exportJob.error}>Export fehlgeschlagen: {exportJob.error}</small>}
         {exportJob?.state === 'error' && <LogReportButton label="Fehlerbericht senden" />}
-        <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={() => void exportNow()}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
+        <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={checkAndExport}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'clamp(300px, 22vw, 440px) minmax(0, 1fr) clamp(340px, 24vw, 480px)', gap: 14, minHeight: 0 }}>
@@ -415,7 +444,7 @@ export function EditorScreen(): React.JSX.Element {
             <div title="Klick auf eine Person: Kamera folgt ihr ab hier" onClick={(e) => { if (streamShot) return; const r = e.currentTarget.getBoundingClientRect(); commit({ t: 'follow', at: absT, cx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) }) }}
               style={{ position: 'relative', aspectRatio: `${srcAspect}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 0 0 1px var(--edge)', background: '#000', cursor: streamShot ? 'default' : 'crosshair' }}>
               {srcUrl
-                ? <video ref={videoRef} src={srcUrl} preload="auto" playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ? <video ref={videoRef} src={srcUrl} onError={() => setSrcBroken(true)} preload="auto" playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 : <div style={{ width: '100%', height: '100%', backgroundImage: `url(${IMG.source})`, backgroundSize: 'cover' }} />}
               {streamShot && source && <StreamFrames layout={streamShot} src={{ width: source.width, height: source.height }} onLive={(p) => setStreamLive((l) => ({ ...(l ?? {}), ...p }))} onCommit={commitStream} />}
               {rects.map((r, i) => <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${r.x * 100}%`, width: `${r.w * 100}%`, border: '2px solid var(--accent)', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none', boxShadow: 'var(--accent-glow)' }} />)}
@@ -441,7 +470,7 @@ export function EditorScreen(): React.JSX.Element {
             <div>
               <Row label="Vorlage"><PresetPicker presetId={st.caption.presetId} onPick={(id, p) => { setLive(null); caption({ presetId: id, resetStyle: true, style: {} }); if (!isBuiltin(id)) commit({ t: 'hook', enabled: p.title.enabled }) }} /></Row>
               <PresetBar preset={preset} presetId={st.caption.presetId} patch={st.caption.style} titleEnabled={st.hook.enabled} hasApi={hasApi} canApplyAll={(allReal?.length ?? 0) > 1} onApplyAll={() => void applyAll()} />
-              <CaptionControls value={preset} onLive={(p) => setLive(p)} onCommit={styleCommit} fonts={fonts} onImportFonts={() => void importFonts()} hasApi={hasApi} />
+              <CaptionControls compact value={preset} onLive={(p) => setLive(p)} onCommit={styleCommit} fonts={fonts} onImportFonts={() => void importFonts()} hasApi={hasApi} />
               <Row label="Hervorhebung (KI-Tags)" toggle={<Switch on={st.caption.highlight} onChange={(b) => caption({ highlight: b })} label="Hervorhebung" />} />
               <Row label="Sicherheitszonen"><Segmented options={['Aus', 'TikTok', 'Reels', 'Shorts']} value={zone} onChange={setZone} /></Row>
             </div>

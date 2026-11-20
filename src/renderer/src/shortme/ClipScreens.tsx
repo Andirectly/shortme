@@ -13,7 +13,7 @@ import { Button, Pill, Score } from './ui'
 import { useSprings } from './motion'
 import { EngineBadge, EngineBar } from './EngineSwitch'
 import { V4ProvenancePanel } from './V4Provenance'
-import { estimateStages, fmtEta, fractionOf, remainingSec, ROW_OF, spans, totalSec } from '@shared/estimate'
+import { estimateStages, etaRange, fmtElapsed, fractionOf, measuredStep, remainingSec, ROW_OF, spans, totalSec } from '@shared/estimate'
 import { getSpeed, saveSpeed } from './speed'
 
 const STAGES = [
@@ -282,30 +282,43 @@ function RealProcessing(): React.JSX.Element {
   const eta = engineEta !== null && ROW_OF_STAGE(job.stage) === 2 ? engineEta + est.layout : eta0
   const message = engineEta !== null ? job.message.replace(ETA_RE, '') : job.message
   const busy = job.state === 'running' || job.state === 'queued'
+  // nur Clips, die DIESER Lauf gerade veröffentlicht (noch mit ausstehendem Bildausschnitt) – nicht die Anzeige eines früheren Laufs
+  const provisional = useProject((s) => (s.clipsFile?.hash === job.hash && s.clipsFile.clips.some((c) => c.pending) ? s.clipsFile.clips.length : 0))
+  const projDur = dur
   const title = job.state === 'done' ? 'Clips gefunden' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : job.state === 'queued' ? 'Wartet …' : 'Clips werden erstellt …'
   return (
     <div className="sm-wrap" style={{ display: 'grid', gap: 24, paddingTop: 12 }}>
-      <div><h1>{title}</h1>{engineSel && <div style={{ margin: '6px 0' }}><EngineBadge engine={engineSel} prefix="Engine: " /></div>}<small>{job.title} · {message}</small>{busy && total < 1 && <small style={{ display: 'block', marginTop: 4 }}>Noch {fmtEta(eta)}{total < 0.05 ? ' (Schätzung)' : ''}</small>}</div>
+      <div><h1>{title}</h1>{engineSel && <div style={{ margin: '6px 0' }}><EngineBadge engine={engineSel} prefix="Engine: " /></div>}<small>{job.title}{projDur ? ` · ${fmtElapsed(projDur)} Video` : ''}</small>
+        {busy && <small style={{ display: 'block', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{job.startedAt ? `Läuft seit ${fmtElapsed((now - job.startedAt) / 1000)} · ` : ''}Restzeit {total < 0.05 && engineEta === null ? 'wird ermittelt' : etaRange(eta)}</small>}</div>
       <div className="sm-glass" style={{ padding: 22, display: 'grid', gap: 18 }}>
         {ROWS.map((label, i) => {
-          const [a, b] = sp.row[i]
-          const p = Math.max(0, Math.min(1, (total - a) / (b - a)))
-          const done = p >= 1 || job.state === 'done'
+          // Phase aus der echten Stufe des Jobs (nicht aus der Zeitschätzung): erledigt / läuft / ausstehend
+          const row = ROW_OF_STAGE(job.stage)
+          const done = job.state === 'done' || (row >= 0 && i < row)
+          const active = !done && i === row
+          const step = active ? measuredStep(message) : null
           return (
-            <div key={label} style={{ display: 'grid', gridTemplateColumns: '28px 160px 1fr 48px', alignItems: 'center', gap: 12, opacity: p === 0 ? 0.5 : 1 }}>
-              {done ? <Check size={18} color="var(--ok)" /> : busy && p > 0 ? <Loader2 size={18} className="sm-spin" /> : <span />}
+            <div key={label} style={{ display: 'grid', gridTemplateColumns: '28px 170px 1fr auto', alignItems: 'center', gap: 12, opacity: done || active ? 1 : 0.5 }}>
+              {done ? <Check size={18} aria-label="erledigt" /> : active && busy ? <Loader2 size={18} className="sm-spin" aria-label="läuft" /> : <span aria-label="ausstehend" style={{ width: 10, height: 10, borderRadius: 5, border: '1.5px solid var(--text-3)', justifySelf: 'center' }} />}
               <span>{label}</span>
-              <div className="sm-bar"><i style={{ width: `${(done ? 1 : p) * 100}%` }} /></div>
-              <small style={{ textAlign: 'right' }}>{Math.round((done ? 1 : p) * 100)} %</small>
+              {step ? <div className="sm-bar" title="gemessener Teilschritt"><i style={{ width: `${(step.done / step.total) * 100}%` }} /></div> : <small style={{ color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active ? message.replace(/\s*…$/, '') : ''}</small>}
+              <small style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{done ? 'erledigt' : step ? `${step.done} von ${step.total}` : active ? 'läuft' : 'ausstehend'}</small>
             </div>
           )
         })}
+        {/* Zwischenstände – nur aus echten Daten: Transkript fertig, von der Analyse schon veröffentlichte (vorläufige) Clips */}
+        {(ROW_OF_STAGE(job.stage) > 0 || job.state === 'done' || provisional > 0) && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {(ROW_OF_STAGE(job.stage) > 0 || job.state === 'done') && <span className="sm-badge"><Check size={12} aria-hidden /> Transkript bereit</span>}
+            {provisional > 0 && job.state !== 'done' && <Button variant="secondary" onClick={() => go('clips')} title="Die Clips stehen fest, der Bildausschnitt wird noch berechnet">{provisional} Clips vorläufig ansehen</Button>}
+          </div>
+        )}
         {job.error && <small style={{ color: 'var(--warn)' }}>{job.error}</small>}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           {job.state === 'running' && <Button variant="secondary" onClick={() => void pause()}><Pause size={15} /> Pausieren</Button>}
           {['paused', 'stopped', 'error'].includes(job.state) && <Button variant="secondary" onClick={() => void resume()}><Play size={15} /> Fortsetzen</Button>}
-          {busy && <Button variant="secondary" onClick={() => void stop()}><Square size={14} /> Stoppen &amp; behalten</Button>}
-          <Button variant="secondary" onClick={() => { void discard(); go('start') }}><Trash2 size={15} /> Verwerfen</Button>
+          {busy && <Button variant="secondary" onClick={() => void stop()} title="Lauf beenden; bereits fertige Ergebnisse bleiben im Projekt"><Square size={14} /> Beenden, Ergebnisse behalten</Button>}
+          <Button variant="secondary" onClick={() => { if (window.confirm('Lauf abbrechen und alle Ergebnisse dieses Projekts verwerfen?')) { void discard(); go('start') } }} title="Abbrechen und Ergebnisse verwerfen"><Trash2 size={15} /> Verwerfen</Button>
           {job.state === 'done' && <Button variant="primary" onClick={() => go('clips')}>Weiter</Button>}
         </div>
       </div>

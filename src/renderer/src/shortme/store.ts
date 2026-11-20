@@ -3,7 +3,7 @@ import { CLIPS } from './data'
 import { allClips } from './clipData'
 
 export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'live' | 'upload' | 'workbench' | 'learn' | 'settings' | 'processing' | 'clips' | 'editor' | 'compare' | 'review' | 'tools'
-export type NavId = 'start' | 'projects' | 'studio' | 'live' | 'upload' | 'workbench' | 'learn' | 'models' | 'testlab' | 'settings'
+export type NavId = 'start' | 'projects' | 'studio' | 'live' | 'upload' | 'workbench' | 'learn' | 'models' | 'testlab' | 'settings' | 'tools'
 
 interface Op { label: string; undo: () => void; redo: () => void }
 

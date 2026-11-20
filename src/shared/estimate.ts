@@ -111,3 +111,29 @@ export function fmtEta(sec: number): string {
   if (m >= 20) m = Math.round(m / 5) * 5
   return m >= 60 ? `${Math.floor(m / 60)} Std${m % 60 ? ` ${m % 60} Min` : ''}` : `${m} Min`
 }
+
+/** Echt gemessener Teilfortschritt aus der Jobmeldung („Bewerten (3/12)“, „Bild-Embeddings 64/111 Fenster“); null = kein verlässlicher Nenner. */
+export function measuredStep(message: string | undefined): { done: number; total: number } | null {
+  const m = message ? /(\d+)\s*\/\s*(\d+)/.exec(message) : null
+  if (!m) return null
+  const done = Number(m[1]), total = Number(m[2])
+  return total > 0 && done >= 0 && done <= total ? { done, total } : null
+}
+
+/** Restzeit als ehrliche Spanne (Schätzung −20 % … +30 %), nie als Scheingenauigkeit. */
+export function etaRange(sec: number): string {
+  if (!Number.isFinite(sec) || sec <= 0) return 'Wird ermittelt'
+  if (sec < 60) return 'unter 1 Min'
+  // untere Grenze unter 1 Min → nur die obere nennen (sonst „unter 1–1 Min“)
+  if (sec * 0.8 < 60) return `unter ${fmtEta(Math.max(60, sec * 1.3))}`
+  const lo = fmtEta(sec * 0.8), hi = fmtEta(sec * 1.3)
+  return lo === hi ? `ca. ${lo}` : `ca. ${lo.replace(/ Min$/, '')}–${hi}`
+}
+
+/** Dauer in Worten für „vergangen“: 45 s, 12 Min, 1 Std 05 Min. */
+export function fmtElapsed(sec: number): string {
+  const s = Math.max(0, Math.round(sec))
+  if (s < 60) return `${s} s`
+  const m = Math.floor(s / 60)
+  return m >= 60 ? `${Math.floor(m / 60)} Std ${String(m % 60).padStart(2, '0')} Min` : `${m} Min`
+}

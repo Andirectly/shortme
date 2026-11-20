@@ -6,6 +6,23 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.47.0] - 2026-11-20
+
+### Added
+
+- Review: „Review starten“ in der Clipliste – Clips nacheinander im Export-Bildausschnitt ansehen und mit 1 (Freigeben), 2 (Zur Prüfung), 3 (Verwerfen) entscheiden; Leertaste spielt ab, N/P wechselt, E öffnet den Editor. Entscheidungen bleiben gespeichert; „Verwerfen“ löscht nichts.
+- Getrennte Angaben je Clip: KI-Prüfung (geprüft / bitte prüfen / nicht bestanden / keine), deine Freigabe und die Lernbewertung (Daumen) – mit Hinweis, wenn ein Clip seit der Freigabe verändert wurde.
+- Clipliste: Filter (Alle, Offen, Bitte prüfen, Freigegeben, Verworfen), Quellzeit und erster Prüfbefund auf den Karten, „Freigegebene exportieren“.
+- Editor: zurück zum Review, vorheriger und nächster offener Clip; Prüfung vor dem Export (fehlende Quelle, Einstellungen ohne Person mit Sprung zur Stelle, Länge, fehlende Untertitel, verworfen).
+- Werkzeuge: Live, Werkbank, Lernen, Modelle und Testlab gesammelt unter einem Punkt.
+
+### Changed
+
+- Fortschritt: Phasen zeigen erledigt / läuft / ausstehend statt geschätzter Prozente; Zähler nur, wenn die Engine sie wirklich meldet (z. B. „7 von 10“); vergangene Zeit und Restzeit als Spanne; „Transkript bereit“ und vorläufige Clips, sobald sie wirklich vorliegen. Ein kleiner Laufstatus unten links bleibt auf jedem Bildschirm sichtbar.
+- Navigation: Start · Projekte · Exporte & Upload · Vorlagen · Werkzeuge · Einstellungen.
+- Editor: Untertitel zuerst mit Größe, Position und Hervorhebungsfarbe; alle übrigen Regler unter „Erweitert“.
+- „Stoppen & behalten“ heißt jetzt „Beenden, Ergebnisse behalten“; „Verwerfen“ fragt nach.
+
 ## [0.46.0] - 2026-11-20
 
 ### Changed

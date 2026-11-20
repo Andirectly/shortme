@@ -43,6 +43,8 @@ export interface ShortmeJob {
   progress: number
   message: string
   error?: string
+  /** Beginn der aktuellen Ausführung (ms). */
+  startedAt?: number
 }
 
 export interface ShortmeWord { w: string; start: number; end: number; speaker?: number }
