@@ -19,7 +19,7 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 ### Changed
 
 - Fortschritt: Phasen zeigen erledigt / läuft / ausstehend statt geschätzter Prozente; Zähler nur, wenn die Engine sie wirklich meldet (z. B. „7 von 10“); vergangene Zeit und Restzeit als Spanne; „Transkript bereit“ und vorläufige Clips, sobald sie wirklich vorliegen. Ein kleiner Laufstatus unten links bleibt auf jedem Bildschirm sichtbar.
-- Navigation: Start · Projekte · Exporte & Upload · Vorlagen · Werkzeuge · Einstellungen.
+- Navigation: Start · Projekte · Exporte & Upload · Vorlagen · Live · Werkzeuge · Einstellungen.
 - Editor: Untertitel zuerst mit Größe, Position und Hervorhebungsfarbe; alle übrigen Regler unter „Erweitert“.
 - „Stoppen & behalten“ heißt jetzt „Beenden, Ergebnisse behalten“; „Verwerfen“ fragt nach.
 

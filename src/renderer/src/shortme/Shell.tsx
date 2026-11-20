@@ -10,7 +10,7 @@ import { useSprings } from './motion'
 import { useTwitch } from './twitchStore'
 import { useEffect, useState } from 'react'
 
-// Hauptstruktur (UX-Upgrade): seltene Bereiche unter „Werkzeuge“; Live erscheint zusätzlich direkt, solange eine Aufnahme läuft
+// Hauptstruktur (UX-Upgrade): seltene Bereiche unter „Werkzeuge“; Live bleibt fest in der Leiste (Wunsch)
 const NAV: { id: NavId; label: string; icon: ReactNode }[] = [
   { id: 'start', label: 'Start', icon: <Home size={20} /> },
   { id: 'projects', label: 'Projekte', icon: <FolderOpen size={20} /> },
@@ -63,7 +63,7 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
       <JobPill />
       </div>
       <nav className="sm-nav sm-glass" aria-label="Hauptnavigation">
-        {NAV.filter((n) => n.id !== 'live' || liveOn || active === 'live').map((n) => (
+        {NAV.map((n) => (
           <button key={n.id} className={`sm-nav-item${n.id === 'live' && liveOn ? ' sm-nav-live' : ''}`} aria-current={active === n.id ? 'page' : undefined} aria-label={n.id === 'live' && liveOn ? `${n.label} – Aufnahme läuft` : n.label} title={n.id === 'live' && liveOn ? `${n.label} – Aufnahme läuft` : n.label} onClick={() => go(n.id)}>
             {active === n.id && <motion.span layoutId="nav-glow" className="sm-nav-glow" transition={base} />}
             {n.icon}
