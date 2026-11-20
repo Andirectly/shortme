@@ -47,6 +47,7 @@ import { coldOpenFromObs, coverageOf, obsText, observePacket, packetsFor, type P
 import { judgeRender, planCandidate, planPrompt, rankPlans, type ClipPlan } from './director'
 import { candidateLimits, decideExtraInvestigation, mayRequestInspection } from './runtimePolicy'
 import { etaText, Ledger } from './ledger'
+import { indexCached } from '../v3/embedIndex'
 import { mac2MissingModels } from './models'
 import { ensureProxy, needsProxy } from './proxy'
 import { MAC2_MODELS, MAC2_PIPELINE_VERSION, mac2Revisions } from './revisions'
@@ -143,7 +144,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     const sentences = splitSentences(t.words)
     if (req.input.events?.length && sentences.length) for (const [i, m] of marksBySentence(sentences, req.input.events)) sentences[i].ev = m
     // ganze Restarbeit von Anfang an in der Warteschlange (Schätzmengen, später durch die echten Mengen ersetzt) – keine Phase zählt als 0 s
-    const speechWins = textWindows(sentences).length, embedWins = Math.ceil(dur / P.embed.hopSec)
+    const speechWins = textWindows(sentences).length, embedWins = indexCached(project.hash, dur, P.embed) ? 0 : Math.ceil(dur / P.embed.hopSec) // gespeicherte Bildsuche kostet keine Zeit (und verfälscht sonst das gemerkte Tempo)
     L.plan('model-load', 6); L.set('speech-window', speechWins); L.set('embed-window', embedWins)
     L.set('observe-packet', (wanted + 4) * 2); L.set('plan', wanted + 4); L.set('rank', 1); L.set('render', wanted * 40); L.set('audit-packet', wanted * 2); L.set('audit-judge', wanted)
     const speech: LaneResult = await phase('lane-speech', () => withQwen(async (s) => {

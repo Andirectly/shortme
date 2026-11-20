@@ -35,6 +35,9 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>, signa
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { for (;;) { signal?.throwIfAborted(); const i = next++; if (i >= items.length) return; await fn(items[i]) } }))
 }
 
+/** Liegt der Index für diese Einstellungen schon vor? (nur für die Restzeit – buildIndex prüft die Teile selbst) */
+export const indexCached = (hash: string, durationSec: number, cfg: V3ProfileConfig): boolean => existsSync(join(indexDir(hash, indexFingerprint(hash, durationSec, cfg)), 'meta.json'))
+
 /**
  * Index laden oder aufbauen. Ein Teil (64 Fenster) wird erst nach erfolgreichem Embedding als Datei abgelegt; nach Abbruch/Absturz geht die Arbeit ab dem
  * ersten fehlenden Teil weiter. Fehlgeschlagene Teile werden als Lücke protokolliert (nicht als „nichts passiert“).

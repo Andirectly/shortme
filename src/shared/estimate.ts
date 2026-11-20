@@ -59,9 +59,10 @@ export function estimateStages(durationSec: number, wanted?: number, scale = 1, 
   }
   if (engine === 'engine-mac') {
     // Gemessen M1 Pro 16 GB (Nov. 2026): 26-min-Video in ~1 min transkribiert; Kamerawechsel laufen parallel zur Engine (keine eigene Wartezeit);
-    // Engine Mac: Sprachsuche ~27 s je 150 s Video, Ansehen ~25 s je Kandidat (Wunsch + 4), Plan ~18 s je Kandidat, Render+Prüfung ~45 s je Clip, Modellwechsel ~60 s
+    // Engine Mac (mac2-throughput.json, 26-min-Video ≈ 35 min): Sprachsuche 35 s je Fenster (≈ 0,25 × Dauer), Bildsuche ≈ 0,18 × Dauer (entfällt, wenn gespeichert),
+    // Ansehen 2 Pakete × 12 s je Kandidat (Wunsch + 4), Plan 25 s je Kandidat + Rangfolge ~60 s, Prüfung 2 Pakete × 18 s + Urteil 27 s je Clip; Rendern läuft parallel
     s.audio = 3 + 0.002 * dur; s.asr = 10 + 0.04 * dur; s.gaps = 0.002 * dur; s.finalize = 3; s.signals = 5; s.shots = 0
-    s.topics = 0; s.candidates = 0.18 * dur + 30; s.rate = (n + 4) * 25; s.snap = (n + 4) * 18 + 25; s.compare = n * 45 + 60; s.proofread = 0; s.layout = 10 + 3 * n
+    s.topics = 0; s.candidates = 0.25 * dur + 0.18 * dur + 30; s.rate = (n + 4) * 24; s.snap = (n + 4) * 25 + 60; s.compare = n * 63 + 60; s.proofread = 0; s.layout = 10 + 3 * n
   }
   for (const k of STAGES) s[k] *= scale
   return s
@@ -127,7 +128,8 @@ export function etaRange(sec: number): string {
   // untere Grenze unter 1 Min → nur die obere nennen (sonst „unter 1–1 Min“)
   if (sec * 0.8 < 60) return `unter ${fmtEta(Math.max(60, sec * 1.3))}`
   const lo = fmtEta(sec * 0.8), hi = fmtEta(sec * 1.3)
-  return lo === hi ? `ca. ${lo}` : `ca. ${lo.replace(/ Min$/, '')}–${hi}`
+  // „45–1 Std 15 Min“ liest sich wie 45 Std → über die Stundengrenze beide Werte ausschreiben
+  return lo === hi ? `ca. ${lo}` : hi.includes('Std') && !lo.includes('Std') ? `ca. ${lo} – ${hi}` : `ca. ${lo.replace(/ Min$/, '')}–${hi}`
 }
 
 /** Dauer in Worten für „vergangen“: 45 s, 12 Min, 1 Std 05 Min. */

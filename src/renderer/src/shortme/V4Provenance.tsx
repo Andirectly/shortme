@@ -20,7 +20,7 @@ const mmss = (s: number): string => `${Math.floor(s / 60)}:${String(Math.floor(s
 const COLOR: Record<string, string> = { pass: 'var(--ok)', fail: 'var(--warn)', unknown: 'var(--text-2)', 'not-applicable': 'var(--text-3)' }
 
 /** Engine 4: Herkunft eines Clips aus den Lauf-Dateien – warum gefunden, Untersuchung, Graph, Kanten, Varianten, Prüfrunden am gerenderten Clip, Reparaturen. */
-export function V4ProvenancePanel({ runId, clipId, onClose }: { runId: string; clipId: string; onClose: () => void }): React.JSX.Element {
+export function V4ProvenancePanel({ runId, clipId, label = 'Engine 4', onClose }: { runId: string; clipId: string; label?: string; onClose: () => void }): React.JSX.Element {
   const hash = useProject((s) => s.clipsFile?.hash ?? null)
   const [p, setP] = useState<P | null>(null)
   const [err, setErr] = useState('')
@@ -29,7 +29,7 @@ export function V4ProvenancePanel({ runId, clipId, onClose }: { runId: string; c
   return (
     <div role="dialog" aria-label="Herkunft des Clips" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center', padding: 16 }}>
       <div className="sm-glass" onClick={(e) => e.stopPropagation()} style={{ width: 'min(920px, 100%)', maxHeight: '88vh', overflow: 'auto', padding: 18, display: 'grid', gap: 12, background: 'rgba(20,20,26,0.97)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2 style={{ margin: 0 }}>Herkunft · Engine 4</h2><Button variant="secondary" onClick={onClose} aria-label="Schließen"><X size={14} /></Button></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><h2 style={{ margin: 0 }}>Herkunft · {label}</h2><Button variant="secondary" onClick={onClose} aria-label="Schließen"><X size={14} /></Button></div>
         {err && <small role="alert" style={{ color: 'var(--warn)' }}>{err}</small>}
         {!p && !err && <small>Lädt …</small>}
         {p && (

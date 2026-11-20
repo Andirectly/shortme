@@ -345,7 +345,7 @@ export function EditorScreen(): React.JSX.Element {
     const v = review[clipId]
     const issues = preflight({ hasSource: !!srcUrl && !srcBroken, plan, captions: true, words: words.filter((w) => w.t >= trim[0] - 0.01 && w.e <= trim[1] + 0.05 && !cut.includes(w.g)).length,
       quality: real ? qualityOf(real, !!v?.revision && v.revision !== clipRevision(real, null)) : undefined, review: v ? { status: v.status, changedSinceApproval: v.changedSinceApproval } : undefined })
-    if (needsConfirm(issues)) setPreIssues(issues); else void exportNow()
+    setPreIssues(issues) // immer bestätigen: ein Fehlklick erzeugte sonst sofort eine Datei
   }
   const applyAll = async (): Promise<void> => {
     const others = (allReal ?? []).map((c) => c.id).filter((id) => id !== clipId)
@@ -381,9 +381,11 @@ export function EditorScreen(): React.JSX.Element {
   return (
     <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) 262px', gap: 12, height: 'calc(100vh - 60px)', paddingTop: 4 }}>
       {preIssues && (
-        <div role="dialog" aria-label="Vor dem Export prüfen" onClick={() => setPreIssues(null)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center', padding: 16 }}>
+        <div role="dialog" aria-label="Clip exportieren" onClick={() => setPreIssues(null)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center', padding: 16 }}>
           <div className="sm-glass" onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 100%)', padding: 20, display: 'grid', gap: 12, background: 'rgba(22,22,28,0.97)' }}>
-            <h3>Vor dem Export</h3>
+            <h3>Clip exportieren</h3>
+            {!preIssues.length && <small style={{ color: 'var(--text-1)' }}>Keine Auffälligkeiten gefunden.</small>}
+            <small style={{ color: 'var(--text-2)' }}>Format, Qualität und Zielordner kommen aus Einstellungen → Export.</small>
             {preIssues.map((x) => (
               <div key={x.id} style={{ display: 'grid', gridTemplateColumns: '78px 1fr auto', gap: 10, alignItems: 'center' }}>
                 <span className="sm-badge">{x.level === 'fehler' ? 'Fehler' : x.level === 'warnung' ? 'Warnung' : 'Hinweis'}</span>
@@ -393,7 +395,7 @@ export function EditorScreen(): React.JSX.Element {
             ))}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button variant="secondary" onClick={() => setPreIssues(null)}>Abbrechen</Button>
-              <Button variant="primary" disabled={blocks(preIssues)} onClick={() => void exportNow()}>Trotzdem exportieren</Button>
+              <Button variant="primary" disabled={blocks(preIssues)} autoFocus onClick={() => void exportNow()}>{needsConfirm(preIssues) ? 'Trotzdem exportieren' : 'Exportieren'}</Button>
             </div>
           </div>
         </div>
@@ -622,7 +624,7 @@ function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, 
         </div>
         {/* Shots */}
         <div style={{ position: 'relative', borderRadius: 6, background: 'rgba(255,255,255,0.04)' }}>
-          {shots.map((s, i) => <div key={i} title={`${LAYOUT_LABEL[s.layout]}${s.auto ? " (automatisch: keine Person im Ausschnitt → Vollbild)" : ""} · ${fmt(s.start)}–${fmt(s.end)}`} style={{ position: 'absolute', top: 2, bottom: 2, left: pct(s.start), width: `calc(${pct(s.end)} - ${pct(s.start)})`, background: LAYOUT_COLOR[s.layout], borderRadius: 4, fontSize: 10, lineHeight: '20px', paddingLeft: 4, overflow: 'hidden', whiteSpace: 'nowrap', color: '#fff', ...(s.auto ? { outline: '1px dashed var(--warn)' } : {}) }}>{LAYOUT_LABEL[s.layout]}{s.auto ? ' · auto' : ''}</div>)}
+          {shots.map((s, i) => <div key={i} title={`${LAYOUT_LABEL[s.layout]}${s.auto ? " (automatisch: keine Person im Ausschnitt → Vollbild)" : ""} · ${fmt(s.start)}–${fmt(s.end)}`} style={{ position: 'absolute', top: 2, bottom: 2, left: pct(s.start), width: `calc(${pct(s.end)} - ${pct(s.start)})`, background: LAYOUT_COLOR[s.layout], borderRadius: 4, fontSize: 10, lineHeight: '20px', paddingLeft: 4, overflow: 'hidden', whiteSpace: 'nowrap', color: '#fff', ...(s.auto ? { outline: '1px dashed var(--warn)' } : {}) }}>{(s.end - s.start) / duration >= 0.035 && <>{LAYOUT_LABEL[s.layout]}{s.auto ? ' · auto' : ''}</>}</div>)}{/* schmale Einstellungen ohne Text (sonst „Vc S Smart Sn …“), Name steht im Tooltip */}
         </div>
         {mark !== null && <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: pct(Math.min(mark, t)), width: `calc(${pct(Math.max(mark, t))} - ${pct(Math.min(mark, t))})`, background: 'rgba(255,80,80,0.28)', border: '1px solid rgba(255,120,120,0.9)', borderRadius: 6, pointerEvents: 'none' }} />}
         {ranges.map((r, i) => <button key={`r${i}`} type="button" title={`Gelöscht ${fmt(r[0])}–${fmt(r[1])} · Klicken zum Wiederherstellen`} aria-label={`Gelöschten Bereich ${fmt(r[0])} bis ${fmt(r[1])} wiederherstellen`} onPointerDown={(e) => e.stopPropagation()} onClick={() => onRestoreRange(r)} style={{ position: 'absolute', top: 56, height: 22, left: pct(r[0]), width: `calc(${pct(r[1])} - ${pct(r[0])})`, minWidth: 14, zIndex: 2, border: '1px solid rgba(255,255,255,0.8)', borderRadius: 6, background: 'rgba(255,80,80,0.35)', color: '#fff', fontSize: 11, lineHeight: '18px', padding: 0, cursor: 'pointer', overflow: 'hidden' }}>↺</button>)}

@@ -88,6 +88,14 @@ describe('Engine Mac 2 – Laufzeitregeln im Ablauf', () => {
     await expect(L.run('plan', 'x', {}, async () => { throw new Error('kaputt') })).rejects.toThrow('kaputt')
     expect(L.summary().plan).toMatchObject({ calls: 1, failed: 1 })
   })
+  it('Restzeit: Rendern läuft parallel zur Planung und zählt nur, soweit es länger dauert', () => {
+    const L = new Ledger({ plan: 20, render: 2 })
+    L.set('plan', 5) // 100 s
+    L.set('render', 30) // 60 s, versteckt sich hinter der Planung
+    expect(L.remainingSeconds()).toBe(100)
+    L.set('render', 80) // 160 s → 60 s über die Planung hinaus
+    expect(L.remainingSeconds()).toBe(160)
+  })
 })
 
 describe('Engine Mac 2 – Bildsuch-Anfragen', () => {

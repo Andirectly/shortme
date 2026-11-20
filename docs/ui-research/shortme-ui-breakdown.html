@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Shortme UI-Breakdown</title>
+<style>
+@page { size: A4; margin: 14mm 13mm; }
+body { font: 10.5pt/1.45 -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; background: #fff; }
+h1 { font-size: 22pt; margin: 0 0 4pt; }
+h2 { font-size: 15pt; margin: 18pt 0 6pt; border-bottom: 1.5pt solid #222; padding-bottom: 2pt; page-break-after: avoid; }
+h3 { font-size: 12pt; margin: 12pt 0 4pt; page-break-after: avoid; }
+p, li { margin: 3pt 0; }
+ul, ol { padding-left: 16pt; margin: 3pt 0; }
+figure { margin: 8pt 0 10pt; page-break-inside: avoid; }
+figure img { width: 100%; border: 0.5pt solid #bbb; border-radius: 4pt; }
+figcaption { font-size: 9pt; color: #555; margin-top: 2pt; }
+table { border-collapse: collapse; width: 100%; font-size: 9.5pt; margin: 4pt 0 8pt; }
+th, td { border: 0.5pt solid #bbb; padding: 3pt 5pt; text-align: left; vertical-align: top; }
+th { background: #f0f0f0; }
+.box { background: #f5f5f7; border-left: 3pt solid #d97706; padding: 6pt 9pt; margin: 6pt 0; }
+.issue { color: #a33; }
+.sub { color: #555; }
+.pb { page-break-before: always; }
+</style></head><body>
+
+<h1>Shortme – kompletter UI- und Funktions-Breakdown</h1>
+<p class="sub">Version 0.47.0 · Stand 20.11.2026 · Screenshots: macOS-Version (M1 Pro), dunkles Design. Die Windows-Version hat dieselbe Oberfläche, nur andere KI-Engines.</p>
+
+<div class="box">
+<b>Rechercheauftrag an ChatGPT</b>
+<ol>
+<li>Vergleiche Shortme mit Opus Clip, Vizard, Klap, Submagic, Captions, CapCut (Auto-Clips) und Descript: Wo ist dort der Weg „langes Video → fertige Shorts“ schneller, klarer oder angenehmer?</li>
+<li>Bewerte jeden Bildschirm unten: Layout, Hierarchie, Wording, Anzahl Klicks, Konsistenz. Was ist überladen, was fehlt?</li>
+<li>Fortschritt: Wie zeigt man eine 25–35-minütige lokale KI-Verarbeitung so, dass sie sich kürzer anfühlt und trotzdem ehrlich ist? Was kann man währenddessen schon nutzbar machen, etwa erste fertige Clips?</li>
+<li>Review und Clipübersicht: Wie sichtet man 8–20 Vorschläge am schnellsten? Wie trennt man KI-Urteil, eigene Freigabe und Lernbewertung, ohne zu verwirren?</li>
+<li>Editor: Was macht das Schnittfenster gut oder schlecht? Gesucht sind Ideen für Trimmen, Untertitel, Bildausschnitt und Export – auch Tastatur-Workflows.</li>
+<li>Einstellungen und Vorlagen: Welche Optionen sollten Standard, welche „Erweitert“, welche weg sein?</li>
+<li>Gib jede Empfehlung mit Aufwand (klein, mittel, groß), Nutzen und Beispiel aus einem Konkurrenzprodukt an, sortiert nach Nutzen.</li>
+</ol>
+</div>
+
+<h2>1. Was die App ist</h2>
+<ul>
+<li><b>Zweck:</b> Aus langen Videos (Vlogs, Podcasts, Interviews, Twitch-Streams und VODs; 10 min bis 6 h) entstehen automatisch vertikale Shorts (9:16, auch 1:1 und 16:9). Jeder Clip bekommt animierte Untertitel, einen Titel, einen automatischen Bildausschnitt und optional einen Cold Opener.</li>
+<li><b>Nutzer:</b> eine Person, der Entwickler selbst als Content Creator. Die App ist privat, wird nicht verkauft, hat keine Konten.</li>
+<li><b>Technik:</b> Electron + React. Alles läuft <b>lokal und offline</b>, ohne Cloud-KI. Zwei Rechner:
+  <ul>
+  <li>Windows-PC mit NVIDIA-GPU: Engines 1–4, wählbar</li>
+  <li>MacBook M1 Pro mit 16 GB: nur „Engine Mac“</li>
+  </ul>
+  Oberfläche und Funktionen sind auf beiden gleich.</li>
+<li><b>Sprache der Oberfläche:</b> Deutsch. <b>Design:</b> dunkel, Glas-Ebenen, abgerundete Pillen-Knöpfe, Bewegungen nach Apple-Vorbild. Hintergrund wahlweise Glas oder Schwarz.</li>
+</ul>
+
+<h3>Ablauf in einem Satz</h3>
+<p>Der Weg geht so:</p>
+<ol>
+<li>Link oder Datei laden und Optionen wählen, dann „Clips finden“.</li>
+<li>Verarbeitung: Transkribieren → Analysieren → Clips finden, etwa 25–35 min für ein 26-min-Video auf dem Mac.</li>
+<li>Clipliste und Review: freigeben, prüfen oder verwerfen.</li>
+<li>Editor: Feinschnitt, Untertitel, Bildausschnitt.</li>
+<li>Export, dann Upload.</li>
+</ol>
+
+<h3>Was im Hintergrund passiert (für das Verständnis der Wartezeit)</h3>
+<table>
+<tr><th>Schritt</th><th>Was</th><th>Dauer (26-min-Video, Mac)</th></tr>
+<tr><td>Transkribieren</td><td>Spracherkennung mit Wortzeiten (Parakeet)</td><td>~1 min</td></tr>
+<tr><td>Analysieren</td><td>Kamerawechsel, Pausen, Ton-Ereignisse (Lachen, Jubel), Gesichter</td><td>~1–5 min (läuft teils parallel)</td></tr>
+<tr><td>Clips finden</td><td>
+<ul>
+<li>Ein Sprachmodell durchsucht das Transkript.</li>
+<li>Ein Bild- und Tonmodell schaut Kandidaten an.</li>
+<li>Schnittpläne entstehen an Satzgrenzen.</li>
+<li>Rangfolge im Vergleich.</li>
+<li>Jeder fertige Clip wird gerendert und von der KI nochmal geprüft (Anfang, Pointe, Ende, eigenständig verständlich).</li>
+</ul>
+</td><td>~25–30 min</td></tr>
+</table>
+
+<h2>2. Navigation (Seitenleiste)</h2>
+<p>Die Seitenleiste ist schwebend, nur mit Icons, links. Sie hat 7 Punkte:</p>
+<ul>
+<li><b>Start</b></li>
+<li><b>Projekte</b></li>
+<li><b>Exporte &amp; Upload</b></li>
+<li><b>Vorlagen</b>: Untertitel-, Animations- und Titelstile</li>
+<li><b>Live</b>: Twitch-Puffer</li>
+<li><b>Werkzeuge</b>: Live, Werkbank, Lernen, Modelle</li>
+<li><b>Einstellungen</b></li>
+</ul>
+<p>Oben links stehen Logo und Version mit Datum. Ein kleiner Laufstatus unten links bleibt auf jedem Bildschirm sichtbar, solange ein Job läuft.</p>
+
+<h2 class="pb">3. Start und Erstellen-Dialog</h2>
+<figure><img src="img/Start.jpg"><figcaption>Start: große Drop-Zone „Video hierher ziehen“, darunter ein Linkfeld mit „Laden“ und „Zuletzt geöffnet“ als Kachelreihe.</figcaption></figure>
+<p>Nach „Laden“ (YouTube, Twitch-VOD, Twitch-Clip oder Datei) öffnet sich ein Bottom-Sheet. Bei Twitch kann man vorher einen Zeitbereich ziehen. Der Download zeigt Tempo und Restzeit und lässt sich pausieren oder abbrechen.</p>
+<figure><img src="img/Start-Erstellen-Dialog.jpg"><figcaption>Erstellen-Dialog, oberer Teil.</figcaption></figure>
+<p>Der Dialog zeigt oben Vorschaubild, Titel, Dauer und Auflösung. Darunter folgen die Optionen:</p>
+<ul>
+<li><b>Was ist das für ein Video?</b> Podcast/Interview, Vlog, Talking Head/Solo, Stream/Gaming, Vortrag/Präsentation. Der Typ wird automatisch erkannt oder gemerkt.</li>
+<li><b>Auswahl-Engine</b> mit Kurzbeschreibung und Status der Voraussetzungen. Auf Windows ist sie wählbar, auf dem Mac fest.</li>
+<li><b>Format:</b> 9:16, 1:1 oder 16:9.</li>
+<li><b>Bildausschnitt:</b> Smart (folgt Sprecher), Vollbild (mit unscharfem Hintergrund), Split, Fest, Facecam + Gameplay.</li>
+<li><b>Cliplänge:</b> Automatisch, ≤ 30 s, 30–60 s oder 60–90 s.</li>
+<li><b>Untertitel:</b> 8 Stil-Vorschauen (Impact Gelb, Clean Weiß, Box Schwarz, Pop Pink, Dezent, Glow Karaoke, Kinetisch, Glas) oder „Keine“.</li>
+<li><b>Titel einblenden</b> (Schalter).</li>
+<li><b>Cold Opener:</b> Aus oder 1–5 s. Ein starker Moment wird vorangestellt.</li>
+<li><b>Anzahl Clips:</b> Auto, 5, 10, 15, 20, 30, 40 oder 50.</li>
+<li><b>Sprechpausen entfernen</b> (Schalter).</li>
+<li><b>Workflow:</b> Automatisch oder Prüfen &amp; Bearbeiten.</li>
+<li><b>Wonach suchen?</b> Freitext, z. B. „lustige Momente“.</li>
+<li><b>Erweitert:</b> Sprache, Transkriptionsmodell, Sprecher unterscheiden.</li>
+</ul>
+<p>Unten stehen „Dauer etwa 40 Min“ (aus gemessenen Werten dieses Rechners), „Abbrechen“ und „Clips finden“.</p>
+<figure><img src="img/Start-Erstellen-Dialog-unten.jpg"><figcaption>Erstellen-Dialog, unterer Teil (Untertitel-Stile, Cold Opener, Anzahl, Workflow).</figcaption></figure>
+
+<h2 class="pb">4. Verarbeitung</h2>
+<figure><img src="img/Verarbeitung.jpg"><figcaption>Verarbeitung: drei Phasen mit Status statt Prozentbalken, Detailzeile der Engine, „Transkript bereit“.</figcaption></figure>
+<ul>
+<li>Überschrift „Clips werden erstellt …“, eine Marke für die Engine, Videotitel und -länge.</li>
+<li>„Läuft seit X Min · Restzeit ca. 30–45 Min“: die Restzeit als Spanne. Während „Clips finden“ rechnet die Engine selbst aus der echten Restarbeit.</li>
+<li>Drei Phasen (Transkribieren, Analysieren, Clips finden), jeweils erledigt, läuft oder ausstehend. Bei Clips finden steht eine Detailzeile, z. B. „Sprachsuche (Qwen3.5), Fenster 2 von 11“ oder „Clip 3 von 8 rendern“.</li>
+<li>Zwischenstände als Chips: „Transkript bereit“ und vorläufige Clips, sobald sie vorliegen.</li>
+<li>Knöpfe: Pausieren, Beenden mit Ergebnissen, Verwerfen (mit Rückfrage), Fortsetzen.</li>
+</ul>
+<figure><img src="img/Verarbeitung-gestoppt.jpg"><figcaption>Nach „Beenden, Ergebnisse behalten“.</figcaption></figure>
+
+<h2 class="pb">5. Projekte</h2>
+<figure><img src="img/Projekte.jpg"><figcaption>Projekte: Kacheln mit Vorschaubild, Titel, Dauer, Clip-Anzahl oder „nur geladen“, Datum; Etikett „Noch nicht analysiert“.</figcaption></figure>
+<figure><img src="img/Projekte-Kontextmenue.jpg"><figcaption>Rechtsklick: Link kopieren, Neu analysieren, Projekt löschen. „Auswählen“ oben rechts löscht mehrere (Alle, Letzte 30 Tage, Keine).</figcaption></figure>
+
+<h2 class="pb">6. Clipliste eines Projekts</h2>
+<figure><img src="img/Clips-Raster.jpg"><figcaption>Clipliste als Raster.</figcaption></figure>
+<ul>
+<li><b>Kopf:</b> Videotitel, „8 Clips · nach Score sortiert · Laufzeit 35:04 min“. Rechts stehen:
+  <ul>
+  <li>„Neu berechnen“</li>
+  <li>Engine-Marke „Angezeigt: Engine Mac“, Status der Voraussetzungen</li>
+  <li>„Wer ist wer?“ (Personen benennen)</li>
+  <li><b>„Review starten“</b></li>
+  <li>Raster/Liste</li>
+  </ul>
+</li>
+<li><b>Filter:</b> Alle, Offen, Bitte prüfen (KI), Freigegeben, Verworfen, jeweils mit Anzahl.</li>
+<li><b>Karte (9:16):</b>
+  <ul>
+  <li>bewegtes Vorschaubild, Score 0–100 (Klick zeigt Herkunft und Begründung)</li>
+  <li>Auswahlkreis für den Sammelexport</li>
+  <li>Titel, Länge, Quellzeit, Engine</li>
+  <li>Marke für die KI-Prüfung („KI: bitte prüfen“) und den ersten Befund</li>
+  <li>Lernbewertung Stark / Mittel / Schlecht, Löschen</li>
+  </ul>
+  Ein Klick öffnet den Editor.</li>
+<li>„Freigegebene exportieren“ exportiert alle freigegebenen Clips auf einmal.</li>
+</ul>
+<figure><img src="img/Clips-Score-Details.jpg"><figcaption>Score-Details als Popup: Suchwege, Belege, Prüfbefunde, Zusammenfassung.</figcaption></figure>
+<figure><img src="img/Clips-Liste.jpg"><figcaption>Listenansicht.</figcaption></figure>
+
+<h2 class="pb">7. Review-Modus</h2>
+<figure><img src="img/Review.jpg"><figcaption>Review: Clips nacheinander im Export-Ausschnitt ansehen und entscheiden.</figcaption></figure>
+<ul>
+<li>Links ist der Player (9:16) mit Abspielen und Zeitleiste. Rechts stehen:
+  <ul>
+  <li>„Clip 1 von 8“, Titel, Länge, Quellzeit, Score</li>
+  <li>die Zusammenfassung der KI-Prüfung und die Befunde (z. B. „standalone: fail – nicht ohne Vorwissen verständlich“)</li>
+  </ul>
+</li>
+<li>Drei getrennte Angaben je Clip:
+  <ul>
+  <li><b>KI-Prüfung:</b> geprüft, bitte prüfen, nicht bestanden oder keine</li>
+  <li><b>Deine Entscheidung:</b> Freigeben (1), Prüfen (2), Verwerfen (3)</li>
+  <li><b>Lernbewertung:</b> Daumen, unabhängig von der Freigabe</li>
+  </ul>
+</li>
+<li>Tastatur: Leertaste, N/P, 1/2/3, E (Editor). Unten läuft ein Filmstreifen aller Clips. „Verwerfen“ löscht nichts.</li>
+</ul>
+
+<h2 class="pb">8. Editor (Schnittfenster)</h2>
+<figure><img src="img/Editor-Untertitel.jpg"><figcaption>Editor mit Reiter „Untertitel“.</figcaption></figure>
+<h3>Aufbau</h3>
+<ul>
+<li><b>Kopfzeile:</b>
+  <ul>
+  <li>Zurück (zum Review oder zur Liste), vorheriger und nächster offener Clip, Titel</li>
+  <li>Freigabestatus („Offen“)</li>
+  <li>Layout-Schnellwahl: Smart, Fest, Vollbild, Split</li>
+  <li>Lernbewertung, „Gespeichert“, Rückgängig/Wiederholen (Strg+Z/Y)</li>
+  <li><b>Exportieren</b>: öffnet einen kurzen Dialog mit Prüfhinweisen und startet erst nach Bestätigung; der Fortschritt steht dann im Knopf</li>
+  </ul>
+</li>
+<li><b>Links – Transkript:</b> Das aktuelle Wort ist hervorgehoben, außerhalb des Clips ist der Text grau. Es gibt „Text ändern“ (korrigiert den Untertitel) und „Herausschneiden“ (Wörter markieren, um Stellen aus dem Clip zu schneiden).</li>
+<li><b>Mitte:</b>
+  <ul>
+  <li>Quellbild mit Ausschnittrahmen („Quelle · Person anklicken“ wählt, wem die Kamera folgt)</li>
+  <li>9:16-Vorschau, identisch mit dem Export</li>
+  </ul>
+</li>
+<li><b>Rechts – Reiter:</b>
+  <ul>
+  <li><b>Untertitel:</b>
+    <ul>
+    <li>Vorlage wählen, „Speichern als …“, Überschreiben, als Standard setzen, auf alle Clips anwenden, Import, Export</li>
+    <li>zuerst Größe, Position und Farbe des aktiven Worts</li>
+    <li>unter „Erweitert“: Schrift, Zeilenabstand, Wörter pro Zeile, Farben, Großbuchstaben, Kontur, Schatten, Glow, Box, KI-Hervorhebung, Sicherheitszonen (TikTok, Reels, Shorts)</li>
+    </ul>
+  </li>
+  <li><b>Animation:</b> Erscheinen (Keine, Einblenden, Pop, Hochgleiten, Blur-In) mit Dauer, aktives Wort (nur Farbe, Farbe + Vergrößerung, Farbe + Glow-Puls), Dämpfung, Wort für Wort oder ganze Zeile, Verschwinden – getrennt für Untertitel und Titel.</li>
+  <li><b>Titel:</b> einblenden, Text, Dauer, Variante (weiße oder schwarze Box), Größe, Position, Umbruch.</li>
+  <li><b>Bildausschnitt:</b> Inhaltstyp; für den ganzen Clip Smart, Fest oder Vollbild; für die aktuelle Einstellung Smart, Fest, Vollbild, Split oder Facecam + Gameplay; Facecam suchen; Quelle anzeigen.</li>
+  </ul>
+</li>
+<li><b>Unten – Zeitleiste:</b>
+  <ul>
+  <li>Abspielen, ±5 s, Ton, Lautstärke, Zeit</li>
+  <li>„Export nach Kürzen: 18.6 s“</li>
+  <li>Werkzeuge: Ab hier markieren, Ende prüfen, Satz verlängern, Satz kürzen</li>
+  <li>Filmstreifen und Wellenform des Quellvideos; darauf der Clipbereich mit Griffen und Einstellungs-Segmenten (Layout je Kameraeinstellung)</li>
+  </ul>
+</li>
+<li>Der Export-Dialog prüft: fehlende Quelle, Einstellungen ohne Person (mit Sprung zur Stelle), Länge, fehlende Untertitel, verworfener Clip, KI-Hinweise.</li>
+</ul>
+<figure><img src="img/Editor-Animation.jpg"><figcaption>Reiter Animation.</figcaption></figure>
+<figure><img src="img/Editor-Titel.jpg"><figcaption>Reiter Titel.</figcaption></figure>
+<figure><img src="img/Editor-Bildausschnitt.jpg"><figcaption>Reiter Bildausschnitt.</figcaption></figure>
+<figure><img src="img/Editor-Export-Dialog.jpg"><figcaption>Export-Dialog mit Prüfhinweis.</figcaption></figure>
+
+<h2 class="pb">9. Exporte &amp; Upload</h2>
+<figure><img src="img/Exporte___Upload.jpg"><figcaption>Liste der exportierten Clips, Ziel TikTok, YouTube oder Instagram, Text und Beschreibung, Verbinden mit eigenen API-Schlüsseln, Entwürfe hochladen.</figcaption></figure>
+
+<h2>10. Vorlagen (Stil-Studio)</h2>
+<p>Dieselben Regler wie im Editor, aber als globale Vorlagen mit großer Vorschau. Es gibt drei Reiter: Untertitel, Animation, Titel.</p>
+<figure><img src="img/Vorlagen.jpg"><figcaption>Vorlagen – Untertitel.</figcaption></figure>
+<figure><img src="img/Vorlagen-Animation.jpg"><figcaption>Vorlagen – Animation.</figcaption></figure>
+<figure><img src="img/Vorlagen-Titel.jpg"><figcaption>Vorlagen – Titel.</figcaption></figure>
+
+<h2 class="pb">11. Live (Twitch)</h2>
+<figure><img src="img/Live.jpg"><figcaption>Live: „Puffer starten“ nimmt einen laufenden Twitch-Stream rollierend auf (5–60 min). Mit einem Knopf sichert man die letzten Minuten unter „Gesicherte Ausschnitte“ und macht daraus Clips. Twitch-Chat kann als Signal fürs Ranking dienen.</figcaption></figure>
+
+<h2>12. Werkzeuge</h2>
+<figure><img src="img/Werkzeuge.jpg"><figcaption>Werkzeuge als Übersicht: Live, Werkbank, Lernen, Modelle (dazu Testlab, wenn eingeschaltet).</figcaption></figure>
+<ul>
+<li><b>Werkbank:</b> Stapelverarbeitung vieler Videos, z. B. eigene veröffentlichte Shorts mit den Vorschlägen der App vergleichen. Knöpfe: Hinzufügen, Pausieren, Videodatei nach Auswertung löschen.</li>
+<li><b>Lernen:</b> Bewertungen und Korrekturen werden als Lerndaten gesammelt. Optional gibt es ein schwaches Trend-Signal aus der YouTube-Suche. Man kann die Daten exportieren oder alle löschen.</li>
+<li><b>Modelle:</b> Liste der lokalen KI-Modelle mit Größe und Status, „Weitere Modelle“, Import „Von USB“. Fehlende Modelle lädt die App beim Start selbst.</li>
+</ul>
+<figure><img src="img/Werkzeuge-Werkbank.jpg"><figcaption>Werkbank.</figcaption></figure>
+<figure><img src="img/Werkzeuge-Lernen.jpg"><figcaption>Lernen.</figcaption></figure>
+<figure><img src="img/Werkzeuge-Modelle.jpg"><figcaption>Modelle.</figcaption></figure>
+
+<h2 class="pb">13. Einstellungen</h2>
+<p>Es gibt vier Reiter:</p>
+<ul>
+<li><b>Allgemein:</b>
+  <ul>
+  <li>Hintergrund Glas oder Schwarz</li>
+  <li>Export-Profil TikTok, Reels, Shorts oder Eigenes</li>
+  <li>Qualität Normal, Hoch oder Maximal</li>
+  <li>Encoder Auto, NVENC oder CPU</li>
+  <li>Untertitel eingebrannt, als SRT oder beides</li>
+  <li>Dateinamen nach KI-Titel, Zielordner</li>
+  </ul>
+</li>
+<li><b>Modelle &amp; Updates:</b> Modellverwaltung, „Nach Updates suchen“ (In-App-Updates über GitHub-Releases), Patch Notes der aktuellen Version.</li>
+<li><b>Konten &amp; Dienste:</b>
+  <ul>
+  <li>Twitch: Chat als Signal, Kanal-Layouts Facecam + Gameplay, Live-Puffer-Länge, Token</li>
+  <li>YouTube-Anmeldung bei Bot-Prüfung (Firefox-Cookies oder Datei)</li>
+  <li>Bewertungen über ein privates GitHub-Repo teilen</li>
+  </ul>
+</li>
+<li><b>System:</b> Systemcheck, Logs öffnen, Fehlerbericht exportieren, Testlab-Schalter für die Entwicklung.</li>
+</ul>
+<figure><img src="img/Einstellungen.jpg"><figcaption>Einstellungen – Allgemein.</figcaption></figure>
+<figure><img src="img/Einstellungen-Modelle___Updates.jpg"><figcaption>Modelle &amp; Updates.</figcaption></figure>
+<figure><img src="img/Einstellungen-Konten___Dienste.jpg"><figcaption>Konten &amp; Dienste.</figcaption></figure>
+<figure><img src="img/Einstellungen-System.jpg"><figcaption>System.</figcaption></figure>
+
+<h2 class="pb">14. Bekannte Schwachstellen</h2>
+<p class="sub">Schon behoben (nach der ersten Fassung dieses Dokuments): widersprüchliche Restzeiten, „läuft“ bei gestopptem Lauf, Export ohne Bestätigung, abgeschnittenes Score-Popup mit falscher Engine, veraltete Engine-Beschreibung, überlappende Beschriftungen in der Zeitleiste.</p>
+<ul>
+<li><b>Wartezeit:</b> Ein Lauf dauert 25–35 min, die ersten Clips sieht man erst am Ende.</li>
+<li><b>KI-Prüfung bei Vlogs:</b> Fast jeder Clip ist „bitte prüfen“, weil die KI „nicht eigenständig verständlich“ oft anmerkt. Das schwächt die Marke als Signal.</li>
+<li><b>Viele Regler:</b> Untertitel (Schrift, Farben, Kontur, Schatten, Glow, Box, Animation) gibt es doppelt, in Vorlagen und im Editor.</li>
+<li><b>Mehrere Bewertungsebenen:</b> Score, KI-Prüfung, Freigabe und Lernbewertung stehen nebeneinander. Das ist mächtig, aber erklärungsbedürftig.</li>
+</ul>
+
+<h2>15. Rahmenbedingungen für Vorschläge</h2>
+<ul>
+<li>Alles muss lokal laufen, ohne Cloud-KI und ohne Abo. Ein Upload zu TikTok, YouTube oder Instagram ist erlaubt.</li>
+<li>Es gibt einen einzigen Nutzer: Teams, Konten oder Teilen sind nicht nötig.</li>
+<li>Vorschläge sollen auf Windows (NVIDIA) und Mac (Apple Silicon) gleich funktionieren.</li>
+<li>Vorschau und Export nutzen denselben Render-Code. Bearbeitungen sind nicht-destruktiv (Undo/Redo).</li>
+</ul>
+</body></html>
