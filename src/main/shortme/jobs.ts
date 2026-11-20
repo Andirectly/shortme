@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { friendlyError } from './errors'
+import { logError, logInfo } from '../log'
 import type { RunTiming } from '../../shared/shortme'
 
 export type JobState = 'queued' | 'running' | 'paused' | 'stopped' | 'done' | 'error'
@@ -58,7 +59,10 @@ export class JobQueue extends EventEmitter {
   get(id: string): JobInfo | undefined { const e = this.jobs.get(id); return e && { ...e.info } }
 
   private set(e: Entry, patch: Partial<JobInfo>): void {
+    const before = e.info
     e.info = { ...e.info, ...patch }
+    // Verlauf ins Log: Zustands- und Stufenwechsel (nicht jede Prozentmeldung)
+    if (before.state !== e.info.state || before.stage !== e.info.stage) (e.info.state === 'error' ? logError : logInfo)(`[Job] ${e.info.title} · ${e.info.state}${e.info.stage ? ` · ${e.info.stage}` : ''} · ${e.info.message}${e.info.error ? ` · Fehler: ${e.info.error}` : ''}`)
     this.emit('job', { ...e.info })
   }
 

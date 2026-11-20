@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { LogReportButton } from './LogReport'
 import { useTwitch } from './twitchStore'
 import { CheckCircle2, XCircle, RefreshCw } from 'lucide-react'
 import type { UpdateCheckResult, UpdateDownloadState } from '@shared/types'
@@ -295,7 +296,7 @@ export function SettingsScreen(): React.JSX.Element {
           {section === 'system' && (
             <>
               <Card title="Systemcheck">
-                <div style={{ display: 'flex', gap: 8, paddingBottom: 8 }}><Pill onClick={() => void refreshCheck()}><RefreshCw size={13} className={checking ? 'sm-spin' : ''} /> Neu prüfen</Pill><Pill onClick={() => void window.cutawan?.shortme?.openLogs()}>Logs öffnen</Pill></div>
+                <div style={{ display: 'flex', gap: 8, paddingBottom: 8 }}><Pill onClick={() => void refreshCheck()}><RefreshCw size={13} className={checking ? 'sm-spin' : ''} /> Neu prüfen</Pill><Pill onClick={() => void window.cutawan?.shortme?.openLogs()}>Logs öffnen</Pill><LogReportButton /></div>
                 {check.map((c) => (
                   <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(120px, 210px) 1fr', alignItems: 'center', gap: 8, fontSize: 14, padding: '4px 0' }}>
                     {c.ok ? <CheckCircle2 size={17} color="var(--ok)" /> : <XCircle size={17} color="var(--warn)" />}<span>{c.name}</span><small>{c.detail}</small>

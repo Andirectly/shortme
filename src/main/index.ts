@@ -5,7 +5,8 @@ import { registerShortmeIpc, runExportSelfTestIfRequested } from './shortme/ipc'
 import { registerLearnIpc } from './learn/ipc'
 import { registerTwitchIpc, shutdownTwitch } from './twitch/ipc'
 import { registerUploadIpc } from './upload/ipc'
-import { initLog } from './log'
+import { attachWindowLog, initLog } from './log'
+import { uploadPendingLogs } from './logExport'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { migrateLegacyCookiesDir } from './cookies'
@@ -276,6 +277,7 @@ function createWindow(): void {
   })
 
   win.on('ready-to-show', () => { if (!process.env.CUTAWAN_SMOKE) win.show() })
+  attachWindowLog(win.webContents)
 
   // Headless smoke test hook: CUTAWAN_SMOKE=/dir walks the main screens,
   // capturing a screenshot of each, then quits (see scripts/smoke-test.sh).
@@ -328,6 +330,8 @@ app.whenReady().then(() => {
   })
 
   initLog()
+  // Logs abgeschlossener Sitzungen ins private GitHub-Repo (falls eingerichtet), nach dem Start im Hintergrund
+  setTimeout(() => void uploadPendingLogs().catch(() => undefined), 30_000)
   registerIpcHandlers()
   registerEngineIpc()
   registerShortmeIpc()

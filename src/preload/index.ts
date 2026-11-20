@@ -211,6 +211,7 @@ const api = {
     editsSave: (hash: string, log: EditLog): Promise<void> => ipcRenderer.invoke('shortme:editsSave', hash, log),
     applyAll: (hash: string, clipIds: string[], patch: CaptionPatch): Promise<void> => ipcRenderer.invoke('shortme:applyAll', hash, clipIds, patch),
     openLogs: (): Promise<string> => ipcRenderer.invoke('shortme:openLogs'),
+    exportLog: (): Promise<{ path: string; uploaded: string | null; uploadError: string | null }> => ipcRenderer.invoke('shortme:exportLog'),
     presetExport: (id: string): Promise<boolean> => ipcRenderer.invoke('shortme:presetExport', id),
     presetImport: (): Promise<StylePreset[] | null> => ipcRenderer.invoke('shortme:presetImport'),
     presets: (): Promise<StylePreset[]> => ipcRenderer.invoke('shortme:presets'),

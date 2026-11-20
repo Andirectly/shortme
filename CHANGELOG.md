@@ -8,6 +8,12 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
 ## [0.45.0] - 2026-11-20
 
+### Added
+
+- Fehlerprotokoll: Die App schreibt alles mit – Meldungen und Fehler der App und der Oberfläche, jeden Job-Schritt (Start, Stufe, Fehler mit FFmpeg-Fehlerzeile). Jede Sitzung bekommt eine eigene Datei (die letzten 30 bleiben).
+- „Fehlerbericht exportieren“ (Einstellungen → System, und direkt bei einem fehlgeschlagenen Export im Editor): Systeminfo (Version, Windows, GPU, FFmpeg-Versionen, Export-Encoder) und die letzten Sitzungen als Textdatei in Downloads.
+- Automatischer Upload der Logs ins private GitHub-Repo (logs/<Rechner>/), sobald dort Repo und Token eingerichtet sind (Einstellungen → Konten → Bewertungen). Abgeschlossene Sitzungen werden beim nächsten Start hochgeladen.
+
 ### Changed
 
 - Verarbeitung: eine einzige Restzeit für den ganzen Lauf (keine zweite, widersprüchliche Zahl mehr); Überschrift „Clips werden erstellt …“ statt „Transkribiert …“; die veraltete Zeile „Rendern – folgt …“ ist weg.

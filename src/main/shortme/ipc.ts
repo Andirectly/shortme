@@ -40,6 +40,7 @@ import { addExport } from '../upload/store'
 import { deleteClip } from './corrections'
 import { logCorrection } from './corrections'
 import { logDir } from '../log'
+import { exportLogReport } from '../logExport'
 import { applyCaptionToAll, loadEdits, saveEdits } from './edits'
 import { baseState, effectiveClip, stateOf, type CaptionPatch, type EditLog } from '../../shared/edits'
 import { allPresets, deleteUserPreset, effectivePreset, saveUserPreset } from './presets'
@@ -253,6 +254,8 @@ export function registerShortmeIpc(): void {
   ipcMain.handle('shortme:deleteClip', (_e, hash: string, clipId: string) => deleteClip(hash, clipId))
   ipcMain.handle('shortme:applyAll', (_e, hash: string, clipIds: string[], patch: CaptionPatch) => applyCaptionToAll(hash, clipIds, patch))
   ipcMain.handle('shortme:openLogs', () => shell.openPath(logDir()))
+  /** Fehlerbericht (Systeminfo + letzte Sitzungen) nach Downloads, Upload ins private Repo; Ordner zeigen. */
+  ipcMain.handle('shortme:exportLog', async () => { const r = await exportLogReport(); shell.showItemInFolder(r.path); return r })
   /** Projektliste: Titel, Dauer, Clip-Anzahl und 16:9-Vorschaubild (YouTube-Thumbnail bzw. Screenshot). */
   /** Projekt löschen (mit Rückfrage): Analyse, Clips, Bearbeitungen; ein per Link geladenes Video wird mit entfernt, eine eigene Originaldatei nie. */
   ipcMain.handle('shortme:deleteProject', async (e, hash: string) => {
