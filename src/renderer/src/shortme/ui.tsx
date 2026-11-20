@@ -13,10 +13,10 @@ export function Button({ variant = 'secondary', children, className = '', ...res
   )
 }
 
-export function Pill({ pressed, onClick, children, role, disabled }: { pressed?: boolean; onClick?: () => void; children: ReactNode; role?: string; disabled?: boolean }): React.JSX.Element {
+export function Pill({ pressed, onClick, children, role, disabled, title }: { pressed?: boolean; onClick?: () => void; children: ReactNode; role?: string; disabled?: boolean; title?: string }): React.JSX.Element {
   const { base, reduced } = useSprings()
   return (
-    <motion.button role={role} aria-pressed={role ? undefined : pressed} aria-checked={role ? pressed : undefined} whileTap={reduced ? undefined : press} transition={base} className="sm-pill" disabled={disabled} style={disabled ? { opacity: 0.4 } : undefined} onClick={onClick}>
+    <motion.button role={role} aria-pressed={role ? undefined : pressed} aria-checked={role ? pressed : undefined} whileTap={reduced ? undefined : press} transition={base} className="sm-pill" disabled={disabled} title={title} style={disabled ? { opacity: 0.4 } : undefined} onClick={onClick}>
       {children}
     </motion.button>
   )

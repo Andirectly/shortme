@@ -58,13 +58,17 @@ export function StartScreen(): React.JSX.Element {
   const lastMinutes = async (minutes: number): Promise<void> => { if (await twitchImport(link.trim(), { lastMinutes: minutes, analyze: true })) go('processing') }
   const liveBuffer = (): void => { if (tw.info?.channel) setChannelDraft(tw.info.channel); go('live') }
   const { base } = useSprings()
+  const projects = useProject((s) => s.projects)
+  const openProject = useProject((s) => s.openProject)
+  const job = useProject((s) => s.job)
+  const running = job && ['running', 'queued', 'paused'].includes(job.state) ? job : null
+  const resume = projects.find((p) => p.clips > 0) ?? null
   return (
-    <div className="sm-wrap" style={{ maxWidth: 1400, display: 'grid', gap: 28, paddingTop: 12 }}>
-      <div>
-        <h1>Aus langen Videos kurze Clips</h1>
-        <p style={{ color: 'var(--text-2)', margin: '8px 0 0' }}>Alles lokal auf deinem Rechner – keine Cloud.</p>
-      </div>
-      <div style={{ display: 'grid', gap: 14 }}>
+    <div className="sm-wrap" style={{ maxWidth: 1400, display: 'grid', gap: 24, paddingTop: 12 }}>
+      <h1>Neues Video</h1>
+      {/* links: Ablegen/Wählen/Link in EINER Karte; rechts: Weitermachen (letztes Projekt bzw. laufende Analyse) */}
+      <div style={{ display: 'grid', gridTemplateColumns: resume || running ? 'minmax(0, 1.7fr) minmax(280px, 1fr)' : 'minmax(0, 1fr)', gap: 16, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gap: 14, minWidth: 0 }}>
       <motion.div
         className="sm-glass"
         role="button"
@@ -76,23 +80,24 @@ export function StartScreen(): React.JSX.Element {
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; void open(f && hasApi ? window.cutawan.pathForFile(f) : undefined) }}
         onClick={() => void open()}
-        onKeyDown={(e) => e.key === 'Enter' && void open()}
-        style={{ height: 260, display: 'grid', placeItems: 'center', textAlign: 'center', borderStyle: 'dashed' }}
+        onKeyDown={(e) => e.target === e.currentTarget && e.key === 'Enter' && void open()}
+        style={{ minHeight: 280, display: 'grid', placeItems: 'center', textAlign: 'center', borderStyle: 'dashed', padding: 24, cursor: 'pointer' }}
       >
-        <div style={{ display: 'grid', gap: 10, justifyItems: 'center' }}>
-          <UploadCloud size={44} strokeWidth={1.4} color="rgba(255,255,255,0.7)" />
-          <h2>Video hierher ziehen</h2>
-          {importing && <small>{importMessage}</small>}{importError && <small style={{ color: 'var(--warn)' }}>{importError}</small>}
+        <div style={{ display: 'grid', gap: 10, justifyItems: 'center', width: 'min(640px, 100%)' }}>
+          <UploadCloud size={40} strokeWidth={1.4} color="rgba(255,255,255,0.7)" />
+          <h2>Video hier ablegen</h2>
+          <small>oder klicken, um eine Datei zu wählen · YouTube- und Twitch-Links unten einfügen</small>
+          <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%', marginTop: 10, cursor: 'default' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Link2 size={16} style={{ position: 'absolute', left: 16, top: 12, color: 'var(--text-3)' }} />
+              <input className="sm-input" style={{ paddingLeft: 42 }} placeholder="Link einfügen (YouTube, Twitch-VOD, Twitch-Clip …)" aria-label="Video-Link" value={link} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void openLink()} />
+            </div>
+            <Button variant="primary" disabled={importing || !link.trim()} onClick={() => void openLink()}>Laden</Button>
+          </div>
+          {importError && !importing && <small style={{ color: 'var(--warn)' }}>{importError}</small>}
         </div>
       </motion.div>
       <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <Link2 size={16} style={{ position: 'absolute', left: 16, top: 12, color: 'var(--text-3)' }} />
-          <input className="sm-input" style={{ paddingLeft: 42 }} placeholder="Oder Link einfügen (YouTube, …)" aria-label="Video-Link" value={link} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void openLink()} />
-        </div>
-        <Button variant="secondary" disabled={importing} onClick={() => void openLink()}>Laden</Button>
-      </div>
       {isTwitchUrl(link) && <TwitchPanel info={tw.info} error={tw.error} loading={tw.loading} section={section} setSection={setSection} busy={importing} onLast={(m) => void lastMinutes(m)} onLiveBuffer={liveBuffer} />}
       {(importing || importError) && (
         <div className="sm-card" role="status" aria-live="polite" style={{ padding: 14, display: 'grid', gap: 8 }}>
@@ -118,6 +123,27 @@ export function StartScreen(): React.JSX.Element {
         </div>
       )}
       </div>
+      </div>
+      {(resume || running) && (
+        <aside className="sm-glass" aria-label="Weitermachen" style={{ padding: 16, display: 'grid', gap: 12, alignContent: 'start', minWidth: 0 }}>
+          <small style={{ color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 0.6, fontSize: 10.5 }}>Weitermachen</small>
+          {running && (
+            <button className="sm-card" onClick={() => go('processing')} style={{ padding: 12, textAlign: 'left', display: 'grid', gap: 4 }}>
+              <strong style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{running.title}</strong>
+              <small>{running.state === 'paused' ? 'Pausiert' : 'Clips werden erstellt'} – zum Fortschritt</small>
+            </button>
+          )}
+          {resume && (
+            <button className="sm-card" onClick={() => void openProject(resume.hash).then((to) => to && go(to))} style={{ padding: 0, overflow: 'hidden', textAlign: 'left', display: 'grid' }}>
+              <div style={{ aspectRatio: '16/9', background: resume.poster ? `center/cover url(${resume.poster})` : 'rgba(255,255,255,0.04)' }} />
+              <span style={{ padding: '10px 12px 12px', display: 'grid', gap: 3, minWidth: 0 }}>
+                <strong style={{ fontSize: 14, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{resume.title}</strong>
+                <small>{resume.clips} Clips · {fmtDur(resume.durationSec)} – Clips ansehen</small>
+              </span>
+            </button>
+          )}
+        </aside>
+      )}
       </div>
       <section>
         <h3 style={{ marginBottom: 12 }}>Zuletzt geöffnet</h3>

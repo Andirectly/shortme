@@ -6,6 +6,18 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.50.0] - 2026-11-20
+
+### Changed
+
+- Exporte & Upload neu: Projekt wählen, nach Status filtern (noch nicht gesendet / gesendet / Fehler), Titel suchen, Clips als Galerie; mehrere Clips auswählen und nacheinander mit je eigenem Textvorschlag senden; rechts große Vorschau, „Im Ordner zeigen“, Text und Senden.
+- Live neu: Status oben, Puffer-Länge und Chat direkt einstellbar, Kanalprüfung als Karte, während der Aufnahme Kennzahlen (Laufzeit, Puffer, Speicher, Chat) und große „Moment sichern“-Knöpfe; gesicherte Ausschnitte mit Vorschaubild und Clip-Anzahl.
+- Start: „Neues Video“ mit Ablegen, Datei wählen und Link in einer Karte, daneben „Weitermachen“ (letztes Projekt bzw. laufende Analyse).
+
+### Fixed
+
+- Review: Text und Knöpfe ragten über den Rand der rechten Spalte.
+
 ## [0.49.0] - 2026-11-20
 
 ### Added

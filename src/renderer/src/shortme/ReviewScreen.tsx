@@ -184,9 +184,9 @@ export function ReviewScreen(): React.JSX.Element {
       </div>
 
       {!c ? <div className="sm-glass" style={{ padding: 24 }}><small>Keine Clips in diesem Filter.</small></div> : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, auto) minmax(300px, 420px)', gap: 20, alignItems: 'start', justifyContent: 'center', minHeight: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, auto) minmax(320px, 520px)', gap: 20, alignItems: 'start', justifyContent: 'center', minHeight: 0 }}>
           <ReviewPlayer key={c.id} hash={hash} clip={c} srcPath={src} playing={playing} onPlaying={setPlaying} />
-          <div className="sm-glass" style={{ padding: 18, display: 'grid', gap: 12, alignContent: 'start' }}>
+          <div className="sm-glass" style={{ padding: 18, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', minWidth: 0, overflowWrap: 'anywhere', gap: 12, alignContent: 'start' }}>
             <small style={{ color: 'var(--text-2)' }}>Clip {idx + 1} von {list.length}</small>
             <h2 style={{ fontSize: 20, lineHeight: 1.25 }}>{c.title}</h2>
             <small style={{ fontVariantNumeric: 'tabular-nums' }}>Länge {Math.round(c.end - c.start)} s · Quelle {mmss(c.start)}–{mmss(c.end)}{typeof c.score === 'number' ? ` · Score ${c.score}` : ''}</small>
@@ -198,7 +198,7 @@ export function ReviewScreen(): React.JSX.Element {
             <div style={{ display: 'grid', gap: 6 }}>
               <small style={{ color: 'var(--text-2)' }}>Deine Entscheidung</small>
               <div><ReviewBadge view={cur!.view} /></div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 <Button variant={cur!.view?.status === 'freigegeben' ? 'primary' : 'secondary'} onClick={() => decideNow('freigegeben')} title="Taste 1"><Check size={14} /> Freigeben <kbd>1</kbd></Button>
                 <Button variant={cur!.view?.status === 'zur_pruefung' ? 'primary' : 'secondary'} onClick={() => decideNow('zur_pruefung')} title="Taste 2"><ShieldQuestion size={14} /> Prüfen <kbd>2</kbd></Button>
                 <Button variant={cur!.view?.status === 'verworfen' ? 'primary' : 'secondary'} onClick={() => decideNow('verworfen')} title="Taste 3 – verwerfen löscht nichts"><X size={14} /> Verwerfen <kbd>3</kbd></Button>
