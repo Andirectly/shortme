@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { Sparkles } from 'lucide-react'
 import changelog from '../../../../CHANGELOG.md?raw'
-import { changelogSection, parseNotes, type NotesBlock } from '@shared/releaseNotes'
+import { changelogSection, notesForPlatform, parseNotes, type NotesBlock } from '@shared/releaseNotes'
 import { Button } from './ui'
 import { useProject } from './projectStore'
 import { useSprings } from './motion'
@@ -10,9 +10,10 @@ import { useSprings } from './motion'
 const HEAD: Record<string, string> = { added: 'Neu', changed: 'Geändert', fixed: 'Behoben', removed: 'Entfernt' }
 const plain = (s: string): string => s.replace(/`([^`]+)`/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1')
 
-export const notesOf = (version: string): NotesBlock[] => parseNotes(changelogSection(changelog, version))
+// Windows zeigt keine Mac-Punkte (Engine Mac usw.); Versionen ohne übrige Punkte fallen aus der Liste
+export const notesOf = (version: string): NotesBlock[] => notesForPlatform(parseNotes(changelogSection(changelog, version)), window.cutawan?.platform ?? 'win32')
 /** Alle Versionen aus dem Changelog, neueste zuerst. */
-export const allVersions = (): string[] => [...changelog.matchAll(/^##\s+\[?(\d+\.\d+\.\d+)\]?/gm)].map((m) => m[1])
+export const allVersions = (): string[] => [...changelog.matchAll(/^##\s+\[?(\d+\.\d+\.\d+)\]?/gm)].map((m) => m[1]).filter((v) => notesOf(v).length > 0)
 
 export function NotesBlocks({ blocks }: { blocks: NotesBlock[] }): React.JSX.Element {
   return (

@@ -6,7 +6,7 @@ import type { JobQueue } from './jobs'
 import { loadMeta, saveMeta, type ProjectMeta } from './project'
 import { runAnalysis } from './clips/analysis'
 import { loadProfile, rememberChoice, sourceKey } from './profiles'
-import { claimProject, loadDefaultEngine, saveDefaultEngine, switchEngine, type SwitchRequest } from './clips/engines/control'
+import { claimProject, isLocalEngine, loadDefaultEngine, saveDefaultEngine, switchEngine, type SwitchRequest } from './clips/engines/control'
 import { engineRevisions } from './clips/engines'
 import { loadState, setSelected, stopStaleRuns } from './clips/engines/state'
 import { v2MissingModels } from './clips/engines/v2/models'
@@ -17,7 +17,7 @@ import { v4Provenance } from './clips/engines/v4/provenance'
 import { installAvRuntime, installRuntime, runtimeStatus } from './clips/engines/v3/runtime'
 import { addOverride, addRecheck, listRechecks, addReview, clipIndex, blindPresentation, createComparison, getComparison, listComparisons } from './clips/compare'
 import type { EventMatchOverride } from '../../shared/compare'
-import { ENGINE_IDS, isV3Profile, type AnalysisState, type SelectionEngineId, type V3Profile } from '../../shared/engine'
+import { isV3Profile, type AnalysisState, type SelectionEngineId, type V3Profile } from '../../shared/engine'
 import type { ContentType, FrameChoice } from '../../shared/videoKind'
 
 const ACTIVE = ['queued', 'running', 'paused']
@@ -98,7 +98,8 @@ export async function recomputeProject(jobs: JobQueue, hash: string, o: Recomput
     const meta = await loadMeta(hash)
     if (!meta) throw new Error('Projekt nicht gefunden')
     await stopStaleRuns(hash)
-    const engine = o.engine && ENGINE_IDS.includes(o.engine) ? o.engine : (await loadState(hash)).selected
+    const sel = (await loadState(hash)).selected
+    const engine = o.engine && isLocalEngine(o.engine) ? o.engine : isLocalEngine(sel) ? sel : await loadDefaultEngine()
     await setSelected(hash, engine)
     { const missing = await missingModelsFor(engine); if (missing.length) return { jobId: null, missing } }
     const kind = (o.contentType ?? meta.contentType ?? 'podcast') as ContentType

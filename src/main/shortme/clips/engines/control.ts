@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { dataRoot } from '../../../engines/paths'
 import { writeFileAtomic } from '../../atomic'
 import { loadMeta, type ProjectMeta } from '../../project'
-import { ENGINE_IDS, LEGACY_RUN_ID, V2_ENGINE_VERSION, fingerprintOf, type AnalysisState, type EngineSwitchResult, type SelectionEngineId } from '../../../../shared/engine'
+import { ENGINE_IDS, LEGACY_RUN_ID, enginesFor, V2_ENGINE_VERSION, fingerprintOf, type AnalysisState, type EngineSwitchResult, type SelectionEngineId } from '../../../../shared/engine'
 import { clipsPathFor, loadState, setSelected, showRun, stopStaleRuns } from './state'
 import { existsSync } from 'node:fs'
 import { loadProfile } from '../../profiles'
@@ -14,12 +14,15 @@ import type { ContentType } from '../../../../shared/videoKind'
 const defaultFile = (): string => join(dataRoot(), 'engine-default.json')
 
 /** Standard-Engine für neue Projekte (zunächst Engine 3, bis der Nutzer etwas anderes wählt). */
+/** Nur die Engines dieses Systems (Windows: 1–4, Mac: Engine Mac) – die Grenze gilt auch im Hauptprozess, nicht nur in der Oberfläche. */
+export const isLocalEngine = (e: unknown): e is SelectionEngineId => enginesFor(process.platform).includes(e as SelectionEngineId)
+
 export async function loadDefaultEngine(): Promise<SelectionEngineId> {
   if (process.platform === 'darwin') return 'engine-mac'
-  try { const e = (JSON.parse(await readFile(defaultFile(), 'utf8')) as { engine?: unknown }).engine; return ENGINE_IDS.includes(e as SelectionEngineId) ? (e as SelectionEngineId) : 'adaptive-v3' } catch { return 'adaptive-v3' }
+  try { const e = (JSON.parse(await readFile(defaultFile(), 'utf8')) as { engine?: unknown }).engine; return isLocalEngine(e) ? e : 'adaptive-v3' } catch { return 'adaptive-v3' }
 }
 export async function saveDefaultEngine(engine: SelectionEngineId): Promise<SelectionEngineId> {
-  if (!ENGINE_IDS.includes(engine)) throw new Error('Unbekannte Engine')
+  if (!isLocalEngine(engine)) throw new Error('Diese Engine läuft auf diesem System nicht')
   await writeFileAtomic(defaultFile(), JSON.stringify({ engine }))
   return engine
 }
@@ -82,6 +85,7 @@ export function claimProject(hash: string): (() => void) | null {
 export async function switchEngine(req: SwitchRequest, deps: SwitchDeps): Promise<EngineSwitchResult> {
   const { hash, engine } = req
   if (!ENGINE_IDS.includes(engine)) throw new Error('Unbekannte Engine')
+  if (!isLocalEngine(engine)) throw new Error('Diese Engine läuft auf diesem System nicht')
   const release = claimProject(hash)
   if (!release || deps.hasActiveJob(hash)) { release?.(); return { kind: 'busy', state: await loadState(hash) } }
   try {

@@ -48,3 +48,12 @@ describe('release notes', () => {
     expect(parseNotes(changelogSection(readFileSync('CHANGELOG.md', 'utf8'), version)).length).toBeGreaterThan(0)
   })
 })
+
+describe('Patch Notes je Plattform', () => {
+  it('blendet unter Windows Mac-Punkte aus, auf dem Mac nicht', async () => {
+    const { notesForPlatform } = await import('../src/shared/releaseNotes')
+    const blocks = [{ heading: 'Added', items: ['Engine Mac rendert vorab', 'Export schneller'] }, { heading: 'Fixed', items: ['Mac: Download pausieren'] }]
+    expect(notesForPlatform(blocks, 'win32')).toEqual([{ heading: 'Added', items: ['Export schneller'] }])
+    expect(notesForPlatform(blocks, 'darwin')).toEqual(blocks)
+  })
+})

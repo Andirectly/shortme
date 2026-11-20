@@ -245,9 +245,9 @@ function CreateSheet(): React.JSX.Element {
                 </div>
               </Row>
               <Row label="Titel einblenden" hint="Standard für alle neuen Clips; pro Clip im Editor änderbar"><Switch on={!!style.titleEnabled} onChange={(b) => void saveStyle({ ...style, titleEnabled: b })} label="Titel einblenden" /></Row>
-              <Row label="Cold Opener" hint="starker Moment des Clips vorneweg, danach der Clip von Anfang; 0 = aus (Engine Mac)">
+              {window.cutawan?.platform === 'darwin' && <Row label="Cold Opener" hint="starker Moment des Clips vorneweg, danach der Clip von Anfang; 0 = aus (Engine Mac)">
                 <Segmented options={['Aus', '1 s', '2 s', '3 s', '4 s', '5 s']} value={style.coldOpenSec ? `${style.coldOpenSec} s` : 'Aus'} onChange={(v) => void saveStyle({ ...style, coldOpenSec: v === 'Aus' ? 0 : Number(v.split(' ')[0]) })} />
-              </Row>
+              </Row>}
               <Row label="Anzahl Clips" hint="Auto ≈ 1 je 2,5 Min"><Segmented options={['Auto', '5', '10', '15', '20', '30', '40', '50']} value={opts.count ?? 'Auto'} onChange={(count) => setOpts({ count })} /></Row>
               <Row label="Sprechpausen entfernen"><Switch on={opts.removePauses} onChange={(removePauses) => setOpts({ removePauses })} label="Sprechpausen entfernen" /></Row>
               <Row label="Workflow"><Segmented options={['Automatisch', 'Prüfen & Bearbeiten']} value={opts.workflow} onChange={(workflow) => setOpts({ workflow })} /></Row>

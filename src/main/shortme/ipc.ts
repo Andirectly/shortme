@@ -15,7 +15,7 @@ import { loadTranscript, runTranscription } from './transcription'
 import { findClip, loadClips, saveClips, layoutFile } from './clips/analysis'
 import { ENGINE_LABEL, LEGACY_RUN_ID, isV3Profile } from '../../shared/engine'
 import { registerEngineControlIpc, hasActiveJob, missingModelsFor, recomputeProject } from './engineIpc'
-import { loadDefaultEngine } from './clips/engines/control'
+import { isLocalEngine, loadDefaultEngine } from './clips/engines/control'
 import { setSelected } from './clips/engines/state'
 import { runAnalysis } from './clips/analysis'
 import type { SelectionEngineId, V3Profile } from '../../shared/engine'
@@ -124,7 +124,7 @@ export function registerShortmeIpc(): void {
     if (!meta) throw new Error('Projekt nicht gefunden')
     if (hasActiveJob(jobs, hash)) throw new Error('Für dieses Projekt läuft schon eine Analyse.')
     // Engine: Wahl im Erstellen-Dialog, sonst Standard für neue Projekte (zunächst die bisherige Engine); sie bleibt als Projektauswahl gespeichert
-    const engine = opts?.engine ?? (await loadDefaultEngine())
+    const engine = opts?.engine && isLocalEngine(opts.engine) ? opts.engine : await loadDefaultEngine()
     { const missing = await missingModelsFor(engine); if (missing.length) throw new Error(`Für ${ENGINE_LABEL[engine]} fehlen Modelle: ${missing.map((m) => m.name).join(', ')}. Bitte im Modell-Manager installieren.`) }
     await setSelected(hash, engine)
     // Inhaltstyp am Projekt merken und als letzte Auswahl dieser Quelle (Twitch: des Kanals) speichern

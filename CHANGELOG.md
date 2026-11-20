@@ -6,6 +6,19 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.46.0] - 2026-11-20
+
+### Changed
+
+- Gemeinsamer Stand für Windows und Mac: Design- und Bedienänderungen gelten auf beiden Systemen (u. a. Verarbeitung mit einer einzigen Restzeit und Überschrift „Clips werden erstellt …“, Editor-Layout, Twitch-Zeitbereich zum Ziehen, Download pausieren/abbrechen mit Restzeit, Projektstatus).
+- Windows zeigt nur seine eigenen Engines (1–4); Mac-Engine, Mac-Modelle und Mac-Optionen sind unter Windows nicht sichtbar und können auch nicht gestartet werden.
+- Patch Notes zeigen nur, was das eigene System betrifft.
+
+### Fixed
+
+- Projekt öffnen zeigte manchmal die Clips des zuletzt bearbeiteten Projekts.
+- Updates unter Windows: Die neueste Version hatte keine Windows-Update-Datei, Windows fand daher kein Update.
+
 ## [0.45.0] - 2026-11-20
 
 ### Added

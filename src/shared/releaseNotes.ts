@@ -39,3 +39,10 @@ export function parseNotes(section: string): NotesBlock[] {
   }
   return blocks.filter((b) => b.items.length)
 }
+
+/** Mac-only notes (Engine Mac, Apple Silicon, macOS …) are not shown on Windows – that app has nothing of it. Blocks left empty disappear. */
+const MAC_ONLY = /\bMac\b|\bmacOS\b|Apple|Mac-|MLX|mlx|Metal\b|Gemma|LFM/
+export function notesForPlatform(blocks: NotesBlock[], platform: string): NotesBlock[] {
+  if (platform === 'darwin') return blocks
+  return blocks.map((b) => ({ ...b, items: b.items.filter((t) => !MAC_ONLY.test(t)) })).filter((b) => b.items.length)
+}
