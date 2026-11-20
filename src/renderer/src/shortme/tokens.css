@@ -185,3 +185,6 @@ textarea.sm-input { height: auto; padding: 10px 16px; border-radius: 18px; resiz
 .sm-root[data-navlabels] .sm-nav-glow { border-radius: 22px; }
 .sm-nav-label { position: relative; font-size: 13.5px; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
 .sm-root[data-navlabels] .sm-page { left: 224px; }
+
+/* schmale Fenster: Doppeltes ausblenden (z. B. Ausschnitt-Schnellwahl im Editor-Kopf, steht auch im Reiter) */
+@media (max-width: 1279px) { .sm-wide-only { display: none !important; } }

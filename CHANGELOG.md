@@ -6,6 +6,17 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.51.0] - 2026-11-20
+
+### Changed
+
+- Clipliste: Klick auf einen Clip öffnet ein Fenster in der Mitte (Hintergrund abgedunkelt) mit großem Video im Export-Ausschnitt und den Details; ← → wechselt den Clip, Esc oder ✕ schließt. Die Karten nutzen wieder die volle Breite.
+- Editor: passt jetzt auch ins kleinste Fenster (1080 px); unter 1280 px steht die Ausschnitt-Schnellwahl nur im Reiter „Bildausschnitt“.
+
+### Fixed
+
+- Begründungen und KI-Befunde, die mitten im Wort abgeschnitten waren („… hastig durchwü“), enden jetzt auf dem letzten ganzen Wort mit „…“; doppelte Befunde in den Details entfallen.
+
 ## [0.50.0] - 2026-11-20
 
 ### Changed

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, CircleHelp, Pause, Pencil, Play, ShieldAlert, ShieldCheck, ShieldQuestion, Timer, X } from 'lucide-react'
 import type { PreviewPlan, ShortmeClip } from '@shared/shortme'
-import { FILTER_LABEL, QUALITY_LABEL, REVIEW_LABEL, clipRevision, matchesFilter, nextOpenIndex, qualityOf, type QualityStatus, type ReviewFilter, type ReviewStatus, type ReviewView } from '@shared/review'
+import { FILTER_LABEL, QUALITY_LABEL, REVIEW_LABEL, clipRevision, matchesFilter, nextOpenIndex, qualityOf, type QualityStatus, type ReviewFilter, type ReviewStatus, type ReviewView, tidyCut } from '@shared/review'
 import { drawLayout } from '@shared/previewDraw'
 import { useProject } from './projectStore'
 import { useStore } from './store'
@@ -190,10 +190,10 @@ export function ReviewScreen(): React.JSX.Element {
             <small style={{ color: 'var(--text-2)' }}>Clip {idx + 1} von {list.length}</small>
             <h2 style={{ fontSize: 20, lineHeight: 1.25 }}>{c.title}</h2>
             <small style={{ fontVariantNumeric: 'tabular-nums' }}>Länge {Math.round(c.end - c.start)} s · Quelle {mmss(c.start)}–{mmss(c.end)}{typeof c.score === 'number' ? ` · Score ${c.score}` : ''}</small>
-            {c.reason && <small style={{ color: 'var(--text-1)' }} title="Begründung der Auswahl – keine Qualitätsgarantie">{c.reason}</small>}
+            {c.reason && <small style={{ color: 'var(--text-1)' }} title="Begründung der Auswahl – keine Qualitätsgarantie">{tidyCut(c.reason)}</small>}
             <div style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
               <QualityBadge status={cur!.q.status} stale={cur!.q.stale} />
-              {cur!.q.findings.map((f, i) => <small key={i} style={{ color: 'var(--text-2)' }}>• {f}</small>)}
+              {cur!.q.findings.map((f, i) => <small key={i} style={{ color: 'var(--text-2)' }}>• {tidyCut(f)}</small>)}
             </div>
             <div style={{ display: 'grid', gap: 6 }}>
               <small style={{ color: 'var(--text-2)' }}>Deine Entscheidung</small>

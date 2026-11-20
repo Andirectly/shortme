@@ -380,7 +380,7 @@ export function EditorScreen(): React.JSX.Element {
   const outDuration = plan ? plan.duration : trim[1] - trim[0]
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) 262px', gap: 12, height: 'calc(100vh - 60px)', paddingTop: 4 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'auto minmax(0, 1fr) 262px', gap: 12, height: 'calc(100vh - 60px)', paddingTop: 4 }}>
       {preIssues && (
         <div role="dialog" aria-label="Clip exportieren" onClick={() => setPreIssues(null)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center', padding: 16 }}>
           <div className="sm-glass" onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 100%)', padding: 20, display: 'grid', gap: 12, background: 'rgba(22,22,28,0.97)' }}>
@@ -405,12 +405,12 @@ export function EditorScreen(): React.JSX.Element {
         <Button variant="ghost" aria-label={returnTo === 'review' ? 'Zurück zum Review' : 'Zurück'} title={returnTo === 'review' ? 'Zurück zum Review' : 'Zurück zur Clipliste'} onClick={() => { videoRef.current?.pause(); void persist(logRef.current).then(() => { if (hash) void useProject.getState().loadReview(hash) }); go(returnTo === 'review' ? 'review' : 'clips') }}><ArrowLeft size={18} /></Button>
         <Button variant="ghost" aria-label="Vorheriger Clip" title="Vorheriger Clip" disabled={!neighbour(-1, false)} onClick={() => void switchTo(neighbour(-1, false))}><ChevronLeft size={16} /></Button>
         <Button variant="ghost" aria-label="Nächster offener Clip" title="Nächster offener Clip (noch nicht entschieden)" disabled={!neighbour(1, true)} onClick={() => void switchTo(neighbour(1, true))}><ChevronRight size={16} /></Button>
-        <h2 style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{clip.title}</h2>
+        <h2 title={clip.title} style={{ flex: 1, minWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{clip.title}</h2>
         {review[clipId] && <ReviewBadge view={review[clipId]} />}
         {/* Schnellwahl: Ausschnitt der aktuellen Einstellung (Szene) sofort ändern – derselbe Operationsweg wie im Reiter „Bildausschnitt“ */}
-        <Segmented options={Object.keys(LAYOUTS).filter((k) => k !== 'Facecam + Gameplay' || canStream)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} />
+        <div className="sm-wide-only" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}><Segmented options={Object.keys(LAYOUTS).filter((k) => k !== 'Facecam + Gameplay' || canStream)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} /></div>
         <RatingBar clipId={clipId} chips="dropdown" />
-        <small style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{saved ? <><Check size={13} /> Gespeichert</> : 'Speichert …'}</small>
+        <small style={{ display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>{saved ? <><Check size={13} /><span className="sm-wide-only">Gespeichert</span></> : 'Speichert …'}</small>
         <Button variant="ghost" aria-label={`Rückgängig (${modKey()}Z)`} title={`Rückgängig (${modKey()}Z)`} disabled={!canUndo(log)} onClick={undo}><Undo2 size={16} /></Button>
         <Button variant="ghost" aria-label={`Wiederholen (${window.cutawan?.platform === 'darwin' ? '⌘⇧Z' : 'Strg+Y'})`} title={`Wiederholen (${window.cutawan?.platform === 'darwin' ? '⌘⇧Z' : 'Strg+Y'})`} disabled={!canRedo(log)} onClick={redo}><Redo2 size={16} /></Button>
         {exportJob?.state === 'done' && exportJob.message.includes('exportiert nach') && <small role="status" title={exportJob.message} style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exportJob.message}</small>}
@@ -419,7 +419,7 @@ export function EditorScreen(): React.JSX.Element {
         <Button variant="primary" disabled={exportJob?.state === 'running'} onClick={checkAndExport}>{exportJob?.state === 'running' ? `${Math.round(exportJob.progress * 100)} %` : 'Exportieren'}</Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'clamp(300px, 22vw, 440px) minmax(0, 1fr) clamp(340px, 24vw, 480px)', gap: 14, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'clamp(240px, 22vw, 440px) minmax(0, 1fr) clamp(280px, 24vw, 480px)', gap: 14, minHeight: 0 }}>
         {/* Transkript */}
         <div className="sm-glass" style={{ padding: 16, overflowY: 'auto' }}>
           <h3 style={{ marginBottom: 10 }}>Transkript</h3>

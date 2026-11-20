@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { RatingBar, setHoveredClip, useListRatingKeys } from './RatingBar'
-import { Pause, Play, Square, Trash2, Check, Loader2, AlertTriangle, LayoutGrid, List, Download, Wand2, ListChecks, Pencil, ShieldQuestion, X } from 'lucide-react'
-import { FILTER_LABEL, clipRevision, matchesFilter, qualityOf, type QualityStatus, type ReviewFilter, type ReviewStatus, type ReviewView } from '@shared/review'
+import { Pause, Play, Square, Trash2, Check, Loader2, AlertTriangle, LayoutGrid, List, Download, Wand2, ListChecks, Pencil, ShieldQuestion, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { FILTER_LABEL, clipRevision, matchesFilter, qualityOf, type QualityStatus, type ReviewFilter, type ReviewStatus, type ReviewView, tidyCut } from '@shared/review'
 import type { ShortmeClip } from '@shared/shortme'
 import { QualityBadge, ReviewBadge, ReviewPlayer, saveMem } from './ReviewScreen'
 import { useStore } from './store'
@@ -122,7 +122,8 @@ function ClipCard({ c, selected, focused, onSelect, onFocus, onOpen, pct, info }
 }
 
 /** Rechte Spalte der Clipliste: alles zu EINEM Clip – Vorschau, Begründung und die drei getrennten Angaben (KI-Prüfung, deine Entscheidung, Lernbewertung). */
-function ClipInspector({ c, info, real, hash, srcPath, onOpen, onReview }: { c: Clip; info?: CardInfo; real?: ShortmeClip; hash: string; srcPath: string | null; onOpen: () => void; onReview: () => void }): React.JSX.Element {
+/** Clip-Details als Fenster in der Mitte (Hintergrund abgedunkelt): links das Video im Export-Ausschnitt, rechts Begründung und die drei getrennten Angaben. */
+function ClipInspector({ c, info, real, hash, srcPath, pos, onOpen, onReview, onClose, onMove }: { c: Clip; info?: CardInfo; real?: ShortmeClip; hash: string; srcPath: string | null; pos: string; onOpen: () => void; onReview: () => void; onClose: () => void; onMove: (d: number) => void }): React.JSX.Element {
   const setReview = useProject((s) => s.setReview)
   const deleteClip = useProject((s) => s.deleteClip)
   const [playingId, setPlayingId] = useState<string | null>(null)
@@ -130,12 +131,35 @@ function ClipInspector({ c, info, real, hash, srcPath, onOpen, onReview }: { c: 
   const status = info?.view?.status
   const decide = (s: ReviewStatus): void => { void setReview(c.id, s) }
   const label = (t: string): React.JSX.Element => <small style={{ color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 0.6, fontSize: 10.5 }}>{t}</small>
+  const { base } = useSprings()
+  useEffect(() => {
+    const k = (e: KeyboardEvent): void => {
+      const t = (e.target as HTMLElement).tagName
+      if (t === 'INPUT' || t === 'TEXTAREA' || prov) return
+      if (e.key === 'Escape') onClose()
+      else if (e.key === 'ArrowRight') { e.preventDefault(); onMove(1) }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); onMove(-1) }
+      else if (e.key === ' ') { e.preventDefault(); setPlayingId((p) => (p === c.id ? null : c.id)) }
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [onClose, onMove, c.id, prov])
   return (
-    <aside aria-label="Clip-Details" className="sm-glass" style={{ position: 'sticky', top: 12, maxHeight: 'calc(100vh - 90px)', overflowY: 'auto', overflowWrap: 'anywhere', padding: 16, display: 'grid', gap: 14, alignContent: 'start', background: 'rgba(24,24,32,0.72)' }}>
-      {prov && c.v4RunId && <V4ProvenancePanel runId={c.v4RunId} clipId={c.id} label={c.v4Label ?? 'Engine 4'} onClose={() => setProv(false)} />}
-      {real && hash ? <ReviewPlayer key={c.id} hash={hash} clip={real} srcPath={srcPath} playing={playingId === c.id} onPlaying={(p) => setPlayingId(p ? c.id : null)} height="min(40vh, 380px)" /> : <div style={{ justifySelf: 'center', width: 160, aspectRatio: '9/16', borderRadius: 14, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover' }} />}
+    <motion.div role="dialog" aria-modal="true" aria-label="Clip-Details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={base} onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.62)', display: 'grid', placeItems: 'center', padding: 24 }}>
+    {prov && c.v4RunId && <V4ProvenancePanel runId={c.v4RunId} clipId={c.id} label={c.v4Label ?? 'Engine 4'} onClose={() => setProv(false)} />}
+    <motion.div initial={{ scale: 0.97, y: 8 }} animate={{ scale: 1, y: 0 }} transition={base} className="sm-glass" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '100%', height: 'min(calc(100vh - 48px), 860px)', display: 'grid', gridTemplateColumns: 'auto minmax(320px, 440px)', gridTemplateRows: 'minmax(0, 1fr)', gap: 24, padding: 20, overflow: 'hidden', background: 'rgba(22,22,28,0.94)' }}>
+      <div style={{ display: 'grid', gap: 10, alignContent: 'center', justifyItems: 'center', minHeight: 0 }}>
+        {real && hash ? <ReviewPlayer key={c.id} hash={hash} clip={real} srcPath={srcPath} playing={playingId === c.id} onPlaying={(p) => setPlayingId(p ? c.id : null)} height="min(calc(100vh - 150px), 760px)" /> : <div style={{ height: 'min(calc(100vh - 150px), 760px)', aspectRatio: '9/16', borderRadius: 18, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover' }} />}
+      </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, alignContent: 'start', overflowY: 'auto', overflowWrap: 'anywhere', minWidth: 0, paddingRight: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <small style={{ flex: 1, color: 'var(--text-2)' }} title="Leertaste: Abspielen · ← →: Clip wechseln · Esc: Schließen">Clip {pos}</small>
+        <Button variant="ghost" aria-label="Vorheriger Clip (←)" title="Vorheriger Clip (←)" onClick={() => onMove(-1)}><ChevronLeft size={16} /></Button>
+        <Button variant="ghost" aria-label="Nächster Clip (→)" title="Nächster Clip (→)" onClick={() => onMove(1)}><ChevronRight size={16} /></Button>
+        <Button variant="ghost" aria-label="Schließen (Esc)" title="Schließen (Esc)" onClick={onClose}><X size={16} /></Button>
+      </div>
       <div style={{ display: 'grid', gap: 4 }}>
-        <h2 style={{ fontSize: 18, lineHeight: 1.25 }}>{c.title}</h2>
+        <h2 style={{ fontSize: 20, lineHeight: 1.25 }}>{c.title}</h2>
         <small style={{ fontVariantNumeric: 'tabular-nums' }}>Score {c.score} · {c.duration} s{info ? ` · Quelle ${mmss(info.start)}–${mmss(info.end)}` : ''}{c.v4RunId ? ` · ${c.v4Label ?? 'Engine 4'}` : ''}</small>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -156,7 +180,7 @@ function ClipInspector({ c, info, real, hash, srcPath, onOpen, onReview }: { c: 
         <section style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
           {label('KI-Prüfung')}
           <QualityBadge status={info.q.status} stale={info.q.stale} />
-          {info.q.findings.map((f, i) => <small key={i} style={{ color: 'var(--text-2)' }}>• {f}</small>)}
+          {info.q.findings.map((f, i) => <small key={i} style={{ color: 'var(--text-2)' }}>• {tidyCut(f)}</small>)}
         </section>
       )}
       <section style={{ display: 'grid', gap: 6 }}>
@@ -165,20 +189,23 @@ function ClipInspector({ c, info, real, hash, srcPath, onOpen, onReview }: { c: 
       </section>
       <section style={{ display: 'grid', gap: 8 }}>
         {label('Warum empfohlen')}
-        {c.reason && <small style={{ color: 'var(--text-1)' }}>{c.reason}</small>}
+        {c.reason && <small style={{ color: 'var(--text-1)' }}>{tidyCut(c.reason)}</small>}
         {c.criteria.map((k) => (
           <div key={k.label} style={{ display: 'grid', gridTemplateColumns: '1fr 28px', gap: 8, alignItems: 'center', fontSize: 12 }}>
             <div style={{ display: 'grid', gap: 3 }}>{k.label}<div className="sm-bar" style={{ height: 4 }}><i style={{ width: `${(k.value / 20) * 100}%` }} /></div></div>
             <span style={{ textAlign: 'right' }}>{k.value}</span>
           </div>
         ))}
-        {c.notes?.map((n, i) => <small key={i} style={{ color: 'var(--text-2)' }}>{n}</small>)}
+        {/* Befunde stehen schon unter KI-Prüfung → hier nicht doppelt */}
+        {c.notes?.filter((n) => !info?.q.findings.some((f) => n.includes(f.slice(0, 40)))).map((n, i) => <small key={i} style={{ color: 'var(--text-2)' }}>{n}</small>)}
       </section>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingBottom: 4 }}>
         {c.v4RunId && <Button variant="secondary" onClick={() => setProv(true)}>Herkunft</Button>}
         <Button variant="secondary" onClick={() => { if (window.confirm(`„${c.title}“ löschen?`)) void deleteClip(c.id) }} style={{ color: 'var(--warn)' }}><Trash2 size={14} /> Löschen</Button>
       </div>
-    </aside>
+    </div>
+    </motion.div>
+    </motion.div>
   )
 }
 
@@ -213,7 +240,11 @@ export function ClipsScreen(): React.JSX.Element {
   const hash = useProject((s) => s.clipsFile?.hash ?? '')
   const srcPath = useProject((s) => s.clipsFile?.source?.path ?? null)
   const [focusId, setFocusId] = useState<string | null>(null)
-  const focus = shown.find((c) => c.id === focusId) ?? shown.find((c) => !c.pending) ?? null
+  const focus = shown.find((c) => c.id === focusId && !c.pending) ?? null
+  const ready = shown.filter((c) => !c.pending)
+  const fIdx = focus ? ready.findIndex((c) => c.id === focus.id) : -1
+  const moveFocus = useCallback((d: number): void => { if (ready.length) setFocusId(ready[(fIdx + d + ready.length) % ready.length].id) }, [ready, fIdx])
+  const closeFocus = useCallback((): void => setFocusId(null), [])
   const reviewFrom = (id: string): void => { if (hash) saveMem(hash, { filter: 'alle', clipId: id }); go('review') }
   return (
     <div style={{ display: 'grid', gap: 18, paddingTop: 12, paddingBottom: 90 }}>
@@ -236,9 +267,9 @@ export function ClipsScreen(): React.JSX.Element {
           {FILTERS.map((f) => { const n = sorted.filter((c) => { const i = infos.get(c.id); return !i || matchesFilter(i.view ?? { status: 'offen' }, i.q.status, f) }).length; return <Pill key={f} pressed={filter === f} onClick={() => setFilter(f)}>{FILTER_LABEL[f]} ({n})</Pill> })}
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: focus ? 'minmax(0, 1fr) clamp(300px, 26vw, 380px)' : 'minmax(0, 1fr)', gap: 18, alignItems: 'start' }}>
+      <div>
       {view === 'grid' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 16 }}>
           {shown.map((c) => <ClipCard key={c.id} c={c} selected={selected.includes(c.id)} focused={focus?.id === c.id} onSelect={() => toggle(c.id)} onFocus={() => setFocusId(c.id)} onOpen={() => !c.pending && openClip(c.id)} pct={pct} info={infos.get(c.id)} />)}
         </div>
       ) : (
@@ -247,15 +278,15 @@ export function ClipsScreen(): React.JSX.Element {
             <motion.div key={c.id} className="sm-card" whileTap={{ scale: 0.99 }} transition={base} onClick={() => setFocusId(c.id)} onDoubleClick={() => !c.pending && openClip(c.id)} title="Klick: Details rechts · Doppelklick: im Editor öffnen" style={{ ...(c.pending ? { opacity: 0.45, pointerEvents: 'none' as const } : {}), outline: focus?.id === c.id ? '2px solid rgba(255,255,255,0.75)' : 'none', cursor: 'pointer', display: 'grid', gridTemplateColumns: '24px 54px 1fr auto auto', alignItems: 'center', gap: 14, padding: 10 }}>
               <input type="checkbox" checked={selected.includes(c.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(c.id)} aria-label="Auswählen" />
               <div style={{ width: 54, aspectRatio: '9/16', borderRadius: 8, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover' }} />
-              <div style={{ display: 'grid', gap: 4 }}><h3>{c.title}</h3><small>{c.reason}</small>{infos.get(c.id) && !c.pending && <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><QualityBadge status={infos.get(c.id)!.q.status} stale={infos.get(c.id)!.q.stale} /><ReviewBadge view={infos.get(c.id)!.view} /><small style={{ color: 'var(--text-2)' }}>Quelle {mmss(infos.get(c.id)!.start)}–{mmss(infos.get(c.id)!.end)}</small></div>}</div>
+              <div style={{ display: 'grid', gap: 4 }}><h3>{c.title}</h3><small>{tidyCut(c.reason)}</small>{infos.get(c.id) && !c.pending && <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><QualityBadge status={infos.get(c.id)!.q.status} stale={infos.get(c.id)!.q.stale} /><ReviewBadge view={infos.get(c.id)!.view} /><small style={{ color: 'var(--text-2)' }}>Quelle {mmss(infos.get(c.id)!.start)}–{mmss(infos.get(c.id)!.end)}</small></div>}</div>
               <small>{c.duration} s</small>
               <Score v={c.score} />
             </motion.div>
           ))}
         </div>
       )}
-      {focus && <ClipInspector key={focus.id} c={focus} info={infos.get(focus.id)} real={(realClips ?? []).find((r) => r.id === focus.id)} hash={hash} srcPath={srcPath} onOpen={() => openClip(focus.id)} onReview={() => reviewFrom(focus.id)} />}
       </div>
+      <AnimatePresence>{focus && <ClipInspector key="inspector" c={focus} info={infos.get(focus.id)} real={(realClips ?? []).find((r) => r.id === focus.id)} hash={hash} srcPath={srcPath} pos={`${fIdx + 1} von ${ready.length}`} onOpen={() => openClip(focus.id)} onReview={() => reviewFrom(focus.id)} onClose={closeFocus} onMove={moveFocus} />}</AnimatePresence>
       <AnimatePresence>
         {selected.length > 0 && (
           <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }} transition={base} className="sm-glass" style={{ position: 'fixed', bottom: 20, left: '50%', translate: '-50% 0', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderRadius: 999, zIndex: 30, background: 'rgba(24,24,32,0.9)' }}>

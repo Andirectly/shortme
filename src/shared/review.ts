@@ -86,3 +86,12 @@ export function nextOpenIndex(statuses: ReviewStatus[], from: number): number | 
   for (let k = 1; k <= n; k++) { const i = (from + k) % n; if (statuses[i] === 'offen' || statuses[i] === 'zur_pruefung') return i }
   return null
 }
+
+/** Modelltext, der an einer festen Höchstlänge abgeschnitten wurde („… hastig durchwü“), bis zum letzten ganzen Wort kürzen und „…“ anhängen. */
+export function tidyCut(text: string): string {
+  const t = text.trim()
+  // nur lange Texte (kurze sind nie an der Grenze abgeschnitten); Zahlen/Kennungen am Ende gelten als vollständig
+  if (t.length < 80 || /[.!?…)"“”»]$/.test(t) || /\d\S*$/.test(t)) return t
+  const cut = t.replace(/[\s'"„“‚‘(,;:–-]*\S*$/, '').replace(/[\s,;:–-]+$/, '')
+  return cut.length >= t.length * 0.6 ? `${cut} …` : t
+}
