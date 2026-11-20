@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Logo } from './Logo'
-import { Home, FolderOpen, Palette, Settings, Radio, Upload, LayoutGrid, Loader2 } from 'lucide-react'
+import { Home, FolderOpen, Palette, Settings, Radio, Upload, LayoutGrid, Loader2, PanelLeftOpen, PanelLeftClose, Search } from 'lucide-react'
+import { CommandLayer, modKey } from './Commands'
 import { useProject } from './projectStore'
 import { fmtElapsed } from '@shared/estimate'
 import type { ReactNode } from 'react'
@@ -50,10 +51,14 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
   const active = parentNav(screen)
   const liveOn = useTwitch((s) => s.live.running)
   const refreshLive = useTwitch((s) => s.refreshLive)
+  // Beschriftungen in der Seitenleiste (Wunsch je Rechner, nur Komfort)
+  const [labels, setLabels] = useState(() => { try { return localStorage.getItem('sm.nav.labels') === '1' } catch { return false } })
+  const toggleLabels = (): void => setLabels((v) => { try { localStorage.setItem('sm.nav.labels', v ? '0' : '1') } catch { /* nur Komfort */ } return !v })
+  const openPalette = (): void => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', [window.cutawan?.platform === 'darwin' ? 'metaKey' : 'ctrlKey']: true })) }
   // Der Puffer läuft im Hintergrund weiter; der Status wird alle 3 s abgefragt (Badge am Live-Tab)
   useEffect(() => { void refreshLive(); const t = setInterval(() => void refreshLive(), 3000); return () => clearInterval(t) }, [refreshLive])
   return (
-    <div className="sm-root" data-theme={theme} data-platform={window.cutawan?.platform}>
+    <div className="sm-root" data-theme={theme} data-platform={window.cutawan?.platform} data-navlabels={labels ? '1' : undefined}>
       {/* Festes Stimmungsbild nur in der Browser-Vorschau; in der App scheint der echte Desktop durch (Windows-Acrylic) */}
       {!window.cutawan && <div className="sm-ambient" style={{ backgroundImage: `url(${IMG.ambient})` }} />}
       <div className="sm-titlebar">
@@ -62,13 +67,18 @@ export function Shell({ children }: { children: ReactNode }): React.JSX.Element 
         <small className="sm-build" aria-label="Version">{__BUILD__}</small>
       <JobPill />
       </div>
+      <CommandLayer onToggleLabels={toggleLabels} />
       <nav className="sm-nav sm-glass" aria-label="Hauptnavigation">
         {NAV.map((n) => (
           <button key={n.id} className={`sm-nav-item${n.id === 'live' && liveOn ? ' sm-nav-live' : ''}`} aria-current={active === n.id ? 'page' : undefined} aria-label={n.id === 'live' && liveOn ? `${n.label} – Aufnahme läuft` : n.label} title={n.id === 'live' && liveOn ? `${n.label} – Aufnahme läuft` : n.label} onClick={() => go(n.id)}>
             {active === n.id && <motion.span layoutId="nav-glow" className="sm-nav-glow" transition={base} />}
             {n.icon}
+            {labels && <span className="sm-nav-label">{n.label}</span>}
           </button>
         ))}
+        <span className="sm-nav-sep" aria-hidden />
+        <button className="sm-nav-item" aria-label={`Suchen und Befehle (${modKey()}K)`} title={`Suchen und Befehle (${modKey()}K)`} onClick={openPalette}><Search size={18} />{labels && <span className="sm-nav-label">Suchen <kbd>{modKey()}K</kbd></span>}</button>
+        <button className="sm-nav-item" aria-label={labels ? 'Beschriftungen ausblenden' : 'Beschriftungen einblenden'} title={labels ? 'Beschriftungen ausblenden' : 'Beschriftungen einblenden'} onClick={toggleLabels}>{labels ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}{labels && <span className="sm-nav-label">Einklappen</span>}</button>
       </nav>
       <AnimatePresence mode="wait" initial={false}>
         <motion.main key={screen} className="sm-page sm-scroll-mask" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={base}>

@@ -177,3 +177,11 @@ textarea.sm-input { height: auto; padding: 10px 16px; border-radius: 18px; resiz
 .sm-advanced > summary::before { content: '▸ '; }
 .sm-advanced[open] > summary::before { content: '▾ '; }
 .sm-advanced > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* Seitenleiste mit Beschriftungen (Schalter unten in der Leiste) */
+.sm-nav-sep { height: 1px; margin: 4px 8px; background: var(--edge); }
+.sm-root[data-navlabels] .sm-nav { width: 196px; border-radius: 28px; }
+.sm-root[data-navlabels] .sm-nav-item { width: 100%; border-radius: 22px; display: flex; justify-content: flex-start; gap: 12px; padding: 0 13px; }
+.sm-root[data-navlabels] .sm-nav-glow { border-radius: 22px; }
+.sm-nav-label { position: relative; font-size: 13.5px; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.sm-root[data-navlabels] .sm-page { left: 224px; }

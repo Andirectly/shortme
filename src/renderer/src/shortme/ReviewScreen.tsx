@@ -16,7 +16,7 @@ const mmss = (s: number): string => `${Math.floor(Math.max(0, s) / 60)}:${String
 const FILTERS: ReviewFilter[] = ['alle', 'offen', 'ki_pruefen', 'freigegeben', 'verworfen']
 const memKey = (hash: string): string => `sm.review.${hash}`
 const loadMem = (hash: string): { filter: ReviewFilter; clipId: string | null } => { try { const v = JSON.parse(localStorage.getItem(memKey(hash)) ?? 'null') as { filter?: ReviewFilter; clipId?: string } | null; return { filter: FILTERS.includes(v?.filter as ReviewFilter) ? (v!.filter as ReviewFilter) : 'alle', clipId: v?.clipId ?? null } } catch { return { filter: 'alle', clipId: null } } }
-const saveMem = (hash: string, v: { filter: ReviewFilter; clipId: string | null }): void => { try { localStorage.setItem(memKey(hash), JSON.stringify(v)) } catch { /* nur Komfort */ } }
+export const saveMem = (hash: string, v: { filter: ReviewFilter; clipId: string | null }): void => { try { localStorage.setItem(memKey(hash), JSON.stringify(v)) } catch { /* nur Komfort */ } }
 
 /** KI-Prüfung als Text + Icon (nie nur Farbe). */
 export function QualityBadge({ status, stale }: { status: QualityStatus; stale?: boolean }): React.JSX.Element {
@@ -33,7 +33,7 @@ export function ReviewBadge({ view }: { view?: ReviewView }): React.JSX.Element 
 }
 
 /** Ein Clip, abgespielt wie im Export (gleicher Plan und gleiche Geometrie wie der Editor); Pausenschnitte werden übersprungen. Ohne Untertitel-Ebene. */
-function ReviewPlayer({ hash, clip, srcPath, playing, onPlaying }: { hash: string; clip: ShortmeClip; srcPath: string | null; playing: boolean; onPlaying: (p: boolean) => void }): React.JSX.Element {
+export function ReviewPlayer({ hash, clip, srcPath, playing, onPlaying, height = 'min(72vh, 860px)' }: { hash: string; clip: ShortmeClip; srcPath: string | null; playing: boolean; onPlaying: (p: boolean) => void; height?: string }): React.JSX.Element {
   const [plan, setPlan] = useState<PreviewPlan | null>(null)
   const [t, setT] = useState(0)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -92,7 +92,7 @@ function ReviewPlayer({ hash, clip, srcPath, playing, onPlaying }: { hash: strin
   const total = plan ? plan.end - plan.start : clip.end - clip.start
   return (
     <div style={{ display: 'grid', gap: 8, justifyItems: 'center', minHeight: 0 }}>
-      <div style={{ position: 'relative', height: 'min(72vh, 860px)', aspectRatio: '9 / 16', borderRadius: 18, overflow: 'hidden', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.45)' }}>
+      <div style={{ position: 'relative', height, aspectRatio: '9 / 16', borderRadius: 18, overflow: 'hidden', background: '#000', boxShadow: '0 20px 60px rgba(0,0,0,0.45)' }}>
         {srcPath ? <video ref={videoRef} src={window.cutawan.mediaUrl(srcPath)} preload="auto" playsInline style={{ display: 'none' }} /> : null}
         <canvas ref={canvasRef} width={W} height={H} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-label={`Vorschau: ${clip.title}`} />
         {!srcPath && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 24, textAlign: 'center', color: 'var(--text-2)' }}>Quellvideo nicht verfügbar – Vorschau nicht möglich.</div>}

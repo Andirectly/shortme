@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { modKey } from './Commands'
 import { blocks, needsConfirm, preflight, type PreflightIssue } from '@shared/preflight'
 import { clipRevision, qualityOf } from '@shared/review'
 import { LogReportButton } from './LogReport'
@@ -285,8 +286,8 @@ export function EditorScreen(): React.JSX.Element {
     const k = (e: KeyboardEvent): void => {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
-      else if (e.ctrlKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo() }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+      else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo() }
       else if (e.key === ' ') { e.preventDefault(); togglePlay() }
       else if ((e.key === 'Delete' || e.key === 'Backspace') && selRef.current !== null) { e.preventDefault(); toggleCutRef.current(selRef.current) }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(tRef.current - (e.shiftKey ? 5 : 1)) }
@@ -410,8 +411,8 @@ export function EditorScreen(): React.JSX.Element {
         <Segmented options={Object.keys(LAYOUTS).filter((k) => k !== 'Facecam + Gameplay' || canStream)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} />
         <RatingBar clipId={clipId} chips="dropdown" />
         <small style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{saved ? <><Check size={13} /> Gespeichert</> : 'Speichert …'}</small>
-        <Button variant="ghost" aria-label="Rückgängig (Strg+Z)" disabled={!canUndo(log)} onClick={undo}><Undo2 size={16} /></Button>
-        <Button variant="ghost" aria-label="Wiederholen (Strg+Y)" disabled={!canRedo(log)} onClick={redo}><Redo2 size={16} /></Button>
+        <Button variant="ghost" aria-label={`Rückgängig (${modKey()}Z)`} title={`Rückgängig (${modKey()}Z)`} disabled={!canUndo(log)} onClick={undo}><Undo2 size={16} /></Button>
+        <Button variant="ghost" aria-label={`Wiederholen (${window.cutawan?.platform === 'darwin' ? '⌘⇧Z' : 'Strg+Y'})`} title={`Wiederholen (${window.cutawan?.platform === 'darwin' ? '⌘⇧Z' : 'Strg+Y'})`} disabled={!canRedo(log)} onClick={redo}><Redo2 size={16} /></Button>
         {exportJob?.state === 'done' && exportJob.message.includes('exportiert nach') && <small role="status" title={exportJob.message} style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exportJob.message}</small>}
         {exportJob?.state === 'error' && <small role="alert" style={{ color: 'var(--warn)', maxWidth: 260 }} title={exportJob.error}>Export fehlgeschlagen: {exportJob.error}</small>}
         {exportJob?.state === 'error' && <LogReportButton label="Fehlerbericht senden" />}

@@ -198,7 +198,7 @@ function CreateSheet(): React.JSX.Element {
             dragElastic={{ top: 0.08, bottom: 0.6 }}
             dragMomentum={false}
             onDragEnd={onEnd}
-            style={{ y, position: 'fixed', left: 'calc(50% - 360px)', width: 720, bottom: 12, top: 56, zIndex: 61, background: 'rgba(24,24,32,0.92)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            style={{ y, position: 'fixed', left: 'max(96px, calc(50% - 590px))', right: 'max(16px, calc(50% - 590px))', bottom: 12, top: 56, zIndex: 61, background: 'rgba(24,24,32,0.92)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
           >
             <div style={{ display: 'grid', placeItems: 'center', padding: '10px 0 6px', touchAction: 'none' }}>
               <span style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.25)' }} />
@@ -213,10 +213,20 @@ function CreateSheet(): React.JSX.Element {
                 {imported?.preflight.warnings.map((e) => <small key={e}>{e}</small>)}
               </div>
             </div>
+            {/* breite Ansicht in Gruppen statt langer Liste; Startknopf bleibt unten fest */}
             <div style={{ overflowY: 'auto', padding: '0 24px 12px' }} {...stop}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '0 32px', alignItems: 'start' }}>
+              <section>
+                <h3 style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-2)', margin: '6px 0 2px' }}>Clip-Ziel</h3>
               <Row label="Was ist das für ein Video?" toggle={suggesting ? <small>wird eingeschätzt …</small> : kindSource && kindSource !== 'manual' ? <span className="sm-tag" title={kindReason}>{kindSource === 'remembered' ? 'zuletzt gewählt' : 'erkannt'}</span> : undefined}>
                 <Segmented options={CONTENT_TYPES.map((c) => c.label)} value={contentLabel(contentType)} onChange={(n) => void setContentType(CONTENT_TYPES.find((c) => c.label === n)!.id)} />
               </Row>
+              <Row label="Wonach suchen?" hint="optional">
+                <textarea className="sm-input" rows={2} placeholder="z. B. lustige Momente, Fachwissen, Streit …" value={opts.query} onChange={(e) => setOpts({ query: e.target.value })} />
+              </Row>
+              <Row label="Anzahl Clips" hint="Auto ≈ 1 je 2,5 Min"><Segmented options={['Auto', '5', '10', '15', '20', '30', '40', '50']} value={opts.count ?? 'Auto'} onChange={(count) => setOpts({ count })} /></Row>
+              <Row label="Cliplänge"><Segmented options={['Automatisch', '≤ 30 s', '30–60 s', '60–90 s']} value={opts.length} onChange={(length) => setOpts({ length })} /></Row>
+              <Row label="Workflow"><Segmented options={['Automatisch', 'Prüfen & Bearbeiten']} value={opts.workflow} onChange={(workflow) => setOpts({ workflow })} /></Row>
               <Row label="Auswahl-Engine">
                 <div style={{ display: 'grid', gap: 8 }}>
                   <EngineSwitch value={startEngine} onSelect={(e) => void setStartEngine(e)} />
@@ -232,9 +242,11 @@ function CreateSheet(): React.JSX.Element {
                   {startEngine !== 'legacy' && startMissing.length === 0 && <small style={{ color: 'var(--ok)' }}>{ENGINE_LABEL[startEngine]} gewählt · Voraussetzungen installiert</small>}
                 </div>
               </Row>
+              </section>
+              <section>
+                <h3 style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-2)', margin: '6px 0 2px' }}>Look</h3>
               <Row label="Format"><Segmented options={['9:16', '1:1', '16:9']} value={opts.format} onChange={(format) => setOpts({ format })} /></Row>
               <Row label="Bildausschnitt"><Segmented options={Object.values(FRAME_LABELS)} value={frame} onChange={setFrame} /></Row>
-              <Row label="Cliplänge"><Segmented options={['Automatisch', '≤ 30 s', '30–60 s', '60–90 s']} value={opts.length} onChange={(length) => setOpts({ length })} /></Row>
               <Row label="Untertitel">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
                   {allPresets.map((p) => <PresetTile key={p.id} preset={p} selected={opts.captions === 'preset' && (style.presetId ?? presetId) === p.id} onClick={() => { setPreset(p.id); setOpts({ captions: 'preset' }); void saveStyle({ ...style, presetId: p.id, style: {} }) }} />)}
@@ -248,12 +260,11 @@ function CreateSheet(): React.JSX.Element {
               {window.cutawan?.platform === 'darwin' && <Row label="Cold Opener" hint="starker Moment des Clips vorneweg, danach der Clip von Anfang; 0 = aus (Engine Mac)">
                 <Segmented options={['Aus', '1 s', '2 s', '3 s', '4 s', '5 s']} value={style.coldOpenSec ? `${style.coldOpenSec} s` : 'Aus'} onChange={(v) => void saveStyle({ ...style, coldOpenSec: v === 'Aus' ? 0 : Number(v.split(' ')[0]) })} />
               </Row>}
-              <Row label="Anzahl Clips" hint="Auto ≈ 1 je 2,5 Min"><Segmented options={['Auto', '5', '10', '15', '20', '30', '40', '50']} value={opts.count ?? 'Auto'} onChange={(count) => setOpts({ count })} /></Row>
+              </section>
+              </div>
+              <section>
+                <h3 style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-2)', margin: '6px 0 2px' }}>Feintuning</h3>
               <Row label="Sprechpausen entfernen"><Switch on={opts.removePauses} onChange={(removePauses) => setOpts({ removePauses })} label="Sprechpausen entfernen" /></Row>
-              <Row label="Workflow"><Segmented options={['Automatisch', 'Prüfen & Bearbeiten']} value={opts.workflow} onChange={(workflow) => setOpts({ workflow })} /></Row>
-              <Row label="Wonach suchen?" hint="optional">
-                <textarea className="sm-input" rows={2} placeholder="z. B. lustige Momente, Fachwissen, Streit …" value={opts.query} onChange={(e) => setOpts({ query: e.target.value })} />
-              </Row>
               <div style={{ borderTop: '1px solid var(--edge)', paddingTop: 12 }}>
                 <Pill pressed={adv} onClick={() => setAdv(!adv)}>Erweitert <ChevronDown size={14} style={{ transform: adv ? 'rotate(180deg)' : 'none' }} /></Pill>
                 {adv && (
@@ -267,6 +278,7 @@ function CreateSheet(): React.JSX.Element {
                   </div>
                 )}
               </div>
+              </section>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 24px', borderTop: '1px solid var(--edge)' }}>
               {imported && <small style={{ marginRight: 'auto', alignSelf: 'center' }} title="Grobe Schätzung; sie passt sich nach dem ersten kompletten Lauf an diesen Rechner an.">Dauer etwa {fmtEta(totalSec(estimateStages(imported.meta.durationSec, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined, startEngine === 'engine-mac' ? 1 : getSpeed(), startEngine, startProfile)))}</small>}

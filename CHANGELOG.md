@@ -6,6 +6,23 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.49.0] - 2026-11-20
+
+### Added
+
+- Clipliste: Clip-Inspector rechts – Klick auf eine Karte zeigt Vorschau im Export-Ausschnitt, Begründung, KI-Prüfung, deine Entscheidung (Freigeben/Prüfen/Verwerfen) und Lernbewertung getrennt; Doppelklick öffnet den Editor, „Review“ startet ab diesem Clip. Ersetzt das Score-Popup auf der Karte.
+- Befehlssuche mit ⌘K (Mac) bzw. Strg+K (Windows): Seiten, Projekte und Aktionen per Tastatur; auch als Lupe in der Seitenleiste.
+- Tastenkürzel-Übersicht mit „?“.
+- Seitenleiste mit Beschriftungen (Schalter unten in der Leiste).
+
+### Changed
+
+- Erstellen-Dialog breiter und in Gruppen: „Clip-Ziel“ (Videotyp, Suche, Anzahl, Länge, Workflow, Engine), „Look“ (Format, Bildausschnitt, Untertitel, Titel, Cold Opener) und „Feintuning“; „Clips finden“ bleibt unten fest.
+
+### Fixed
+
+- Editor: Rückgängig/Wiederholen auf dem Mac auch mit ⌘Z / ⌘⇧Z.
+
 ## [0.48.0] - 2026-11-20
 
 ### Changed

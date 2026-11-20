@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { RatingBar, setHoveredClip, useListRatingKeys } from './RatingBar'
-import { Pause, Play, Square, Trash2, Check, Loader2, AlertTriangle, LayoutGrid, List, Download, Wand2, ListChecks } from 'lucide-react'
-import { FILTER_LABEL, clipRevision, matchesFilter, qualityOf, type QualityStatus, type ReviewFilter, type ReviewView } from '@shared/review'
-import { QualityBadge, ReviewBadge } from './ReviewScreen'
+import { Pause, Play, Square, Trash2, Check, Loader2, AlertTriangle, LayoutGrid, List, Download, Wand2, ListChecks, Pencil, ShieldQuestion, X } from 'lucide-react'
+import { FILTER_LABEL, clipRevision, matchesFilter, qualityOf, type QualityStatus, type ReviewFilter, type ReviewStatus, type ReviewView } from '@shared/review'
+import type { ShortmeClip } from '@shared/shortme'
+import { QualityBadge, ReviewBadge, ReviewPlayer, saveMem } from './ReviewScreen'
 import { useStore } from './store'
 import { useProject } from './projectStore'
 import { CLIPS, PROJECTS, type Clip } from './data'
@@ -98,48 +99,86 @@ const fmtDur = (s: number): string => (s >= 3600 ? `${Math.floor(s / 3600)} h ${
 interface CardInfo { start: number; end: number; q: { status: QualityStatus; findings: string[]; stale: boolean }; view?: ReviewView }
 const mmss = (s: number): string => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
-function ClipCard({ c, selected, onSelect, onOpen, pct, info }: { c: Clip; selected: boolean; onSelect: () => void; onOpen: () => void; pct: number; info?: CardInfo }): React.JSX.Element {
+function ClipCard({ c, selected, focused, onSelect, onFocus, onOpen, pct, info }: { c: Clip; selected: boolean; focused: boolean; onSelect: () => void; onFocus: () => void; onOpen: () => void; pct: number; info?: CardInfo }): React.JSX.Element {
   const { base, reduced } = useSprings()
-  const deleteClip = useProject((s) => s.deleteClip)
   const [hover, setHover] = useState(false)
-  const [pop, setPop] = useState(false)
-  const [prov, setProv] = useState(false)
   return (
-    <>
-    {prov && c.v4RunId && <V4ProvenancePanel runId={c.v4RunId} clipId={c.id} label={c.v4Label ?? 'Engine 4'} onClose={() => setProv(false)} />}
-    <motion.div className="sm-card" style={{ position: 'relative', overflow: 'visible', contentVisibility: 'auto', containIntrinsicSize: '260px 520px', outline: selected ? '2px solid var(--accent)' : 'none', ...(c.pending ? { opacity: 0.45, pointerEvents: 'none', filter: 'grayscale(0.8)' } : {}) }} whileTap={reduced ? undefined : { scale: 0.97 }} transition={base} onHoverStart={() => { setHover(true); setHoveredClip(c.id) }} onHoverEnd={() => { setHover(false); setPop(false); setHoveredClip(null) }}>
-      <div onClick={onOpen} style={{ aspectRatio: '9/16', borderRadius: 'var(--r-card) var(--r-card) 0 0', overflow: 'hidden', position: 'relative' }}>
+    <motion.div className="sm-card" style={{ position: 'relative', overflow: 'visible', contentVisibility: 'auto', containIntrinsicSize: '260px 520px', outline: selected ? '2px solid var(--accent)' : focused ? '2px solid rgba(255,255,255,0.75)' : 'none', ...(c.pending ? { opacity: 0.45, pointerEvents: 'none', filter: 'grayscale(0.8)' } : {}) }} whileTap={reduced ? undefined : { scale: 0.97 }} transition={base} onHoverStart={() => { setHover(true); setHoveredClip(c.id) }} onHoverEnd={() => { setHover(false); setHoveredClip(null) }}>
+      {/* Klick = Inspector rechts, Doppelklick = Editor */}
+      <div onClick={onFocus} onDoubleClick={onOpen} title="Klick: Details rechts · Doppelklick: im Editor öffnen" style={{ aspectRatio: '9/16', borderRadius: 'var(--r-card) var(--r-card) 0 0', overflow: 'hidden', position: 'relative', cursor: 'pointer' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover', transform: hover && !reduced ? 'scale(1.08)' : 'scale(1)', transition: 'transform 2.4s linear' }} />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.3), transparent 30%, transparent 60%, rgba(0,0,0,0.7))' }} />
         {c.pending && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 15, background: 'rgba(0,0,0,0.35)' }}>{pct}&nbsp;%</div>}
       </div>
-      <button className="sm-score" style={{ position: 'absolute', top: 10, left: 10, border: 0 }} aria-label={`Score ${c.score}, Details`} onClick={(e) => { e.stopPropagation(); setPop(!pop) }}>{c.score}</button>
+      <button className="sm-score" style={{ position: 'absolute', top: 10, left: 10, border: 0 }} aria-label={`Score ${c.score}, Details`} onClick={(e) => { e.stopPropagation(); onFocus() }}>{c.score}</button>
       <button aria-label="Auswählen" aria-pressed={selected} onClick={onSelect} style={{ position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: '50%', border: '1.5px solid #fff', background: selected ? 'var(--accent)' : 'rgba(0,0,0,0.35)', display: 'grid', placeItems: 'center' }}>{selected && <Check size={14} />}</button>
-      <div style={{ padding: '10px 12px 12px', display: 'grid', gap: 4 }}>
+      <div onClick={onFocus} style={{ padding: '10px 12px 12px', display: 'grid', gap: 4, cursor: 'pointer' }}>
         <h3 style={{ fontSize: 14, lineHeight: 1.25 }}>{c.title}</h3>
-        <small>{c.duration} s{info ? ` · Quelle ${mmss(info.start)}–${mmss(info.end)}` : ''}{c.v4RunId ? ` · ${c.v4Label ?? 'Engine 4'}` : c.notes ? ' · Neue Engine' : ''} {c.faceRatio < 0.6 && <span title={`Gesichtsquote ${Math.round(c.faceRatio * 100)} %`} style={{ color: 'var(--warn)', marginLeft: 6 }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> wenig Gesicht</span>}</small>
+        <small>{c.duration} s{info ? ` · Quelle ${mmss(info.start)}–${mmss(info.end)}` : ''} {c.faceRatio < 0.6 && <span title={`Gesichtsquote ${Math.round(c.faceRatio * 100)} %`} style={{ color: 'var(--warn)', marginLeft: 6 }}><AlertTriangle size={12} style={{ verticalAlign: -2 }} /> wenig Gesicht</span>}</small>
         {info && !c.pending && <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><QualityBadge status={info.q.status} stale={info.q.stale} /><ReviewBadge view={info.view} /></div>}
-        {info?.q.findings[0] && <small style={{ color: 'var(--text-2)', fontSize: 11.5, lineHeight: 1.35 }} title={info.q.findings.join('\n')}>{info.q.findings[0]}</small>}
-        {/* eigene Zeile (vorher absolut über Titel/Dauer gelegt → überlappte) */}
-        <div style={{ display: 'flex', gap: 4, alignItems: 'flex-start', justifyContent: 'flex-end', marginTop: 2 }}><RatingBar clipId={c.id} chips="popover" /><button aria-label="Clip löschen" title="Clip löschen" onClick={(e) => { e.stopPropagation(); void deleteClip(c.id) }} style={{ width: 28, height: 28, borderRadius: 14, border: '1px solid var(--edge)', background: 'rgba(0,0,0,0.35)', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><Trash2 size={14} /></button></div>
       </div>
-      <AnimatePresence>
-        {pop && (
-          <motion.div initial={{ opacity: 0, scale: 0.92, filter: 'blur(6px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} exit={{ opacity: 0, scale: 0.92 }} transition={base} className="sm-glass" style={{ position: 'absolute', top: 40, left: 8, right: 8, bottom: 8, overflowY: 'auto', overflowWrap: 'anywhere', gridTemplateColumns: 'minmax(0, 1fr)', zIndex: 20, padding: 14, alignContent: 'start', transformOrigin: 'top left', background: 'rgba(24,24,32,0.95)', borderRadius: 16, display: 'grid', gap: 8 }}>
-            {c.criteria.map((k) => (
-              <div key={k.label} style={{ display: 'grid', gridTemplateColumns: '1fr 28px', gap: 8, alignItems: 'center', fontSize: 12 }}>
-                <div style={{ display: 'grid', gap: 3 }}>{k.label}<div className="sm-bar" style={{ height: 4 }}><i style={{ width: `${(k.value / 20) * 100}%` }} /></div></div>
-                <span style={{ textAlign: 'right' }}>{k.value}</span>
-              </div>
-            ))}
-            {c.notes?.map((n, i) => <small key={i} style={{ color: 'var(--text-2)' }}>{n}</small>)}
-            <small style={{ color: 'var(--text-1)' }}>{c.reason}</small>
-            {c.v4RunId && <Button variant="secondary" onClick={(e) => { e.stopPropagation(); setProv(true); setPop(false) }}>Herkunft ({c.v4Label ?? 'Engine 4'})</Button>}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
-    </>
+  )
+}
+
+/** Rechte Spalte der Clipliste: alles zu EINEM Clip – Vorschau, Begründung und die drei getrennten Angaben (KI-Prüfung, deine Entscheidung, Lernbewertung). */
+function ClipInspector({ c, info, real, hash, srcPath, onOpen, onReview }: { c: Clip; info?: CardInfo; real?: ShortmeClip; hash: string; srcPath: string | null; onOpen: () => void; onReview: () => void }): React.JSX.Element {
+  const setReview = useProject((s) => s.setReview)
+  const deleteClip = useProject((s) => s.deleteClip)
+  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [prov, setProv] = useState(false)
+  const status = info?.view?.status
+  const decide = (s: ReviewStatus): void => { void setReview(c.id, s) }
+  const label = (t: string): React.JSX.Element => <small style={{ color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 0.6, fontSize: 10.5 }}>{t}</small>
+  return (
+    <aside aria-label="Clip-Details" className="sm-glass" style={{ position: 'sticky', top: 12, maxHeight: 'calc(100vh - 90px)', overflowY: 'auto', overflowWrap: 'anywhere', padding: 16, display: 'grid', gap: 14, alignContent: 'start', background: 'rgba(24,24,32,0.72)' }}>
+      {prov && c.v4RunId && <V4ProvenancePanel runId={c.v4RunId} clipId={c.id} label={c.v4Label ?? 'Engine 4'} onClose={() => setProv(false)} />}
+      {real && hash ? <ReviewPlayer key={c.id} hash={hash} clip={real} srcPath={srcPath} playing={playingId === c.id} onPlaying={(p) => setPlayingId(p ? c.id : null)} height="min(40vh, 380px)" /> : <div style={{ justifySelf: 'center', width: 160, aspectRatio: '9/16', borderRadius: 14, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover' }} />}
+      <div style={{ display: 'grid', gap: 4 }}>
+        <h2 style={{ fontSize: 18, lineHeight: 1.25 }}>{c.title}</h2>
+        <small style={{ fontVariantNumeric: 'tabular-nums' }}>Score {c.score} · {c.duration} s{info ? ` · Quelle ${mmss(info.start)}–${mmss(info.end)}` : ''}{c.v4RunId ? ` · ${c.v4Label ?? 'Engine 4'}` : ''}</small>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button variant="primary" onClick={onOpen} style={{ flex: 1 }}><Pencil size={14} /> Im Editor</Button>
+        {real && <Button variant="secondary" onClick={onReview} title="Review ab diesem Clip"><ListChecks size={14} /> Review</Button>}
+      </div>
+      {real && (
+        <section style={{ display: 'grid', gap: 6 }}>
+          {label('Deine Entscheidung')}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <Button variant={status === 'freigegeben' ? 'primary' : 'secondary'} onClick={() => decide('freigegeben')}><Check size={13} /> Freigeben</Button>
+            <Button variant={status === 'zur_pruefung' ? 'primary' : 'secondary'} onClick={() => decide('zur_pruefung')}><ShieldQuestion size={13} /> Prüfen</Button>
+            <Button variant={status === 'verworfen' ? 'primary' : 'secondary'} onClick={() => decide('verworfen')} title="Verwerfen löscht nichts"><X size={13} /> Verwerfen</Button>
+          </div>
+        </section>
+      )}
+      {info && (
+        <section style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
+          {label('KI-Prüfung')}
+          <QualityBadge status={info.q.status} stale={info.q.stale} />
+          {info.q.findings.map((f, i) => <small key={i} style={{ color: 'var(--text-2)' }}>• {f}</small>)}
+        </section>
+      )}
+      <section style={{ display: 'grid', gap: 6 }}>
+        {label('Lernbewertung (nicht Freigabe)')}
+        <RatingBar clipId={c.id} chips="dropdown" />
+      </section>
+      <section style={{ display: 'grid', gap: 8 }}>
+        {label('Warum empfohlen')}
+        {c.reason && <small style={{ color: 'var(--text-1)' }}>{c.reason}</small>}
+        {c.criteria.map((k) => (
+          <div key={k.label} style={{ display: 'grid', gridTemplateColumns: '1fr 28px', gap: 8, alignItems: 'center', fontSize: 12 }}>
+            <div style={{ display: 'grid', gap: 3 }}>{k.label}<div className="sm-bar" style={{ height: 4 }}><i style={{ width: `${(k.value / 20) * 100}%` }} /></div></div>
+            <span style={{ textAlign: 'right' }}>{k.value}</span>
+          </div>
+        ))}
+        {c.notes?.map((n, i) => <small key={i} style={{ color: 'var(--text-2)' }}>{n}</small>)}
+      </section>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {c.v4RunId && <Button variant="secondary" onClick={() => setProv(true)}>Herkunft</Button>}
+        <Button variant="secondary" onClick={() => { if (window.confirm(`„${c.title}“ löschen?`)) void deleteClip(c.id) }} style={{ color: 'var(--warn)' }}><Trash2 size={14} /> Löschen</Button>
+      </div>
+    </aside>
   )
 }
 
@@ -171,6 +210,11 @@ export function ClipsScreen(): React.JSX.Element {
   const shown = sorted.filter((c) => { const i = infos.get(c.id); return !i || matchesFilter(i.view ?? { status: 'offen' }, i.q.status, filter) })
   const approved = (realClips ?? []).filter((rc) => review[rc.id]?.status === 'freigegeben').map((rc) => rc.id)
   const FILTERS: ReviewFilter[] = ['alle', 'offen', 'ki_pruefen', 'freigegeben', 'verworfen']
+  const hash = useProject((s) => s.clipsFile?.hash ?? '')
+  const srcPath = useProject((s) => s.clipsFile?.source?.path ?? null)
+  const [focusId, setFocusId] = useState<string | null>(null)
+  const focus = shown.find((c) => c.id === focusId) ?? shown.find((c) => !c.pending) ?? null
+  const reviewFrom = (id: string): void => { if (hash) saveMem(hash, { filter: 'alle', clipId: id }); go('review') }
   return (
     <div style={{ display: 'grid', gap: 18, paddingTop: 12, paddingBottom: 90 }}>
       <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}>
@@ -180,7 +224,7 @@ export function ClipsScreen(): React.JSX.Element {
           <EngineBar />
           <div style={{ display: 'flex', gap: 8 }}>
             {persons && persons.persons.length > 0 && <Pill onClick={openPersons}>Wer ist wer?{persons.needsReview ? ' ·  prüfen' : ''}</Pill>}
-            {realClips && realClips.length > 0 && <Button variant="primary" onClick={() => go('review')} title="Clips nacheinander ansehen und freigeben (Tasten 1/2/3, N/P)"><ListChecks size={15} /> Review starten</Button>}
+            {realClips && realClips.length > 0 && <Button variant="primary" onClick={() => (focus ? reviewFrom(focus.id) : go('review'))} title="Clips nacheinander ansehen und freigeben (Tasten 1/2/3, N/P)"><ListChecks size={15} /> Review starten</Button>}
             {approved.length > 0 && <Button variant="secondary" disabled={exportJob?.state === 'running'} onClick={() => void exportClips(approved, presetId, false)} title="Nur freigegebene Clips exportieren"><Download size={15} /> Freigegebene exportieren ({approved.length})</Button>}
             <Pill pressed={view === 'grid'} onClick={() => setView('grid')}><LayoutGrid size={14} /> Raster</Pill>
             <Pill pressed={view === 'list'} onClick={() => setView('list')}><List size={14} /> Liste</Pill>
@@ -192,14 +236,15 @@ export function ClipsScreen(): React.JSX.Element {
           {FILTERS.map((f) => { const n = sorted.filter((c) => { const i = infos.get(c.id); return !i || matchesFilter(i.view ?? { status: 'offen' }, i.q.status, f) }).length; return <Pill key={f} pressed={filter === f} onClick={() => setFilter(f)}>{FILTER_LABEL[f]} ({n})</Pill> })}
         </div>
       )}
+      <div style={{ display: 'grid', gridTemplateColumns: focus ? 'minmax(0, 1fr) clamp(300px, 26vw, 380px)' : 'minmax(0, 1fr)', gap: 18, alignItems: 'start' }}>
       {view === 'grid' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-          {shown.map((c) => <ClipCard key={c.id} c={c} selected={selected.includes(c.id)} onSelect={() => toggle(c.id)} onOpen={() => !c.pending && openClip(c.id)} pct={pct} info={infos.get(c.id)} />)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: 14 }}>
+          {shown.map((c) => <ClipCard key={c.id} c={c} selected={selected.includes(c.id)} focused={focus?.id === c.id} onSelect={() => toggle(c.id)} onFocus={() => setFocusId(c.id)} onOpen={() => !c.pending && openClip(c.id)} pct={pct} info={infos.get(c.id)} />)}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
           {shown.map((c) => (
-            <motion.div key={c.id} className="sm-card" whileTap={{ scale: 0.99 }} transition={base} onClick={() => !c.pending && openClip(c.id)} style={{ ...(c.pending ? { opacity: 0.45, pointerEvents: 'none' as const } : {}), display: 'grid', gridTemplateColumns: '24px 54px 1fr auto auto', alignItems: 'center', gap: 14, padding: 10 }}>
+            <motion.div key={c.id} className="sm-card" whileTap={{ scale: 0.99 }} transition={base} onClick={() => setFocusId(c.id)} onDoubleClick={() => !c.pending && openClip(c.id)} title="Klick: Details rechts · Doppelklick: im Editor öffnen" style={{ ...(c.pending ? { opacity: 0.45, pointerEvents: 'none' as const } : {}), outline: focus?.id === c.id ? '2px solid rgba(255,255,255,0.75)' : 'none', cursor: 'pointer', display: 'grid', gridTemplateColumns: '24px 54px 1fr auto auto', alignItems: 'center', gap: 14, padding: 10 }}>
               <input type="checkbox" checked={selected.includes(c.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(c.id)} aria-label="Auswählen" />
               <div style={{ width: 54, aspectRatio: '9/16', borderRadius: 8, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover' }} />
               <div style={{ display: 'grid', gap: 4 }}><h3>{c.title}</h3><small>{c.reason}</small>{infos.get(c.id) && !c.pending && <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><QualityBadge status={infos.get(c.id)!.q.status} stale={infos.get(c.id)!.q.stale} /><ReviewBadge view={infos.get(c.id)!.view} /><small style={{ color: 'var(--text-2)' }}>Quelle {mmss(infos.get(c.id)!.start)}–{mmss(infos.get(c.id)!.end)}</small></div>}</div>
@@ -209,6 +254,8 @@ export function ClipsScreen(): React.JSX.Element {
           ))}
         </div>
       )}
+      {focus && <ClipInspector key={focus.id} c={focus} info={infos.get(focus.id)} real={(realClips ?? []).find((r) => r.id === focus.id)} hash={hash} srcPath={srcPath} onOpen={() => openClip(focus.id)} onReview={() => reviewFrom(focus.id)} />}
+      </div>
       <AnimatePresence>
         {selected.length > 0 && (
           <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }} transition={base} className="sm-glass" style={{ position: 'fixed', bottom: 20, left: '50%', translate: '-50% 0', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderRadius: 999, zIndex: 30, background: 'rgba(24,24,32,0.9)' }}>
