@@ -175,7 +175,7 @@ export async function saveLive(minutes: number): Promise<{ hash: string; title: 
     const startWall = take[0].mtime - SEGMENT_SEC * 1000
     const msgs: ChatMsg[] = chat.messagesSince(startWall)
     tw.chat = await storeChat(meta.hash, msgs, meta.durationSec).catch(() => false)
-    if (tw.chat) await writeFileAtomic(chatFile(meta.hash), JSON.stringify({ comments: msgs.map((m) => ({ content_offset_seconds: m.t, message: { body: m.text } })) })).catch(() => undefined)
+    if (tw.chat) await writeFileAtomic(chatFile(meta.hash), JSON.stringify({ comments: msgs.map((m) => ({ content_offset_seconds: m.t, ...(m.user ? { user: m.user } : {}), message: { body: m.text } })) })).catch(() => undefined)
   }
   meta.twitch = tw
   meta.title = `${channel} – live ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} (letzte ${minutes} Min)`

@@ -2,7 +2,7 @@
 // (wss://irc-ws.chat.twitch.tv, Nutzername „justinfan…“, ohne Anmeldung). Es werden nur Zeit und Text im Arbeitsspeicher gehalten.
 import type { ChatMsg } from './chat'
 
-interface Stored { wall: number; text: string }
+interface Stored { wall: number; text: string; user?: string }
 
 /** Nachricht aus einer IRC-Zeile (PRIVMSG) lesen; alles andere → null. */
 export function parsePrivmsg(line: string): string | null {
@@ -36,7 +36,7 @@ export class ChatRecorder {
         for (const line of String(ev.data).split('\r\n')) {
           if (line.startsWith('PING')) { ws.send(line.replace('PING', 'PONG')); continue }
           const text = parsePrivmsg(line)
-          if (text !== null) this.add(text)
+          if (text !== null) this.add(text, line.match(/^(?:@\S+ )?:([^!\s]+)!/)?.[1])
         }
       }
       ws.onclose = () => { if (!this.stopped) this.retry = setTimeout(() => this.connect(), 4000) }
@@ -44,16 +44,16 @@ export class ChatRecorder {
     } catch { this.retry = setTimeout(() => this.connect(), 8000) }
   }
 
-  private add(text: string): void {
+  private add(text: string, user?: string): void {
     const now = Date.now()
-    this.msgs.push({ wall: now, text })
+    this.msgs.push({ wall: now, text, ...(user ? { user } : {}) })
     const cut = now - this.keepSec * 1000
     if (this.msgs.length > 2000 && this.msgs[0].wall < cut) this.msgs = this.msgs.filter((m) => m.wall >= cut)
   }
 
   /** Nachrichten ab einem Zeitpunkt (Wanduhr, ms), als Sekunden relativ dazu. */
   messagesSince(startWall: number): ChatMsg[] {
-    return this.msgs.filter((m) => m.wall >= startWall).map((m) => ({ t: (m.wall - startWall) / 1000, text: m.text }))
+    return this.msgs.filter((m) => m.wall >= startWall).map((m) => ({ t: (m.wall - startWall) / 1000, text: m.text, ...(m.user ? { user: m.user } : {}) }))
   }
 
   stop(): void {

@@ -25,7 +25,8 @@ import { frameDiffs, keyframeScan } from '../v2/visualIndex'
 import { withEmbedder } from '../v3/embedWorker'
 import { withAv, type AvSession } from '../v3/avWorker'
 import { decilesCovered, fuseSeeds, overlapRatio, rankFinal, requiredSpan, selectBalanced, type CoverageWindow, type CutCandidate, type Finalist, type Seed, type SeedGroup, type Span } from './core'
-import { audioLane, crossModalLane, expandQueries, QUERY_BANK, speechLane, speechUncertainWindows, visualLane, type LaneResult } from './lanes'
+import { learnedLaneWeights } from './laneWeights'
+import { audioLane, chatLane, crossModalLane, expandQueries, QUERY_BANK, speechLane, speechUncertainWindows, visualLane, type LaneResult } from './lanes'
 import { investigateGroup, type InvestigationResult } from './investigate'
 import { actionEdges, audioPhraseEdges, buildEdges, judgeCuts, makeVariants, type Variant } from './cut'
 import { clipFor, firstRepairable, judgeRendered, measuredCriteria, planRepair, previewDir, renderVariant, type JudgeRound, type Rendered } from './finalize'
@@ -108,7 +109,7 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
     const sentences = splitSentences(t.words)
     if (req.input.events?.length && sentences.length) for (const [i, m] of marksBySentence(sentences, req.input.events)) sentences[i].ev = m
     report('candidates', 0, 'Sprach-Lane (lokales LLM) …')
-    const speech = await stage('lane-speech', () => withLlm((url) => speechLane(url, sentences, { duration: dur, query: req.options.query, asrModel: t.model ?? 'parakeet', max: P.perLane * 4, tracer, signal, onProgress: (f) => report('candidates', 0.3 * f, 'Sprach-Lane …') })))
+    const speech = await stage('lane-speech', () => withLlm((url) => speechLane(url, sentences, { duration: dur, query: req.options.query, asrModel: t.model ?? 'parakeet', max: P.perLane * 4, tracer, signal, cacheDir: projectFile(project.hash, 'analysis/cache'), onProgress: (f) => report('candidates', 0.3 * f, 'Sprach-Lane …') })))
     report('candidates', 0.3, 'Ton-Lane …')
     const audio = await stage('lane-audio', () => audioLane(series, req.input.signals, { duration: dur, max: P.perLane * 4, tracer, hasAudio }))
     report('candidates', 0.35, 'Bildänderungen …')
@@ -123,7 +124,8 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
       for (const w of speech.coverage) if (w.source.startsWith('asr:') && unsure.some((u) => u.start < w.endSeconds && u.end > w.startSeconds)) Object.assign(w, { status: 'partial', reason: 'Gesang/Musik: ASR-Wörter unsicher' })
       for (const e of speech.evidence) if (unsure.some((u) => u.start < e.end && u.end > e.start)) Object.assign(e, { state: 'unknown', uncertainty: 'Gesang/Musik im Ton (YAMNet): Wortlaut unsicher' })
     }
-    const lanes: LaneResult[] = [speech, audio, visual, xm]
+    const chat = chatLane(req.input.chatSpikes, { duration: dur, max: P.perLane * 4 })
+    const lanes: LaneResult[] = [speech, audio, visual, xm, ...(chat ? [chat] : [])]
     // ganz ausgefallene Lane = Teilergebnis, nicht „fertig“ (gemessen: alle Textfenster HTTP 500 → vorher Status completed)
     if (Number(speech.diag.windows) > 0 && speech.diag.failedWindows === speech.diag.windows) fail('lane-speech', new Error(`alle ${speech.diag.windows} Textfenster fehlgeschlagen (LLM)`))
     const coverage: CoverageWindow[] = lanes.flatMap((l) => l.coverage)
@@ -132,10 +134,11 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
     const evidence = new Map<string, Evidence>()
     for (const l of lanes) for (const e of l.evidence) evidence.set(e.id, e)
     const seeds: Seed[] = lanes.flatMap((l) => l.seeds)
-    const groups = fuseSeeds(seeds)
+    const learned = await learnedLaneWeights().catch(() => ({ weights: {}, samples: 0 }))
+    const groups = fuseSeeds(seeds, 60, learned.weights)
     const selected = selectBalanced(groups, P.seedsMax, P.perLane, dur)
-    await save('candidates.json', { lanes: Object.fromEntries(lanes.map((l) => [l.lane, { seeds: l.seeds.length, diag: l.diag }])), seeds, groups: groups.map((g) => ({ ...g, seeds: g.seeds.map((s) => s.id) })), selected: selected.map((g) => g.id), budget: { seedsMax: P.seedsMax, perLane: P.perLane } })
-    report('candidates', 1, `${seeds.length} Seeds aus 4 Lanes → ${groups.length} Gruppen, ${selected.length} ausgewählt`)
+    await save('candidates.json', { lanes: Object.fromEntries(lanes.map((l) => [l.lane, { seeds: l.seeds.length, diag: l.diag }])), seeds, groups: groups.map((g) => ({ ...g, seeds: g.seeds.map((s) => s.id) })), selected: selected.map((g) => g.id), budget: { seedsMax: P.seedsMax, perLane: P.perLane }, laneWeights: learned })
+    report('candidates', 1, `${seeds.length} Seeds aus ${lanes.length} Lanes → ${groups.length} Gruppen, ${selected.length} ausgewählt`)
 
     // ---------------------------------------------------------------------------------------------------------------- S4–S6 mit MiniCPM-o (eine GPU-Phase)
     // ohne Tonspur keine Ton-Kanten (Pausen/Tonphrasen wären aus einer nicht vorhandenen Spur abgeleitet)
@@ -251,7 +254,7 @@ export async function selectV4(req: SelectionRequest, F: V4Flavor = ENGINE4_FLAV
         title: x.round.title || x.rendered.clip.title,
         score: Math.round((100 * fin.passes) / 10), criteria: { hook: st('hook'), payoff: st('payoff'), quotable: st('standalone'), standalone: st('standalone'), density: st('dead-air') },
         reason: `Geprüft am gerenderten Clip: ${j.decision} (${fin.passes}/10 Kriterien bestanden)`,
-        v2: { eventId: x.inv.graph.id, variantId: x.variant.id, kind: (x.group.seeds[0]?.hint as never) ?? 'sonstiges', summary: x.round.title || x.group.seeds[0]?.summary || '', verification: j.decision === 'acceptable' ? 'verified' : 'needs-review', evidenceIds: [...new Set(x.inv.graph.nodes.flatMap((n) => n.evidenceIds))].slice(0, 40), modalities: [...new Set(x.group.lanes.map((l) => (l === 'speech' ? 'text' : l === 'cross-modal' ? 'visual' : l)))] as Array<'text' | 'audio' | 'visual'>, eventNote: `${F.label} · Lanes ${x.group.lanes.join('+')} · ${x.inv.calls} Untersuchungen${x.inv.secondWindow ? ' (mit Folgefenster)' : ''} · Variante ${x.variant.style} · Ausgabe ${x.rendered.sha256.slice(0, 12)}`, uncertainty: weak.map((c) => `${c.id}: ${c.state} – ${c.reason}`).slice(0, 6) }
+        v2: { eventId: x.inv.graph.id, variantId: x.variant.id, kind: (x.group.seeds[0]?.hint as never) ?? 'sonstiges', summary: x.round.title || x.group.seeds[0]?.summary || '', verification: j.decision === 'acceptable' ? 'verified' : 'needs-review', evidenceIds: [...new Set(x.inv.graph.nodes.flatMap((n) => n.evidenceIds))].slice(0, 40), modalities: [...new Set(x.group.lanes.map((l) => (l === 'speech' ? 'text' : l === 'cross-modal' ? 'visual' : l)))], eventNote: `${F.label} · Lanes ${x.group.lanes.join('+')} · ${x.inv.calls} Untersuchungen${x.inv.secondWindow ? ' (mit Folgefenster)' : ''} · Variante ${x.variant.style} · Ausgabe ${x.rendered.sha256.slice(0, 12)}`, uncertainty: weak.map((c) => `${c.id}: ${c.state} – ${c.reason}`).slice(0, 6) }
       } as ShortmeClip
     })
     await save('selection.json', { wanted, finalists: finals.map((x) => ({ id: x.fin.id, decision: x.fin.decision, passes: x.fin.passes, output: x.rendered.path, sha256: x.rendered.sha256 })), chosen: clips.map((c, i) => ({ clipId: c.id, fromFinalist: ranked[i].id, output: finals.find((y) => y.fin.id === ranked[i].id)!.rendered.path })) })

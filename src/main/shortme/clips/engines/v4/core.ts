@@ -2,8 +2,8 @@
 // (Seed-Fusion, lane-balancierte Auswahl, Schnittgitter aus gemessenen Kanten, eine Reparatur je Runde) und jevcut-Prinzip (Grenzen nur als Kanten-IDs).
 // Zeiten sind Quellsekunden (aus Quell-PTS × Timebase der Probe, siehe probe.ts); jede Grenze, die nach außen geht, ist eine Kanten-ID.
 
-export type Lane = 'speech' | 'audio' | 'visual' | 'cross-modal'
-export const LANES: Lane[] = ['speech', 'audio', 'visual', 'cross-modal']
+export type Lane = 'speech' | 'audio' | 'visual' | 'cross-modal' | 'chat'
+export const LANES: Lane[] = ['speech', 'audio', 'visual', 'cross-modal', 'chat']
 export interface Span { start: number; end: number }
 
 export function validSpan(s: Span, duration: number): boolean {
@@ -24,8 +24,8 @@ function sameEvent(a: Seed, b: Seed): boolean {
   return Math.abs(a.anchor - b.anchor) <= 4 && overlapRatio(a.span, b.span) >= 0.55
 }
 
-/** Reciprocal-Rank-Fusion je Gruppe: je Lane zählt nur ihr bester Rang (viele Treffer einer Lane verdrängen keine andere Modalität). */
-export function fuseSeeds(seeds: Seed[], k = 60): SeedGroup[] {
+/** Reciprocal-Rank-Fusion je Gruppe: je Lane zählt nur ihr bester Rang (viele Treffer einer Lane verdrängen keine andere Modalität). `weights` = gelernte Spur-Gewichte (fehlend = 1). */
+export function fuseSeeds(seeds: Seed[], k = 60, weights: Partial<Record<Lane, number>> = {}): SeedGroup[] {
   if (!(k > 0) || !Number.isFinite(k)) throw new Error('k muss positiv sein')
   if (new Set(seeds.map((s) => s.id)).size !== seeds.length) throw new Error('Seed-IDs müssen eindeutig sein')
   const ordered = [...seeds].sort((a, b) => a.anchor - b.anchor || a.lane.localeCompare(b.lane) || a.id.localeCompare(b.id))
@@ -39,7 +39,7 @@ export function fuseSeeds(seeds: Seed[], k = 60): SeedGroup[] {
     const best = new Map<Lane, number>()
     for (const s of g) best.set(s.lane, Math.min(best.get(s.lane) ?? 1e9, s.laneRank))
     const span = { start: Math.min(...g.map((s) => s.span.start)), end: Math.max(...g.map((s) => s.span.end)) }
-    return { id: `g${i + 1}`, seeds: g, lanes: [...best.keys()].sort(), rrf: [...best.values()].reduce((n, r) => n + 1 / (k + r), 0), anchor: g.reduce((n, s) => n + s.anchor, 0) / g.length, span }
+    return { id: `g${i + 1}`, seeds: g, lanes: [...best.keys()].sort(), rrf: [...best].reduce((n, [l, r]) => n + (weights[l] ?? 1) / (k + r), 0), anchor: g.reduce((n, s) => n + s.anchor, 0) / g.length, span }
   }).sort((a, b) => b.rrf - a.rrf || a.anchor - b.anchor)
 }
 
@@ -59,7 +59,7 @@ export function selectBalanced(groups: SeedGroup[], limit: number, perLane: numb
 
 // ------------------------------------------------------------------------------------------------------------------------------- Abdeckung
 
-export interface CoverageWindow { lane: 'speech' | 'audio' | 'visual' | 'cross-modal'; startSeconds: number; endSeconds: number; status: 'inspected' | 'partial' | 'failed' | 'skipped'; reason?: string; source: string }
+export interface CoverageWindow { lane: Lane; startSeconds: number; endSeconds: number; status: 'inspected' | 'partial' | 'failed' | 'skipped'; reason?: string; source: string }
 
 /** Erreicht die geprüfte Abdeckung jedes Zehntel der Quelle? (gleiche Regel wie tools/v4_gate.py) */
 export function decilesCovered(windows: CoverageWindow[], duration: number): boolean[] {
@@ -306,4 +306,23 @@ export function parseModelJson(text: string): unknown {
   const raw = text.slice(i, j + 1)
   try { return JSON.parse(raw) } catch { /* bereinigen */ }
   return JSON.parse(raw.replace(/,\s*([}\]])/g, '$1').replace(/[“”„]/g, '"'))
+}
+
+export interface LaneSample { lanes: Lane[]; ok: boolean }
+/**
+ * Spur-Gewichte aus Review-Entscheidungen: Freigabequote je Spur (mit Vorwissen 10 Entscheidungen zur Gesamtquote geglättet) geteilt durch die Gesamtquote,
+ * begrenzt auf 0,7–1,3. Erst ab 30 Entscheidungen insgesamt und 8 je Spur – vorher bleibt alles 1 (kein Rauschen aus wenigen Klicks).
+ */
+export function laneWeights(samples: LaneSample[], minTotal = 30, minLane = 8): Partial<Record<Lane, number>> {
+  if (samples.length < minTotal) return {}
+  const overall = samples.filter((s) => s.ok).length / samples.length
+  if (overall <= 0 || overall >= 1) return {}
+  const out: Partial<Record<Lane, number>> = {}
+  for (const lane of LANES) {
+    const mine = samples.filter((s) => s.lanes.includes(lane))
+    if (mine.length < minLane) continue
+    const rate = (mine.filter((s) => s.ok).length + 10 * overall) / (mine.length + 10)
+    out[lane] = Math.round(Math.min(1.3, Math.max(0.7, rate / overall)) * 100) / 100
+  }
+  return out
 }

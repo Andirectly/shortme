@@ -12,24 +12,63 @@ export const CHAT_LAG_SEC = 15
 
 const LAUGH = /(?:^|[\s,.!?])(LUL+W?|KEKW?L?|OMEGALUL|ICANT|LMAO+|LOL+|XD+|AHAH\w*|HAHA\w*|PEPEL(?:AUGH)?|4Head|KEK|😂|🤣)(?=$|[\s,.!?])/i
 
-export interface ChatMsg { t: number; text: string }
+export interface ChatMsg { t: number; text: string; /** Schreiber (fehlt bei alten Mitschnitten) */ user?: string }
 
 /** Format von TwitchDownloaderCLI (JSON); eigener IRC-Mitschnitt schreibt dasselbe Minimalformat. */
 export function parseChatJson(json: unknown, offsetSec = 0): ChatMsg[] {
-  const comments = (json as { comments?: Array<{ content_offset_seconds?: number; message?: { body?: string; fragments?: Array<{ text?: string }> } }> })?.comments ?? []
+  const comments = (json as { comments?: Array<{ content_offset_seconds?: number; commenter?: { name?: string; _id?: string }; user?: string; message?: { body?: string; fragments?: Array<{ text?: string }> } }> })?.comments ?? []
   const out: ChatMsg[] = []
   for (const c of comments) {
     const t = Number(c.content_offset_seconds)
     if (!Number.isFinite(t)) continue
     const text = c.message?.body ?? (c.message?.fragments ?? []).map((f) => f.text ?? '').join('')
-    out.push({ t: t - offsetSec, text })
+    const user = c.commenter?.name ?? c.commenter?._id ?? c.user
+    out.push({ t: t - offsetSec, text, ...(user ? { user: String(user) } : {}) })
   }
   return out
 }
 
 export const isLaugh = (text: string): boolean => LAUGH.test(text)
 
-export interface ChatSignal { heat: HeatPoint[]; laughs: AudioEvent[]; messages: number }
+export interface ChatSpike { start: number; end: number; score: number; chatters: number; base: number; laugh: boolean }
+export interface ChatSignal { heat: HeatPoint[]; laughs: AudioEvent[]; messages: number; spikes?: ChatSpike[] }
+
+const SPIKE_BIN = 10
+/**
+ * Chat-Spitzen gegen eine gleitende Basis (Median der letzten 5 min) statt gegen das globale Maximum: ein ruhiger Abschnitt eines vollen Streams
+ * kann so trotzdem eine Spitze haben. Gezählt werden verschiedene Schreiber je 10 s (Mehrfachposts/Spam eines Nutzers zählen einmal;
+ * ohne Nutzernamen zählt derselbe Text höchstens 3×). Zeiten sind um CHAT_LAG_SEC zurückgerechnet.
+ */
+export function chatSpikes(msgs: ChatMsg[], durationSec: number, max = 40): ChatSpike[] {
+  const n = Math.ceil((durationSec + CHAT_LAG_SEC) / SPIKE_BIN) + 1
+  const keys = Array.from({ length: n }, () => new Set<string>())
+  const laughN = new Float64Array(n)
+  const seen = new Map<string, number>()
+  for (const m of msgs) {
+    const i = Math.floor(m.t / SPIKE_BIN)
+    if (i < 0 || i >= n) continue
+    let key = m.user?.toLowerCase()
+    if (!key) { const t = m.text.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 60); const k = `${i}|${t}`; const c = (seen.get(k) ?? 0) + 1; seen.set(k, c); if (c > 3) continue; key = `${t}#${c}` }
+    if (!keys[i].has(key) && isLaugh(m.text)) laughN[i]++
+    keys[i].add(key)
+  }
+  const cnt = keys.map((k) => k.size)
+  const W = Math.round(300 / SPIKE_BIN)
+  const cands: ChatSpike[] = []
+  for (let i = 1; i < n; i++) {
+    const win = cnt.slice(Math.max(0, i - W), i).sort((a, b) => a - b)
+    const base = Math.max(1, win[Math.floor(win.length / 2)] ?? 0)
+    const v = cnt[i]
+    // Spitze: lokales Maximum, ≥ 4 Schreiber und ≥ 1,8× Basis
+    if (v < 4 || v < 1.8 * base || v < (cnt[i - 1] ?? 0) || v < (cnt[i + 1] ?? 0)) continue
+    const start = i * SPIKE_BIN - CHAT_LAG_SEC
+    if (start + SPIKE_BIN <= 0 || start >= durationSec) continue
+    cands.push({ start: Math.max(0, start), end: Math.min(durationSec, start + SPIKE_BIN), score: Math.min(1, Math.log2(v / base) / 3), chatters: v, base, laugh: laughN[i] >= Math.max(3, 0.25 * v) })
+  }
+  const out: ChatSpike[] = []
+  for (const c of cands.sort((a, b) => b.score - a.score || b.chatters - a.chatters)) { if (out.length >= max) break; if (out.every((o) => Math.abs(o.start - c.start) > 20)) out.push(c) }
+  return out.sort((a, b) => a.start - b.start)
+}
 
 /** Nachrichten pro Sekunde (3-s-Glättung), um 15 s nach vorne verschoben, pro Video normalisiert (98. Perzentil = 1); Lach-Salven als Ereignisse. */
 export function chatSignal(msgs: ChatMsg[], durationSec: number): ChatSignal {
@@ -63,7 +102,7 @@ export function chatSignal(msgs: ChatMsg[], durationSec: number): ChatSignal {
       if (start >= 0 && start < n && !laughs.some((x) => Math.abs(x.start - start) < 10)) laughs.push({ kind: 'chat', start, end: start + 5, score: Math.min(1, l8[i] / 15) })
     }
   }
-  return { heat, laughs, messages: msgs.length }
+  return { heat, laughs, messages: msgs.length, spikes: chatSpikes(msgs, durationSec) }
 }
 
 const signalFile = (hash: string): string => projectFile(hash, 'chatsignal.json')
@@ -71,7 +110,11 @@ export const chatFile = (hash: string): string => projectFile(hash, 'chat.json')
 
 export async function saveChatSignal(hash: string, s: ChatSignal): Promise<void> { await writeFileAtomic(signalFile(hash), JSON.stringify(s)) }
 export async function loadChatSignal(hash: string): Promise<ChatSignal | null> {
-  try { const s = JSON.parse(await readFile(signalFile(hash), 'utf8')) as ChatSignal; return Array.isArray(s.heat) ? s : null } catch { return null }
+  let s: ChatSignal
+  try { s = JSON.parse(await readFile(signalFile(hash), 'utf8')) as ChatSignal; if (!Array.isArray(s.heat)) return null } catch { return null }
+  // ältere Projekte: Spitzen aus dem Rohchat nachrechnen
+  if (!s.spikes) { try { s.spikes = chatSpikes(parseChatJson(JSON.parse(await readFile(chatFile(hash), 'utf8'))), s.heat.length) } catch { s.spikes = [] } }
+  return s
 }
 
 /** Chat zum Projekt: Signal aus Nachrichten berechnen und ablegen (Rohchat bleibt als chat.json im Projekt). */

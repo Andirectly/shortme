@@ -16,6 +16,8 @@ export interface SelectInput {
   heat?: HeatPoint[] | null
   /** Twitch-Chat-Aktivität (nur wenn der Chat-Schalter an war), um 15 s zurückgerechnet. */
   chat?: HeatPoint[] | null
+  /** Chat-Spitzen gegen gleitende Basis (Engine 4 / Engine Mac: eigene Spur). */
+  chatSpikes?: import('../../twitch/chat').ChatSpike[] | null
   /** Gewichte aus dem Inhaltstyp-Profil (Standard 5 / 1 / 1). */
   weights?: { signal: number; heat: number; chat: number }
   /** Audio-Ereignisse (YAMNet/VAD) → Markierungen im Transkript für das LLM. */

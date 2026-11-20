@@ -31,7 +31,8 @@ import { withEmbedder } from '../v3/embedWorker'
 import { withMacAv } from '../v3/avWorker'
 import { MAC_AV_MODEL } from '../v3/revisions'
 import { decide, decilesCovered, firstRepairable, fuseSeeds, overlapRatio, selectBalanced, type CoverageWindow, type Criterion, type CutCandidate, type CutEdge, type Seed, type SeedGroup, type Span } from '../v4/core'
-import { audioLane, crossModalLane, expandQueries, QUERY_BANK, speechLane, visualLane, type LaneResult, type V4Query } from '../v4/lanes'
+import { learnedLaneWeights } from '../v4/laneWeights'
+import { audioLane, chatLane, crossModalLane, expandQueries, QUERY_BANK, speechLane, visualLane, type LaneResult, type V4Query } from '../v4/lanes'
 import { actionEdges, buildEdges } from '../v4/cut'
 import { clipFor, measuredCriteria, planRepair, renderVariant, type Rendered } from '../v4/finalize'
 import { probeSource, type SourceInfo } from '../v4/media'
@@ -147,7 +148,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     L.set('observe-packet', (wanted + 4) * 2); L.set('plan', wanted + 4); L.set('rank', 1); L.set('render', wanted * 40); L.set('audit-packet', wanted * 2); L.set('audit-judge', wanted)
     const speech: LaneResult = await phase('lane-speech', () => withQwen(async (s) => {
       bookLoad(s, 'Sprachsuche')
-      return L.run('speech-window', 'Sprachsuche', { model: MAC_QWEN.id, units: speechWins }, () => speechLane(s.url, sentences, { duration: dur, query: req.options.query, asrModel: t.model ?? 'parakeet', max: 24, tracer, signal, model: s.model, modelLabel: `${MAC_QWEN.repo} (mlx_vlm.server)`, timeoutMs: 120_000, onProgress: (f) => say('candidates', 0.3 * f, `Sprachsuche (Qwen3.5), Fenster ${Math.min(speechWins, Math.floor(f * speechWins) + 1)} von ${speechWins}`) }))
+      return L.run('speech-window', 'Sprachsuche', { model: MAC_QWEN.id, units: speechWins }, () => speechLane(s.url, sentences, { duration: dur, query: req.options.query, asrModel: t.model ?? 'parakeet', max: 24, tracer, signal, model: s.model, cacheDir: projectFile(project.hash, 'analysis/cache'), modelLabel: `${MAC_QWEN.repo} (mlx_vlm.server)`, timeoutMs: 120_000, onProgress: (f) => say('candidates', 0.3 * f, `Sprachsuche (Qwen3.5), Fenster ${Math.min(speechWins, Math.floor(f * speechWins) + 1)} von ${speechWins}`) }))
     })).catch((e) => { if (signal?.aborted) throw e; fail('lane-speech', e); return { lane: 'speech' as const, seeds: [], evidence: [], coverage: [], diag: { error: String(e).slice(0, 200) } } })
     if (Number(speech.diag.windows) > 0 && speech.diag.failedWindows === speech.diag.windows) fail('lane-speech', new Error(`alle ${speech.diag.windows} Textfenster fehlgeschlagen`))
 
@@ -158,14 +159,16 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
     const queries = expandQueries([...QUERY_BANK, ...typeQueries(req.contentType, t.words.slice(0, 3000).map((w) => w.w).join(' '))], req.options.query, speech.seeds)
     const xm = await phase('lane-cross-modal', () => withEmbedder(req.runId, (s) => L.run('embed-window', 'Bildsuche', { units: embedWins }, () => crossModalLane(s, { hash: project.hash, video, duration: dur, profile: P, queries, max: 24, tracer, signal, onProgress: (f, m) => say('candidates', 0.3 + 0.6 * f, m) }))))
       .catch((e) => { if (signal?.aborted) throw e; fail('lane-cross-modal', e); return null })
-    const lanes: LaneResult[] = [speech, audio, visual, ...(xm ? [xm] : [])]
+    const chat = chatLane(req.input.chatSpikes, { duration: dur, max: 24 })
+    const lanes: LaneResult[] = [speech, audio, visual, ...(xm ? [xm] : []), ...(chat ? [chat] : [])]
     const coverage: CoverageWindow[] = lanes.flatMap((l) => l.coverage)
     const unsure = apple ? musicWindows(apple, dur) : []
     const evidence = new Map<string, Evidence>()
     for (const l of lanes) for (const e of l.evidence) evidence.set(e.id, e)
     for (const e of speech.evidence) if (unsure.some((u) => u.start < e.end && u.end > e.start)) Object.assign(e, { state: 'unknown', uncertainty: 'Gesang/Musik im Ton (Apple SoundAnalysis): Wortlaut unsicher' })
     const seeds: Seed[] = lanes.flatMap((l) => l.seeds)
-    const groups = fuseSeeds(seeds)
+    const learned = await learnedLaneWeights().catch(() => ({ weights: {}, samples: 0 }))
+    const groups = fuseSeeds(seeds, 60, learned.weights)
     const limits = candidateLimits(wanted, groups.length)
     // Auswahl über die ganze Quelle (Lane-Quoten, zeitliche Streuung), nicht die ersten K einer chronologischen Liste
     const ranked = selectBalanced(groups, limits.totalMaximum, 3, dur)
@@ -495,7 +498,7 @@ export async function selectMac2(req: SelectionRequest): Promise<SelectionOutcom
         criteria: { hook: st(o, 'hook'), payoff: st(o, 'payoff'), quotable: st(o, 'standalone'), standalone: st(o, 'standalone'), density: st(o, 'dead-air') },
         reason: `${o.decision === 'acceptable' ? 'Freigegeben' : 'Prüfen'} – geprüft am fertigen Clip (${passes}/${o.criteria.length} bestanden, ${unknown} unklar). ${o.plan.summary}`.slice(0, 400),
         ...(o.plan.coldOpen ? { coldOpen: o.plan.coldOpen } : {}),
-        v2: { eventId: cand.id, variantId: `${o.plan.candidateId}-r${o.round}`, kind: o.plan.kind, summary: o.plan.summary, verification: o.decision === 'acceptable' ? 'verified' : 'needs-review', evidenceIds: [...new Set(cand.obs.flatMap((x) => x.segments.map((s) => s.id)))].slice(0, 40), modalities: [...new Set(cand.group.lanes.map((l) => (l === 'speech' ? 'text' : l === 'cross-modal' ? 'visual' : l)))] as Array<'text' | 'audio' | 'visual'>, eventNote: `Engine Mac · Suchwege ${cand.group.lanes.join('+')} · LFM3 ${cand.obs.length} Pakete · Rang ${rankIdx(o.plan.candidateId) + 1} · Ausgabe ${r.sha256.slice(0, 12)}${o.round ? ' · repariert' : ''}`, uncertainty: weak.map((c) => `${c.id}: ${c.state} – ${c.reason}`).slice(0, 6) }
+        v2: { eventId: cand.id, variantId: `${o.plan.candidateId}-r${o.round}`, kind: o.plan.kind, summary: o.plan.summary, verification: o.decision === 'acceptable' ? 'verified' : 'needs-review', evidenceIds: [...new Set(cand.obs.flatMap((x) => x.segments.map((s) => s.id)))].slice(0, 40), modalities: [...new Set(cand.group.lanes.map((l) => (l === 'speech' ? 'text' : l === 'cross-modal' ? 'visual' : l)))], eventNote: `Engine Mac · Suchwege ${cand.group.lanes.join('+')} · LFM3 ${cand.obs.length} Pakete · Rang ${rankIdx(o.plan.candidateId) + 1} · Ausgabe ${r.sha256.slice(0, 12)}${o.round ? ' · repariert' : ''}`, uncertainty: weak.map((c) => `${c.id}: ${c.state} – ${c.reason}`).slice(0, 6) }
       } as ShortmeClip
     })
     await save('selection.json', { wanted, winners: winners.map((w) => w.candidateId), results: outs.map((o) => ({ candidate: o.plan.candidateId, title: o.titleFinal, decision: o.decision, round: o.round, output: o.rendered?.path ?? null, sha256: o.rendered?.sha256 ?? null, history: o.history, coldOpen: o.plan.coldOpen })), chosen: clips.map((c) => c.id) })

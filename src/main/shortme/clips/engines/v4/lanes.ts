@@ -4,6 +4,10 @@
 //   visual      : Bildänderungen der Keyframes (Szenen/Aktion) – ohne Transkript
 //   cross-modal : Qwen3-VL-Embedding-2B, positive/negative Anfragen, Erweiterung um Anfragen aus den Sprach-Seeds
 import { join } from 'node:path'
+import { mkdir, readFile } from 'node:fs/promises'
+import { writeFileAtomic } from '../../../atomic'
+import { fnv1a } from '../../../../../shared/review'
+import { V2_PROMPT_REVISION } from '../v2/revisions'
 import type { Sentence } from '../../sentences'
 import type { Evidence, RawProposal } from '../../../../../shared/engineV2'
 import type { Signals } from '../../signals'
@@ -16,6 +20,7 @@ import { peaksOf, scoreQueries } from '../v3/search'
 import type { EmbedSession } from '../v3/embedWorker'
 import { V3_EMBED_MODEL } from '../v3/revisions'
 import type { CoverageWindow, Lane, Seed } from './core'
+import type { ChatSpike } from '../../../../twitch/chat'
 import type { Tracer } from './trace'
 import type { V4Profile } from './revisions'
 
@@ -34,26 +39,53 @@ export function evenWindows(lane: CoverageWindow['lane'], duration: number, step
 }
 
 // -------------------------------------------------------------------------------------------------------------------------------- speech
-export async function speechLane(url: string, sentences: Sentence[], o: { duration: number; query?: string; asrModel: string; max: number; tracer: Tracer; signal?: AbortSignal; onProgress?: (f: number) => void; /** Engine Mac 2: Qwen3.5 über mlx_vlm.server */ model?: string; modelLabel?: string; timeoutMs?: number }): Promise<LaneResult> {
+export async function speechLane(url: string, sentences: Sentence[], o: { duration: number; query?: string; asrModel: string; max: number; tracer: Tracer; signal?: AbortSignal; onProgress?: (f: number) => void; /** Engine Mac 2: Qwen3.5 über mlx_vlm.server */ model?: string; modelLabel?: string; timeoutMs?: number; /** Projektordner für den Zwischenspeicher (gleiches Transkript + Modell + Anfrage → keine neuen LLM-Aufrufe) */ cacheDir?: string }): Promise<LaneResult> {
   // ASR lief über die ganze Tonspur (vorhandenes Transkript); Textsuche läuft in Fenstern darüber
   const coverage = evenWindows('speech', o.duration, 60, `asr:${o.asrModel}`)
   if (!sentences.length) return { lane: 'speech', seeds: [], evidence: [], coverage: coverage.map((w) => ({ ...w, reason: 'keine erkannte Sprache' })), diag: { sentences: 0, note: 'kein Transkript-Text: Lane liefert nichts (keine erfundenen Worte)' } }
   const t0 = Date.now()
-  let r: Awaited<ReturnType<typeof textSearch>>
+  let r: Awaited<ReturnType<typeof textSearch>> | null = null
+  const key = fnv1a(JSON.stringify([V2_PROMPT_REVISION, 'v4-speech', o.model ?? 'llama', o.query ?? '', sentences.map((s) => [s.start, s.end, s.text, s.ev ?? null])]))
+  const cacheFile = o.cacheDir ? join(o.cacheDir, `speech-${key}.json`) : null
+  if (cacheFile) { try { r = JSON.parse(await readFile(cacheFile, 'utf8')); o.onProgress?.(1) } catch { r = null } }
+  if (r) {
+    await o.tracer.record({ role: 'speech_lane', modelRevision: o.modelLabel ?? 'qwen3-14b', realInputModalities: ['speech'], actualMediaWindowIds: [], success: true, validatedOutput: true, wallClockMs: Date.now() - t0, status: `cache ${key}`, input: { sentences: sentences.length }, output: { proposals: r.proposals.length } })
+    return speechResult(r, sentences, coverage, o.max, true)
+  }
   try {
     r = await textSearch(url, sentences, { query: o.query, modelRev: 'v4-speech', signal: o.signal, onProgress: o.onProgress, model: o.model, timeoutMs: o.timeoutMs })
   } catch (e) {
     await o.tracer.record({ role: 'speech_lane', modelRevision: o.modelLabel ?? 'qwen3-14b', realInputModalities: ['speech'], actualMediaWindowIds: [], success: false, validatedOutput: false, wallClockMs: Date.now() - t0, status: 'failed', error: String(e).slice(0, 300), input: { sentences: sentences.length } })
     throw e
   }
+  // nur vollständige Antworten merken (ausgefallene Fenster sollen beim nächsten Lauf neu versucht werden)
+  if (cacheFile && r.failedWindows === 0) { await mkdir(o.cacheDir!, { recursive: true }); await writeFileAtomic(cacheFile, JSON.stringify(r)).catch(() => undefined) }
+  await o.tracer.record({ role: 'speech_lane', modelRevision: o.modelLabel ?? 'qwen3-14b-q4_k_m (llama-server)', promptRevision: 'v2/text-search', realInputModalities: ['speech'], actualMediaWindowIds: textWindows(sentences).map((w) => `S${w.from}-S${w.to}`), success: true, validatedOutput: true, wallClockMs: Date.now() - t0, status: `windows ${r.windows}, failed ${r.failedWindows}`, input: { sentences: sentences.length, windows: r.windows }, output: { proposals: r.proposals.length } })
+  return speechResult(r, sentences, coverage, o.max, false)
+}
+
+function speechResult(r: Awaited<ReturnType<typeof textSearch>>, sentences: Sentence[], coverage: CoverageWindow[], max: number, cached: boolean): LaneResult {
   const wins = textWindows(sentences)
   for (const w of wins) {
     const a = sentences[w.from].start, b = sentences[w.to].end
     const failed = r.failedRanges.some(([x, y]) => x < b && y > a)
     coverage.push({ lane: 'speech', startSeconds: a, endSeconds: b, status: failed ? 'failed' : 'inspected', source: 'speech-lane-llm', ...(failed ? { reason: 'Modellantwort ungültig' } : {}) })
   }
-  await o.tracer.record({ role: 'speech_lane', modelRevision: o.modelLabel ?? 'qwen3-14b-q4_k_m (llama-server)', promptRevision: 'v2/text-search', realInputModalities: ['speech'], actualMediaWindowIds: wins.map((w) => `S${w.from}-S${w.to}`), success: true, validatedOutput: true, wallClockMs: Date.now() - t0, status: `windows ${r.windows}, failed ${r.failedWindows}`, input: { sentences: sentences.length, windows: r.windows }, output: { proposals: r.proposals.length } })
-  return { lane: 'speech', seeds: toSeeds('speech', r.proposals, o.max), evidence: r.evidence, coverage, diag: { windows: r.windows, failedWindows: r.failedWindows, proposals: r.proposals.length } }
+  return { lane: 'speech', seeds: toSeeds('speech', r.proposals, max), evidence: r.evidence, coverage, diag: { windows: r.windows, failedWindows: r.failedWindows, proposals: r.proposals.length, ...(cached ? { cached: true } : {}) } }
+}
+
+// -------------------------------------------------------------------------------------------------------------------------------- chat
+/** Twitch-Chat-Spitzen (nur wenn der Chat-Schalter an war): Reaktion des Publikums, Zeit schon um die Chat-Verzögerung zurückgerechnet. */
+export function chatLane(spikes: ChatSpike[] | null | undefined, o: { duration: number; max: number }): LaneResult | null {
+  if (!spikes) return null
+  const evidence: Evidence[] = [], props: RawProposal[] = []
+  spikes.forEach((s, n) => {
+    const id = `ch${n + 1}`
+    evidence.push({ id, modality: 'chat', state: 'signal-only', source: 'twitch-chat', start: s.start, end: s.end, observation: `${s.chatters} verschiedene Schreiber in 10 s (Basis ${s.base})${s.laugh ? ', viel Lachen' : ''}`, uncertainty: 'Chat-Aktivität, Inhalt nicht geprüft' })
+    // Ereignis liegt vor der Reaktion: mehr Kontext davor als danach
+    props.push({ start: Math.max(0, s.start - 25), end: Math.min(o.duration, s.end + 10), anchor: s.start + 3, source: 'chat', kind: s.laugh ? 'witz' : 'reaktion', summary: s.laugh ? 'Chat lacht' : 'Chat reagiert stark', strength: s.score, evidenceIds: [id] })
+  })
+  return { lane: 'chat', seeds: toSeeds('chat', props, o.max), evidence, coverage: evenWindows('chat', o.duration, 60, 'twitch-chat'), diag: { spikes: spikes.length } }
 }
 
 // -------------------------------------------------------------------------------------------------------------------------------- audio
