@@ -6,6 +6,19 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.45.0] - 2026-11-20
+
+### Changed
+
+- Verarbeitung: eine einzige Restzeit für den ganzen Lauf (keine zweite, widersprüchliche Zahl mehr); Überschrift „Clips werden erstellt …“ statt „Transkribiert …“; die veraltete Zeile „Rendern – folgt …“ ist weg.
+- Engine Mac: Kamerawechsel werden parallel zur Clipsuche erkannt, es werden nur noch so viele Kandidaten angesehen wie geplant, kürzere Beobachtungen.
+- Mac: nur noch Engine Mac wählbar, der Engine-Umschalter erscheint nur, wenn es mehr als eine Engine gibt.
+
+### Fixed
+
+- Projekt öffnen zeigte manchmal die Clips des zuletzt bearbeiteten Projekts.
+- Falsche Warnung „Für Engine Mac fehlt …“ (die Modellprüfung nutzte immer Engine 2).
+
 ## [0.44.0] - 2026-11-19
 
 ### Changed

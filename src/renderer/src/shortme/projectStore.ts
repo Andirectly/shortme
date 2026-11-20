@@ -144,7 +144,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     // noch in Arbeit (z. B. nach Tab-Wechsel wieder geöffnet): Fortschritt zeigen statt nichts zu tun
     const live = (await a.jobs()).filter((j) => j.hash === hash && ['running', 'queued', 'paused'].includes(j.state)).pop()
     if (live) { set({ job: live, currentTitle: p?.title ?? live.title }); return 'processing' }
-    await get().loadResults(hash)
+    await get().loadResults(hash, true) // ausdrücklich geöffnet: immer laden (die Sperre gilt nur für späte Hintergrund-Ergebnisse)
     set({ currentTitle: p?.title ?? null })
     if (get().clipsFile?.clips.length) return 'clips'
     // noch nicht analysiert (z. B. gesicherte Live-Aufnahme): wie nach einem Import den Start-Dialog zeigen

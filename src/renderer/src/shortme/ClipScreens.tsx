@@ -259,7 +259,7 @@ function RealProcessing(): React.JSX.Element {
   const eta = engineEta !== null && ROW_OF_STAGE(job.stage) === 2 ? engineEta + est.layout : eta0
   const message = engineEta !== null ? job.message.replace(ETA_RE, '') : job.message
   const busy = job.state === 'running' || job.state === 'queued'
-  const title = job.state === 'done' ? 'Clips gefunden' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : 'Transkribiert …'
+  const title = job.state === 'done' ? 'Clips gefunden' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : job.state === 'queued' ? 'Wartet …' : 'Clips werden erstellt …'
   return (
     <div className="sm-wrap" style={{ display: 'grid', gap: 24, paddingTop: 12 }}>
       <div><h1>{title}</h1>{engineSel && <div style={{ margin: '6px 0' }}><EngineBadge engine={engineSel} prefix="Engine: " /></div>}<small>{job.title} · {message}</small>{busy && total < 1 && <small style={{ display: 'block', marginTop: 4 }}>Noch {fmtEta(eta)}{total < 0.05 ? ' (Schätzung)' : ''}</small>}</div>
