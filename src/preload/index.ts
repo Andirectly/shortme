@@ -28,6 +28,7 @@ import type { StyleDefaults } from '@shared/edits'
 import type { ContentType, FrameChoice, KindProfile } from '@shared/videoKind'
 import type { StreamLayout } from '@shared/streamLayout'
 import type { ChannelCheck, LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twitch'
+import type { ReviewStatus, ReviewView } from '@shared/review'
 import type { PlatformId, UploadOverview } from '@shared/upload'
 import type { WbOverview, WbProject, WbStatus, WorkItem } from '@shared/workbench'
 import type { LearnSettings } from '@shared/learn'
@@ -208,6 +209,8 @@ const api = {
     chooseExportDir: (): Promise<{ dir: string; isDefault: boolean }> => ipcRenderer.invoke('shortme:exportDirChoose'),
     resetExportDir: (): Promise<{ dir: string; isDefault: boolean }> => ipcRenderer.invoke('shortme:exportDirReset'),
     editsLoad: (hash: string, clipId: string): Promise<EditLog> => ipcRenderer.invoke('shortme:editsLoad', hash, clipId),
+    reviewState: (hash: string, clipIds: string[]): Promise<Record<string, ReviewView>> => ipcRenderer.invoke('shortme:reviewState', hash, clipIds),
+    reviewSet: (hash: string, clipId: string, status: ReviewStatus): Promise<ReviewView> => ipcRenderer.invoke('shortme:reviewSet', hash, clipId, status),
     editsSave: (hash: string, log: EditLog): Promise<void> => ipcRenderer.invoke('shortme:editsSave', hash, log),
     applyAll: (hash: string, clipIds: string[], patch: CaptionPatch): Promise<void> => ipcRenderer.invoke('shortme:applyAll', hash, clipIds, patch),
     openLogs: (): Promise<string> => ipcRenderer.invoke('shortme:openLogs'),

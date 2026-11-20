@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { CLIPS } from './data'
 import { allClips } from './clipData'
 
-export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'live' | 'upload' | 'workbench' | 'learn' | 'settings' | 'processing' | 'clips' | 'editor' | 'compare'
+export type Screen = 'start' | 'projects' | 'studio' | 'models' | 'testlab' | 'live' | 'upload' | 'workbench' | 'learn' | 'settings' | 'processing' | 'clips' | 'editor' | 'compare' | 'review' | 'tools'
 export type NavId = 'start' | 'projects' | 'studio' | 'live' | 'upload' | 'workbench' | 'learn' | 'models' | 'testlab' | 'settings'
 
 interface Op { label: string; undo: () => void; redo: () => void }
@@ -24,6 +24,9 @@ interface State {
   undoStack: Op[]
   redoStack: Op[]
   go: (s: Screen) => void
+  /** Woher der Editor geöffnet wurde (Zurück führt dorthin). */
+  returnTo: 'clips' | 'review'
+  setReturnTo: (r: 'clips' | 'review') => void
   setOpts: (o: Partial<State['opts']>) => void
   toggleSelect: (id: string) => void
   setView: (v: 'grid' | 'list') => void
@@ -66,6 +69,8 @@ export const useStore = create<State>((set, get) => ({
   undoStack: [],
   redoStack: [],
   go: (screen) => set({ screen }),
+  returnTo: 'clips',
+  setReturnTo: (returnTo) => set({ returnTo }),
   setOpts: (o) => { const opts = { ...get().opts, ...o }; save('sm.opts', opts); set({ opts }) },
   toggleSelect: (id) => set((s) => ({ selected: s.selected.includes(id) ? s.selected.filter((x) => x !== id) : [...s.selected, id] })),
   setView: (view) => { save('sm.view', view); set({ view }) },

@@ -1,7 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LogReportButton } from './LogReport'
 import { motion } from 'motion/react'
-import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, SkipBack, SkipForward, Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ReviewBadge } from './ReviewScreen'
 import { baseState, canRedo, canUndo, editWindow, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
 import type { PreviewPlan, ShortmeShot } from '@shared/shortme'
 import { groupWords } from '@shared/captions'
@@ -86,6 +87,22 @@ export function EditorScreen(): React.JSX.Element {
   }, [log, loaded, persist])
 
   const commit = useCallback((op: Op): void => setLog((l) => push(l, op)), [])
+  // ---------- Review-Kontext: Rücksprung, Nachbar-Clips ----------
+  const returnTo = useStore((s) => s.returnTo)
+  const openClipById = useStore((s) => s.openClip)
+  const review = useProject((s) => s.review)
+  const order = useMemo(() => (allReal ?? []).filter((c) => !c.pending).sort((a, b) => b.score - a.score).map((c) => c.id), [allReal])
+  /** Nachbar in Listenreihenfolge; `openOnly` = nur noch nicht entschiedene (offen / zur Prüfung). */
+  const neighbour = (dir: 1 | -1, openOnly: boolean): string | null => {
+    const i = order.indexOf(clipId)
+    for (let k = 1; k < order.length; k++) {
+      const id = order[(i + dir * k + order.length * k) % order.length]
+      const st = review[id]?.status ?? 'offen'
+      if (id !== clipId && (!openOnly || st === 'offen' || st === 'zur_pruefung')) return id
+    }
+    return null
+  }
+  const switchTo = async (id: string | null): Promise<void> => { if (!id) return; videoRef.current?.pause(); await persist(logRef.current); if (hash) void useProject.getState().loadReview(hash); openClipById(id) }
   const undo = useCallback((): void => setLog((l) => undoLog(l)), [])
   const redo = useCallback((): void => setLog((l) => redoLog(l)), [])
 
@@ -353,8 +370,11 @@ export function EditorScreen(): React.JSX.Element {
   return (
     <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) 262px', gap: 12, height: 'calc(100vh - 60px)', paddingTop: 4 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Button variant="ghost" aria-label="Zurück" onClick={() => { videoRef.current?.pause(); go('clips') }}><ArrowLeft size={18} /></Button>
+        <Button variant="ghost" aria-label={returnTo === 'review' ? 'Zurück zum Review' : 'Zurück'} title={returnTo === 'review' ? 'Zurück zum Review' : 'Zurück zur Clipliste'} onClick={() => { videoRef.current?.pause(); void persist(logRef.current).then(() => { if (hash) void useProject.getState().loadReview(hash) }); go(returnTo === 'review' ? 'review' : 'clips') }}><ArrowLeft size={18} /></Button>
+        <Button variant="ghost" aria-label="Vorheriger Clip" title="Vorheriger Clip" disabled={!neighbour(-1, false)} onClick={() => void switchTo(neighbour(-1, false))}><ChevronLeft size={16} /></Button>
+        <Button variant="ghost" aria-label="Nächster offener Clip" title="Nächster offener Clip (noch nicht entschieden)" disabled={!neighbour(1, true)} onClick={() => void switchTo(neighbour(1, true))}><ChevronRight size={16} /></Button>
         <h2 style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{clip.title}</h2>
+        {review[clipId] && <ReviewBadge view={review[clipId]} />}
         {/* Schnellwahl: Ausschnitt der aktuellen Einstellung (Szene) sofort ändern – derselbe Operationsweg wie im Reiter „Bildausschnitt“ */}
         <Segmented options={Object.keys(LAYOUTS).filter((k) => k !== 'Facecam + Gameplay' || canStream)} value={shotNow ? LAYOUT_LABEL[shotNow.shot.layout] : ''} onChange={(n) => commit({ t: 'layout', at: absT, layout: LAYOUTS[n] })} />
         <RatingBar clipId={clipId} chips="dropdown" />

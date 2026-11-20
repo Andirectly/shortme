@@ -21,7 +21,7 @@ const NAV: { id: NavId; label: string; icon: ReactNode }[] = [
   { id: 'settings', label: 'Einstellungen', icon: <Settings size={20} /> }
 ]
 
-const parentNav = (s: Screen): NavId => (s === 'processing' || s === 'clips' || s === 'editor' || s === 'compare' ? 'projects' : (s as NavId))
+const parentNav = (s: Screen): NavId => (s === 'processing' || s === 'clips' || s === 'editor' || s === 'compare' || s === 'review' ? 'projects' : (s as NavId))
 
 export function Shell({ children }: { children: ReactNode }): React.JSX.Element {
   const screen = useStore((s) => s.screen)

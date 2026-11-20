@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Level, Ratings } from '@shared/learn'
 import { useStore } from './store'
+import type { ReviewStatus, ReviewView } from '@shared/review'
 import { FRAME_LABELS, frameFromLabel, type ContentType } from '@shared/videoKind'
 import type { StyleDefaults } from '@shared/edits'
 import { isV3Profile, type AnalysisState, type SelectionEngineId, type V3Profile } from '@shared/engine'
@@ -71,6 +72,10 @@ interface ProjectState {
   /** „Wer ist wer?“ */
   persons: ShortmePersons | null
   feedback: Ratings
+  /** Nutzerfreigabe je Clip (Review), getrennt von KI-Prüfung und Lernbewertung. */
+  review: Record<string, ReviewView>
+  loadReview: (hash: string) => Promise<void>
+  setReview: (clipId: string, status: ReviewStatus) => Promise<void>
   /** Globaler Standardstil der Untertitel (Stil-Studio). */
   style: StyleDefaults
   loadStyle: () => Promise<void>
@@ -110,6 +115,21 @@ export const useProject = create<ProjectState>((set, get) => ({
   exportJob: null,
   persons: null,
   feedback: {},
+  review: {},
+  loadReview: async (hash) => {
+    const a = api(); const f = get().clipsFile
+    if (!a || !f || f.hash !== hash) return
+    const r = await a.reviewState(hash, f.clips.map((c) => c.id))
+    if (get().clipsFile?.hash === hash) set({ review: r })
+  },
+  setReview: async (clipId, status) => {
+    const a = api(); const hash = get().clipsFile?.hash
+    if (!a || !hash) return
+    // sofort sichtbar (schnelles 1/2/3), danach mit dem gespeicherten Stand abgleichen
+    const prev = get().review[clipId]
+    set((s) => ({ review: { ...s.review, [clipId]: { ...(prev ?? { revision: '', changedSinceApproval: false }), status, updatedAt: new Date().toISOString() } } }))
+    try { const v = await a.reviewSet(hash, clipId, status); if (get().clipsFile?.hash === hash) set((s) => ({ review: { ...s.review, [clipId]: v } })) } catch { set((s) => ({ review: { ...s.review, ...(prev ? { [clipId]: prev } : {}) } })) }
+  },
   style: {},
   loadStyle: async () => { const a = api(); if (a) set({ style: await a.styleGet() }) },
   saveStyle: async (st) => { const a = api(); if (a) set({ style: await a.styleSet(st) }) },
@@ -210,7 +230,7 @@ export const useProject = create<ProjectState>((set, get) => ({
     const clipsFile = await a.clips(hash)
     // Verspätete Antwort eines anderen Projekts/Laufs darf die aktuelle Ansicht nicht überschreiben
     const cur = get().clipsFile
-    if (clipsFile && (!cur || cur.hash === hash)) set({ clipsFile })
+    if (clipsFile && (!cur || cur.hash === hash)) { set({ clipsFile }); void get().loadReview(hash) }
     // Transkript nachladen, falls es fehlt (Clips erscheinen schon während der Analyse); sonst zeigte der Editor Beispieltext
     if (clipsFile && !get().transcript) { const transcript = await a.transcript(hash); if (get().clipsFile?.hash === hash) set({ transcript }) }
   },
@@ -220,7 +240,8 @@ export const useProject = create<ProjectState>((set, get) => ({
     const [clipsFile, transcript, persons, feedback] = await Promise.all([a.clips(hash), a.transcript(hash), a.persons(hash), a.feedback(hash)])
     const cur = get().clipsFile
     if (!force && cur && cur.hash !== hash && get().engine.hash !== hash) return
-    set({ clipsFile, transcript, persons, feedback })
+    set({ clipsFile, transcript, persons, feedback, review: {} })
+    void get().loadReview(hash)
   },
   init: () => {
     const a = api()

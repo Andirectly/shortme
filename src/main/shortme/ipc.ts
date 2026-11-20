@@ -41,6 +41,8 @@ import { deleteClip } from './corrections'
 import { logCorrection } from './corrections'
 import { logDir } from '../log'
 import { exportLogReport } from '../logExport'
+import { reviewState, setReview } from './review'
+import { REVIEW_STATUSES, type ReviewStatus } from '../../shared/review'
 import { applyCaptionToAll, loadEdits, saveEdits } from './edits'
 import { baseState, effectiveClip, stateOf, type CaptionPatch, type EditLog } from '../../shared/edits'
 import { allPresets, deleteUserPreset, effectivePreset, saveUserPreset } from './presets'
@@ -249,6 +251,9 @@ export function registerShortmeIpc(): void {
     return allPresets()
   })
   ipcMain.handle('shortme:editsLoad', (_e, hash: string, clipId: string) => loadEdits(hash, clipId))
+  // Review: Nutzerfreigabe je Clip (getrennt von KI-Prüfung und Lernbewertung)
+  ipcMain.handle('shortme:reviewState', (_e, hash: string, clipIds: string[]) => reviewState(String(hash), Array.isArray(clipIds) ? clipIds.map(String) : []))
+  ipcMain.handle('shortme:reviewSet', (_e, hash: string, clipId: string, status: ReviewStatus) => { if (!REVIEW_STATUSES.includes(status)) throw new Error('Unbekannter Review-Status'); return setReview(String(hash), String(clipId), status) })
   ipcMain.handle('shortme:editsSave', (_e, hash: string, log: EditLog) => saveEdits(hash, log))
   ipcMain.handle('shortme:played', (_e, hash: string, clipId: string, sec: number) => (sec >= 1 ? logCorrection(hash, clipId, [{ kind: 'played', sec: Math.round(sec) }]) : undefined))
   ipcMain.handle('shortme:deleteClip', (_e, hash: string, clipId: string) => deleteClip(hash, clipId))
