@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { ShortmeClip } from '../src/shared/shortme'
-import { LEGACY_RUN_ID, newRunId, v2ClipId, type RunInfo } from '../src/shared/engine'
+import { LEGACY_RUN_ID, enginesFor, newRunId, v2ClipId, type RunInfo } from '../src/shared/engine'
 
 const HASH = 'abc123'
 let data = ''
@@ -77,6 +77,8 @@ describe('Läufe: Legacy bleibt unverändert, V2 liegt im eigenen Ordner', () =>
 })
 
 describe('Umschalter-Entscheidung im Main-Prozess', () => {
+  const HAS_V2 = enginesFor(process.platform).includes('multimodal-v2')
+  const LOCAL = HAS_V2 ? 'multimodal-v2' : enginesFor(process.platform)[0] // Windows: Engine 1–4, Mac: nur Engine Mac (Grenze im Hauptprozess)
   const deps = (over: Partial<import('../src/main/shortme/clips/engines/control').SwitchDeps> = {}): import('../src/main/shortme/clips/engines/control').SwitchDeps & { started: number } => {
     const d = { started: 0, hasActiveJob: () => false, missingModels: async () => [], revisions: () => ['r1'], start: () => { d.started++; return 'job1' }, ...over }
     return d as never
@@ -96,13 +98,13 @@ describe('Umschalter-Entscheidung im Main-Prozess', () => {
     const { switchEngine } = await import('../src/main/shortme/clips/engines/control')
     write('transcript.json', { version: 1, hash: HASH, model: 'parakeet-v3', durationSec: 600, words: [], segments: [], speech: [], diarized: false, speakers: 1 })
     const d = deps()
-    const [a, b] = await Promise.all([switchEngine({ hash: HASH, engine: 'multimodal-v2' }, d), switchEngine({ hash: HASH, engine: 'multimodal-v2' }, d)])
+    const [a, b] = await Promise.all([switchEngine({ hash: HASH, engine: LOCAL }, d), switchEngine({ hash: HASH, engine: LOCAL }, d)])
     expect([a.kind, b.kind].sort()).toEqual(['busy', 'started'])
     expect(d.started).toBe(1)
-    const busy = await switchEngine({ hash: HASH, engine: 'multimodal-v2' }, deps({ hasActiveJob: () => true }))
+    const busy = await switchEngine({ hash: HASH, engine: LOCAL }, deps({ hasActiveJob: () => true }))
     expect(busy.kind).toBe('busy')
   })
-  it('vorhandenes V2-Ergebnis wird beim Wechsel angezeigt, auch bei geänderten Optionen; ohne Ergebnis startet ein Lauf', async () => {
+  it.skipIf(!HAS_V2)('vorhandenes V2-Ergebnis wird beim Wechsel angezeigt, auch bei geänderten Optionen; ohne Ergebnis startet ein Lauf', async () => {
     const { switchEngine, analysisFingerprint } = await import('../src/main/shortme/clips/engines/control')
     const { registerRun, clipsPathFor } = await import('../src/main/shortme/clips/engines/state')
     const { loadTranscript } = await import('../src/main/shortme/transcription')
