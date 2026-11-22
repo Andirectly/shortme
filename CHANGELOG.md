@@ -8,6 +8,12 @@ still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
 ## [0.51.0] - 2026-11-20
 
+### Added
+
+- Engine 4 und Engine Mac: Twitch-Chat als eigene Suchspur (nur mit Chat-Schalter) – zählt verschiedene Schreiber gegen die letzten 5 Minuten, Spam eines Nutzers zählt einmal.
+- Engine 4 und Engine Mac lernen aus deinen Review-Entscheidungen, welche Suchspuren gute Clips finden (wirkt ab 30 Freigaben/Verwürfen, vorsichtig begrenzt).
+- Engine 4 und Engine Mac: die Sprachsuche wird gespeichert – ein erneuter Lauf mit gleichem Transkript überspringt sie.
+
 ### Changed
 
 - Clipliste: Klick auf einen Clip öffnet ein Fenster in der Mitte (Hintergrund abgedunkelt) mit großem Video im Export-Ausschnitt und den Details; ← → wechselt den Clip, Esc oder ✕ schließt. Die Karten nutzen wieder die volle Breite.
