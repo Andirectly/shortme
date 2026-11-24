@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +53,9 @@ jobs:
       - name: Validate packaged Mac before publishing
         if: runner.os == 'macOS'
         run: |
+          npm run build:mac-worker
           npm run package:dir -- --arm64
+          test -x release/mac-arm64/Shortme.app/Contents/Resources/bin/shortme-mac-worker
           bash scripts/check-mac-package.sh
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -72,7 +74,6 @@ jobs:
             release/*.dmg
             release/*.zip
             release/*.exe
-            release/*.AppImage
             release/*.blockmap
             release/latest*.yml
 

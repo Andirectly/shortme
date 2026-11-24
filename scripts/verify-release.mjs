@@ -12,9 +12,8 @@ const directory = process.argv[2] ?? 'release'
 const uploaded = process.argv[3] ? JSON.parse(await readFile(process.argv[3], 'utf8')).assets : null
 if (process.argv[3] && !Array.isArray(uploaded)) throw new Error('Missing uploaded asset metadata')
 const expected = {
-  'latest-mac.yml': [`Cutawan-${version}-arm64.dmg`, `Cutawan-${version}-arm64-mac.zip`],
-  'latest.yml': [`Cutawan-Setup-${version}.exe`],
-  'latest-linux.yml': [`Cutawan-${version}.AppImage`]
+  'latest-mac.yml': [`Shortme-${version}-arm64.dmg`, `Shortme-${version}-arm64.zip`],
+  'latest.yml': [`Shortme-Setup-${version}.exe`]
 }
 for (const [manifest, required] of Object.entries(expected)) {
   const data = yaml.load(await readFile(join(directory, manifest), 'utf8'))
