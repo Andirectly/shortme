@@ -28,6 +28,7 @@ import type { StyleDefaults } from '@shared/edits'
 import type { ContentType, FrameChoice, KindProfile } from '@shared/videoKind'
 import type { StreamLayout } from '@shared/streamLayout'
 import type { ChannelCheck, LiveSave, LiveStatus, TwitchInfo, TwitchStatus } from '@shared/twitch'
+import type { RemoteOverview, RemoteSettings } from '@shared/remote/ui'
 import type { ReviewStatus, ReviewView } from '@shared/review'
 import type { PlatformId, UploadOverview } from '@shared/upload'
 import type { WbOverview, WbProject, WbStatus, WorkItem } from '@shared/workbench'
@@ -302,6 +303,21 @@ const api = {
       liveStatus: (): Promise<LiveStatus> => ipcRenderer.invoke('twitch:liveStatus'),
       liveSaves: (): Promise<LiveSave[]> => ipcRenderer.invoke('twitch:liveSaves'),
       liveSave: (minutes: number): Promise<{ hash: string; title: string; seconds: number }> => ipcRenderer.invoke('twitch:liveSave', minutes)
+    },
+    remote: {
+      overview: (): Promise<RemoteOverview> => ipcRenderer.invoke('remote:overview'),
+      setSettings: (patch: Partial<RemoteSettings>): Promise<RemoteOverview> => ipcRenderer.invoke('remote:setSettings', patch),
+      createInvite: (): Promise<RemoteOverview> => ipcRenderer.invoke('remote:createInvite'),
+      acceptInvite: (code: string): Promise<RemoteOverview> => ipcRenderer.invoke('remote:acceptInvite', code),
+      cancelInvite: (): Promise<RemoteOverview> => ipcRenderer.invoke('remote:cancelInvite'),
+      confirmPairing: (deviceId: string, accept: boolean): Promise<RemoteOverview> => ipcRenderer.invoke('remote:confirmPairing', deviceId, accept),
+      unpair: (deviceId: string): Promise<RemoteOverview> => ipcRenderer.invoke('remote:unpair', deviceId),
+      testConnection: (deviceId: string): Promise<{ ok: boolean; ms: number | null; route: string }> => ipcRenderer.invoke('remote:testConnection', deviceId),
+      onOverview: (cb: (o: RemoteOverview) => void): (() => void) => {
+        const l = (_e: Electron.IpcRendererEvent, o: RemoteOverview): void => cb(o)
+        ipcRenderer.on('remote:overview', l)
+        return () => ipcRenderer.removeListener('remote:overview', l)
+      }
     },
     fontCss: (family: string): Promise<string> => ipcRenderer.invoke('shortme:fontCss', family),
     deleteProject: (hash: string): Promise<boolean> => ipcRenderer.invoke('shortme:deleteProject', hash),

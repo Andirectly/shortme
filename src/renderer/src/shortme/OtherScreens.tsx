@@ -8,6 +8,7 @@ import { allVersions, NotesBlocks, notesOf } from './PatchNotes'
 import { fmtBytes, requiredIds, useEngines } from './engines'
 import { useStore } from './store'
 import { Button, Pill, Row, Segmented, Switch } from './ui'
+import { RemoteDevices } from './RemoteDevices'
 
 /** Gespeicherte Facecam-Layouts pro Twitch-Kanal ansehen und löschen. */
 function ChannelLayouts(): React.JSX.Element | null {
@@ -231,6 +232,7 @@ const SECTIONS = [
   { id: 'general', label: 'Allgemein' },
   { id: 'models', label: 'Modelle & Updates' },
   { id: 'accounts', label: 'Konten & Dienste' },
+  { id: 'remote', label: 'Remote-Geräte' },
   { id: 'system', label: 'System' }
 ] as const
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -293,6 +295,7 @@ export function SettingsScreen(): React.JSX.Element {
               </Card>
             </>
           )}
+          {section === 'remote' && <Card title="Remote-Geräte"><RemoteDevices /></Card>}
           {section === 'system' && (
             <>
               <Card title="Systemcheck">

@@ -92,7 +92,9 @@
       "out/main/chunks/**",
       "node_modules/@remotion/compositor-win32-x64-msvc/**",
       "node_modules/sherpa-onnx-darwin-arm64/**",
-      "node_modules/@remotion/compositor-darwin-arm64/**"
+      "node_modules/@remotion/compositor-darwin-arm64/**",
+      "node_modules/sodium-native/**",
+      "node_modules/udx-native/**"
     ],
     "extraResources": [
       {

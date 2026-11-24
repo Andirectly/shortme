@@ -17,6 +17,20 @@ import { resolveUserDataPath } from './userData'
 import { stopInference } from './inference/client'
 import { validatePackage } from './packageValidation'
 import { killOrphanYtDlp, stopAllYtDlp, ytDlpPath } from './pipeline/ytdlp'
+import { initRemote, keepRunningInBackground, startedHidden } from './remote/service'
+
+// Eine Instanz je Benutzer: zwei Instanzen würden mit derselben Geräteidentität konkurrieren.
+const singleInstance = process.env.CUTAWAN_PACKAGE_CHECK || process.env.CUTAWAN_SMOKE ? true : app.requestSingleInstanceLock()
+if (!singleInstance) app.quit()
+
+function showMainWindow(): void {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) return createWindow()
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+app.on('second-instance', () => { if (app.isReady()) showMainWindow() })
 
 app.setName('Cutawan')
 app.setPath('userData', resolveUserDataPath(app.getPath('appData'), process.env.CUTAWAN_USER_DATA))
@@ -304,6 +318,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  if (!singleInstance) return
   killOrphanYtDlp(ytDlpPath())
   if (process.env.CUTAWAN_PACKAGE_CHECK) {
     void validatePackage(process.env.CUTAWAN_PACKAGE_CHECK).then(() => app.quit()).catch(error => {
@@ -342,7 +357,8 @@ app.whenReady().then(() => {
   runSelfTestIfRequested()
   void runExportSelfTestIfRequested()
   applyAppIcon()
-  createWindow()
+  void initRemote({ showWindow: showMainWindow }).catch((e) => console.error('[remote] init:', e))
+  if (!startedHidden()) createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -350,7 +366,8 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // Remote-Worker läuft im Hintergrund weiter (Tray/Menüleiste); beendet wird er dort mit „Worker beenden“.
+  if (process.platform !== 'darwin' && !keepRunningInBackground()) app.quit()
 })
 
 app.on('before-quit', () => { stopInference(); stopAllYtDlp(); void shutdownTwitch() })
