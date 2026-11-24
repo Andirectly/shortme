@@ -6,6 +6,18 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.52.0] - 2026-11-24
+
+### Added
+
+- Remote-Geräte (Einstellungen › Remote-Geräte): Mac und Windows-PC einmal mit Code und Prüfcode koppeln; danach verbinden sie sich direkt (Peer-to-Peer, Ende-zu-Ende verschlüsselt, ohne Server) und nach jedem Neustart automatisch wieder. Verbindung testen, Entkoppeln.
+- Auf anderem Rechner verarbeiten: beim Link unter „Verarbeiten auf“ einen gekoppelten Rechner wählen. Er lädt das Video selbst, transkribiert, analysiert und rendert mit seinen Modellen; das fertige Projekt (voll bearbeitbar) und die geprüften Clips kommen automatisch zurück – auch nachdem dieser Rechner offline war.
+- Remote-Worker im Hintergrund: Fenster schließen beendet ihn nicht (Symbol in Taskleiste/Menüleiste, „Worker beenden“); optional Start nach der Anmeldung.
+
+### Changed
+
+- Shortme läuft nur noch einmal gleichzeitig; ein zweiter Start holt das vorhandene Fenster nach vorn.
+
 ## [0.51.0] - 2026-11-20
 
 ### Added

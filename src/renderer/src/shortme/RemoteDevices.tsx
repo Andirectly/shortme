@@ -1,7 +1,61 @@
 /** Einstellungen › Remote-Geräte (Plan V4, Kap. 4/8.3): Worker an/aus, Autostart, Koppeln mit Code + Fingerabdruck, Test, Entkoppeln. */
 import { useEffect, useState } from 'react'
-import type { RemoteOverview, RemoteDeviceView } from '@shared/remote/ui'
+import type { RemoteOverview, RemoteDeviceView, RemoteJobView } from '@shared/remote/ui'
 import { Button, Row, Switch } from './ui'
+
+/** Gemeinsamer Remote-Zustand für alle Komponenten (ein Abo auf die Übersicht). */
+export function useRemoteOverview(): RemoteOverview | null {
+  const api = typeof window !== 'undefined' ? window.cutawan?.shortme?.remote : undefined
+  const [o, setO] = useState<RemoteOverview | null>(null)
+  useEffect(() => {
+    if (!api) return
+    void api.overview().then(setO).catch(() => undefined)
+    return api.onOverview(setO)
+  }, [api])
+  return o
+}
+
+const COMPUTE: Record<string, string> = {
+  sending: 'Wird gesendet …', accepted: 'Angenommen', 'acquiring-source': 'Lädt Video', preparing: 'Vorbereitung', transcribing: 'Transkription',
+  analyzing: 'KI-Analyse', selecting: 'Clipauswahl', rendering: 'Rendert Clips', auditing: 'Prüfung', publishing: 'Überträgt', completed: 'Fertig',
+  failed: 'Fehlgeschlagen', cancelled: 'Abgebrochen', rejected: 'Abgelehnt', 'resource-paused': 'Pausiert', 'needs-input': 'Eingabe nötig'
+}
+
+/** Liste der an andere Rechner gesendeten Aufträge: Rechenstand, Verbindung und Übertragung getrennt. */
+export function RemoteJobsList({ overview, onOpen }: { overview: RemoteOverview; onOpen?: (hash: string) => void }): React.JSX.Element | null {
+  const api = window.cutawan?.shortme?.remote
+  if (!overview.jobs.length || !api) return null
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {overview.jobs.map((j: RemoteJobView) => {
+        const running = !['completed', 'failed', 'cancelled', 'rejected'].includes(j.compute)
+        const transfer = j.bundleTotal ? `Projekt ${j.projectImported ? 'übertragen' : `${j.bundleDone}/${j.bundleTotal} Dateien`}` : ''
+        const clips = j.clipsReady || j.clipsPending ? `${j.clipsReady} fertig${j.clipsPending ? ` · ${j.clipsPending} in Übertragung` : ''}` : ''
+        return (
+          <div key={j.jobId} className="sm-card" style={{ padding: 12, display: 'grid', gap: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+              <strong style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.title}</strong>
+              <small style={{ whiteSpace: 'nowrap' }}>{j.deviceName} · {j.workerOnline ? 'online' : 'nicht erreichbar'}</small>
+            </div>
+            <small>
+              {COMPUTE[j.compute] ?? j.compute}{j.stage && running ? ` – ${j.stage}` : ''}{j.progress !== undefined && running ? ` (${Math.round(j.progress * 100)} %)` : ''}
+              {!j.workerOnline && running && j.lastUpdateAt ? ` · zuletzt bekannt ${new Date(j.lastUpdateAt).toLocaleTimeString('de-DE', { timeStyle: 'short' })}` : ''}
+            </small>
+            {running && j.progress !== undefined && <div className="sm-bar"><i style={{ width: `${Math.max(j.progress, 0.03) * 100}%` }} /></div>}
+            {(transfer || clips) && <small>{[transfer, clips && `Clips: ${clips}`].filter(Boolean).join(' · ')}</small>}
+            {j.rejected && <small role="alert" style={{ color: 'var(--warn)' }}>{j.rejected.message}</small>}
+            {j.compute === 'failed' && j.stage && <small role="alert" style={{ color: 'var(--warn)' }}>{j.stage}</small>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {j.projectImported && j.projectHash && onOpen && <Button variant="primary" onClick={() => onOpen(j.projectHash!)}>Projekt öffnen</Button>}
+              {running && j.workerOnline && <Button variant="secondary" onClick={() => void api.cancelJob(j.jobId)}>Abbrechen</Button>}
+              {!running && <Button variant="ghost" onClick={() => void api.forgetJob(j.jobId)}>Aus Liste entfernen</Button>}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 const CONNECTIVITY: Record<RemoteDeviceView['connectivity'], string> = {
   'online-direct': 'Online · Direkt (P2P)',
@@ -16,19 +70,14 @@ const when = (iso?: string): string => (iso ? new Date(iso).toLocaleString('de-D
 
 export function RemoteDevices(): React.JSX.Element {
   const api = typeof window !== 'undefined' ? window.cutawan?.shortme?.remote : undefined
-  const [o, setO] = useState<RemoteOverview | null>(null)
+  const o = useRemoteOverview()
   const [code, setCode] = useState('')
   const [msg, setMsg] = useState('')
   const [tests, setTests] = useState<Record<string, string>>({})
-  useEffect(() => {
-    if (!api) return
-    void api.overview().then(setO)
-    return api.onOverview(setO)
-  }, [api])
   if (!api || !o) return <></>
   const run = async (fn: () => Promise<RemoteOverview | void>): Promise<void> => {
     setMsg('')
-    try { const r = await fn(); if (r) setO(r) } catch (e) { setMsg(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e)) }
+    try { await fn() } catch (e) { setMsg(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e)) }
   }
   const s = o.settings
   const set = (patch: Partial<typeof s>): void => void run(() => api.setSettings(patch))
@@ -104,6 +153,15 @@ export function RemoteDevices(): React.JSX.Element {
         </>
       )}
       {msg && <small role="status">{msg}</small>}
+      {(o.jobs.length > 0 || o.workerJobs.length > 0) && <h3 style={{ fontSize: 15, marginTop: 12 }}>Aufträge</h3>}
+      <RemoteJobsList overview={o} />
+      {o.workerJobs.map((w) => (
+        <div key={w.jobId} className="sm-card" style={{ padding: 12, display: 'grid', gap: 4 }}>
+          <strong style={{ fontSize: 14 }}>Für {w.from}: {w.url}</strong>
+          <small>{COMPUTE[w.compute] ?? w.compute}{w.stage ? ` – ${w.stage}` : ''} · {w.published} Clips freigegeben{w.pendingOffers ? ` · ${w.pendingOffers} Dateien warten auf Abholung` : ''}</small>
+          {w.error && <small role="alert" style={{ color: 'var(--warn)' }}>{w.error}</small>}
+        </div>
+      ))}
     </div>
   )
 }

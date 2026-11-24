@@ -26,6 +26,7 @@ const MAX_MESSAGE_BYTES = 256 * 1024
 export const HEARTBEAT_MS = 5_000
 export const OFFLINE_AFTER_MS = 15_000
 export const INVITE_TTL_MS = 5 * 60_000
+export const NUDGE_MS = 60_000
 
 type Kind = 'direct' | 'relay' | 'unknown'
 export interface PeerStatus { deviceId: string; connectivity: ConnectivityState; route: Kind; lastSeenAt?: string }
@@ -43,6 +44,7 @@ export interface HostOptions {
   relay?: Buffer | null
   heartbeatMs?: number
   offlineAfterMs?: number
+  nudgeMs?: number
 }
 
 const hex = (b: Uint8Array): string => Buffer.from(b).toString('hex')
@@ -223,7 +225,8 @@ export class RemoteHost extends EventEmitter {
     const mux = Protomux.from(socket)
     const old = this.links.get(remote)
     if (old?.socket === socket) return
-    old?.socket.destroy() // neuere Verbindung ersetzt alte
+    // Hyperswarm entfernt doppelte Verbindungen selbst und meldet die verbleibende – die neueste gilt
+    old?.socket.destroy()
     const sessions: Link['sessions'] = new Map()
     const ctl = mux.createChannel({ protocol: CONTROL_PROTOCOL })
     const dch = mux.createChannel({ protocol: DRIVE_PROTOCOL })
@@ -312,13 +315,32 @@ export class RemoteHost extends EventEmitter {
     })
   }
 
+  private nudged = new Map<string, number>()
+
   private tick(): void {
-    for (const id of this.links.keys()) void this.ping(id)
-    for (const id of this.lastSeen.keys()) if (!this.isOnline(id) && this.statusSent.get(id) !== 'offline') this.emitStatus(id)
+    const offlineAfter = this.o.offlineAfterMs ?? OFFLINE_AFTER_MS
+    for (const [id, link] of this.links) {
+      // Halbtote Verbindung (offen, aber keine Antworten): schließen, damit Hyperswarm neu verbindet
+      if (Date.now() - (this.lastSeen.get(id) ?? 0) > offlineAfter * 2) { link.socket.destroy(); continue }
+      void this.ping(id)
+    }
+    for (const id of this.lastSeen.keys()) if (this.statusSent.get(id) !== this.status(id).connectivity) this.emitStatus(id)
+    // Hyperswarm verlängert die Pause zwischen Verbindungsversuchen bis in den Minutenbereich; nach Schlaf/Netzwechsel
+    // soll ein gekoppeltes Gerät aber schnell zurückkommen → alle NUDGE_MS die Versuche neu anstoßen (leavePeer/joinPeer setzt den Backoff zurück).
+    const now = Date.now()
+    for (const p of this.o.trust.list()) {
+      if (!this.o.trust.isTrusted(p.deviceId) || this.links.has(p.deviceId)) continue
+      if (now - (this.nudged.get(p.deviceId) ?? 0) < (this.o.nudgeMs ?? NUDGE_MS)) continue
+      if ((this.swarm?.connecting ?? 0) > 0) continue // laufenden Verbindungsaufbau nicht abbrechen
+      this.nudged.set(p.deviceId, now)
+      const key = Buffer.from(p.deviceId, 'hex')
+      this.swarm?.leavePeer(key)
+      this.swarm?.joinPeer(key)
+    }
   }
 
   private statusSent = new Map<string, ConnectivityState>()
-  private isOnline(id: string): boolean { return this.links.has(id) && Date.now() - (this.lastSeen.get(id) ?? 0) < (this.o.offlineAfterMs ?? OFFLINE_AFTER_MS) }
+  isOnline(id: string): boolean { return this.links.has(id) && Date.now() - (this.lastSeen.get(id) ?? 0) < (this.o.offlineAfterMs ?? OFFLINE_AFTER_MS) }
 
   status(deviceId: string): PeerStatus {
     const p = this.o.trust.get(deviceId)

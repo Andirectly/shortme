@@ -102,6 +102,23 @@ export interface ProxyRangeRequest {
   profile: 'scrub-low' | 'preview-standard'
 }
 
+/** Eine übertragbare Datei des Workers. `relPath` ist relativ zum Projekt (nie ein Host-Pfad). */
+export interface AssetOffer {
+  assetId: string
+  jobId: string
+  kind: 'project-file' | 'source' | 'render'
+  relPath: string
+  size: number
+  sha256: string
+  clipId?: string
+  /** Anzahl Projektdateien (inkl. Quelle) dieses Jobs – Import erst, wenn alle verifiziert da sind. */
+  bundleTotal?: number
+  /** Projekt-Hash und Worker-Pfade, damit der Client gespeicherte Pfade auf seine eigenen umschreiben kann. */
+  projectHash?: string
+  workerProjectDir?: string
+  workerSourcePath?: string
+}
+
 export interface JobSnapshot {
   jobId: string
   compute: ComputeState
@@ -129,6 +146,9 @@ export type RemoteMessage = Envelope & (
   | { type: 'ClipImportedAck'; ack: ClipImportedAck }
   | { type: 'RequestProxyRange'; request: ProxyRangeRequest }
   | { type: 'AssetUnavailable'; assetId: string; code: ErrorCode }
+  | { type: 'AssetOffer'; offer: AssetOffer }
+  | { type: 'AssetRequest'; assetId: string }
+  | { type: 'AssetAck'; assetId: string }
 )
 
 export type MessageType = RemoteMessage['type']
@@ -216,9 +236,27 @@ export function parseMessage(raw: unknown): RemoteMessage {
       need((r.to as number) > (r.from as number), 'Bereich leer'); oneOf(r, 'profile', ['scrub-low', 'preview-standard']); break
     }
     case 'AssetUnavailable': id(o, 'assetId'); oneOf(o, 'code', CODES); break
+    case 'AssetRequest': case 'AssetAck': id(o, 'assetId'); break
+    case 'AssetOffer': {
+      const a = sub(o, 'offer')
+      id(a, 'assetId'); id(a, 'jobId'); oneOf(a, 'kind', ['project-file', 'source', 'render']); num(a, 'size'); sha(a, 'sha256')
+      need(typeof a.relPath === 'string' && isSafeRelPath(a.relPath), 'relPath: unzulässiger Pfad')
+      if (a.clipId !== undefined) id(a, 'clipId')
+      if (a.bundleTotal !== undefined) num(a, 'bundleTotal')
+      if (a.projectHash !== undefined) id(a, 'projectHash')
+      if (a.workerProjectDir !== undefined) str(a, 'workerProjectDir', 1000)
+      if (a.workerSourcePath !== undefined) str(a, 'workerSourcePath', 1000)
+      break
+    }
     default: throw new ProtocolError('MALFORMED', `unbekannter Typ ${String(o.type)}`)
   }
   return m as RemoteMessage
+}
+
+/** Relativer Pfad ohne Ausbruch: nur einfache Segmente, kein `..`, kein Laufwerk/absoluter Pfad. */
+export function isSafeRelPath(p: string): boolean {
+  if (p.length === 0 || p.length > 300) return false
+  return p.split('/').every((seg) => /^[A-Za-z0-9_][A-Za-z0-9._ -]{0,120}$/.test(seg) && seg !== '..' && !seg.endsWith('.'))
 }
 
 /** Erlaubte Nachrichten je Recht. Pairing/Unpair/Status brauchen kein Recht (gehen nur zwischen gekoppelten Geräten). */
@@ -227,7 +265,7 @@ export function requiredPermission(type: MessageType): keyof DevicePermissions |
     case 'SubmitJob': return 'canSubmitJobs'
     case 'CancelJob': return 'canCancelOwnJobs'
     case 'RequestProxyRange': return 'canRequestProxies'
-    case 'ClipImportedAck': return 'canReceiveResults'
+    case 'ClipImportedAck': case 'AssetRequest': case 'AssetAck': return 'canReceiveResults'
     default: return null
   }
 }

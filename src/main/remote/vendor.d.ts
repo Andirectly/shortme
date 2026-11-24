@@ -19,6 +19,7 @@ declare module 'hyperswarm' {
   export interface PeerSocket {
     handshakeHash: Uint8Array | null
     remotePublicKey: Uint8Array
+    isInitiator: boolean
     rawStream?: { remoteHost?: string }
     on(event: 'close', cb: () => void): this
     on(event: 'drain', cb: () => void): this
@@ -36,6 +37,7 @@ declare module 'hyperswarm' {
       relayThrough?: ((force: boolean) => Uint8Array | null) | Uint8Array | null
     })
     readonly keyPair: NoiseKeyPair
+    readonly connecting: number
     listen(): Promise<void>
     join(topic: Uint8Array, opts?: { server?: boolean; client?: boolean }): SwarmDiscoverySession
     leave(topic: Uint8Array): Promise<void>

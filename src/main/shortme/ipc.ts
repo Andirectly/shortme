@@ -66,6 +66,24 @@ export async function withStills(r: ImportResult): Promise<ImportResult & { post
   return { ...r, poster: await dataUrl(projectFile(r.meta.hash, 'poster.jpg')), ambient: await dataUrl(projectFile(r.meta.hash, 'ambient.jpg')) }
 }
 
+/** Clips mit allen Editor-Operationen rendern (gemeinsam für Export und Remote-Worker). */
+export async function renderClips(meta: NonNullable<Awaited<ReturnType<typeof loadMeta>>>, transcript: NonNullable<Awaited<ReturnType<typeof loadTranscript>>>, clips: NonNullable<Awaited<ReturnType<typeof findClip>>>['clip'][], outDir: string, opts: { srt?: boolean; captions?: boolean } | undefined, signal: AbortSignal, report: (stage: string, progress: number, message: string) => void, onRendered?: (clip: NonNullable<Awaited<ReturnType<typeof findClip>>>['clip'], exp: { path: string; durationSec: number; title: string }) => Promise<void>): Promise<{ noTitle: string[] }> {
+  const hash = meta.hash
+  const signals = await ensureSignals(meta)
+  const noTitle: string[] = []
+  for (let i = 0; i < clips.length; i++) {
+    // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
+    const st = stateOf(baseState(clips[i], undefined, await loadStyle()), await loadEdits(hash, clips[i].id))
+    const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
+    const exp = await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, coldOpenSec: (await loadStyle()).coldOpenSec ?? 0, hook: st.hook.enabled, renderer: (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' : 'tscaps', seamCaption: st.caption.style.caption?.y === undefined, seamTitle: st.caption.style.title?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+    if (exp.titleDropped) noTitle.push(`${eff.title}: ${exp.titleDropped}`)
+    await logCorrection(hash, clips[i].id, [{ kind: 'export', durationSec: +exp.durationSec.toFixed(1) }])
+    await addExport({ hash, clipId: clips[i].id, title: eff.title, hookText: st.hook.text || eff.hookText, path: exp.path, durationSec: exp.durationSec })
+    await onRendered?.(clips[i], { path: exp.path, durationSec: exp.durationSec, title: eff.title })
+  }
+  return { noTitle }
+}
+
 export function registerShortmeIpc(): void {
   registerEngineControlIpc(jobs)
   const broadcast = (channel: string, payload: unknown): void => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send(channel, payload) }
@@ -207,17 +225,7 @@ export function registerShortmeIpc(): void {
     if (!clips.length) throw new Error('Projekt, Clips oder Transkript fehlen')
     const outDir = join(await exportRoot(), safeFileName(meta.title, 'Projekt'))
     return jobs.enqueue(hash, `Export: ${meta.title}`, async ({ signal, report }) => {
-      const signals = await ensureSignals(meta)
-      const noTitle: string[] = []
-      for (let i = 0; i < clips.length; i++) {
-        // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
-        const st = stateOf(baseState(clips[i], undefined, await loadStyle()), await loadEdits(hash, clips[i].id))
-        const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
-        const exp = await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, coldOpenSec: (await loadStyle()).coldOpenSec ?? 0, hook: st.hook.enabled, renderer: (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' : 'tscaps', seamCaption: st.caption.style.caption?.y === undefined, seamTitle: st.caption.style.title?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
-        if (exp.titleDropped) noTitle.push(`${eff.title}: ${exp.titleDropped}`)
-        await logCorrection(hash, clips[i].id, [{ kind: 'export', durationSec: +exp.durationSec.toFixed(1) }])
-        await addExport({ hash, clipId: clips[i].id, title: eff.title, hookText: st.hook.text || eff.hookText, path: exp.path, durationSec: exp.durationSec })
-      }
+      const { noTitle } = await renderClips(meta, transcript, clips, outDir, opts, signal, report)
       void shell.openPath(outDir)
       return `${clips.length === 1 ? 'Clip' : `${clips.length} Clips`} exportiert nach ${outDir}${noTitle.length ? ` – ohne Titel (Einblendung fehlgeschlagen: ${noTitle[0]})` : ''}`
     })

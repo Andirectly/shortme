@@ -17,11 +17,19 @@ import { estimateStages, fmtEta, totalSec } from '@shared/estimate'
 import { getSpeed } from './speed'
 import { EngineSwitch, ProfilePicker, RuntimeInstall } from './EngineSwitch'
 import { ENGINE_BLURB, ENGINE_LABEL, hasProfiles } from '@shared/engine'
+import { RemoteJobsList, useRemoteOverview } from './RemoteDevices'
 
 export function StartScreen(): React.JSX.Element {
   const openSheet = useStore((s) => s.openSheet)
   const [over, setOver] = useState(false)
   const [link, setLink] = useState('')
+  // Processing Device: dieser Rechner oder ein gekoppelter Worker (Remote Engine)
+  const remote = useRemoteOverview()
+  const [device, setDevice] = useState('local')
+  const [remoteClips, setRemoteClips] = useState(5)
+  const [remoteMsg, setRemoteMsg] = useState('')
+  const remoteDevices = remote?.thisDevice ? remote.devices.filter((d) => d.connectivity !== 'revoked') : []
+  const target = remoteDevices.find((d) => d.deviceId === device)
   const hasApi = useProject((s) => s.hasApi)
   const importing = useProject((s) => s.importing)
   const importMessage = useProject((s) => s.importMessage)
@@ -50,6 +58,16 @@ export function StartScreen(): React.JSX.Element {
   const openLink = async (): Promise<void> => {
     if (!link.trim()) return
     if (!hasApi) { openSheet(true); return }
+    if (target) {
+      // Remote: nur Link + Optionen an den Worker; er lädt selbst herunter und rechnet, Ergebnisse kommen automatisch zurück
+      setRemoteMsg('')
+      try {
+        await window.cutawan.shortme.remote.submitUrl(target.deviceId, link.trim(), { wanted: remoteClips, title: link.trim() })
+        setRemoteMsg(`An „${target.name}“ gesendet. Ergebnisse erscheinen hier automatisch, auch wenn du dieses Fenster schließt.`)
+        setLink('')
+      } catch (e) { setRemoteMsg(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e)) }
+      return
+    }
     // laufendes VOD: „Ganzes VOD“ = alles bis jetzt (festes Ende), sonst nähme der Download den Livestream bis Streamende auf
     if (isTwitchUrl(link)) { const whole: [number, number] | undefined = tw.info?.recording && tw.info.durationSec > 0 ? [0, Math.floor(tw.info.durationSec)] : undefined; if (await twitchImport(link.trim(), { section: section ?? whole })) openSheet(true); return }
     if (await importUrl(link.trim())) openSheet(true)
@@ -95,8 +113,33 @@ export function StartScreen(): React.JSX.Element {
             <Button variant="primary" disabled={importing || !link.trim()} onClick={() => void openLink()}>Laden</Button>
           </div>
           {importError && !importing && <small style={{ color: 'var(--warn)' }}>{importError}</small>}
+          {remoteDevices.length > 0 && (
+            <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%', flexWrap: 'wrap', cursor: 'default' }}>
+              <small>Verarbeiten auf</small>
+              <select className="sm-input" aria-label="Verarbeitungsgerät" value={device} onChange={(e) => setDevice(e.target.value)} style={{ width: 'auto', minWidth: 200 }}>
+                <option value="local">Dieser Rechner</option>
+                {remoteDevices.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.name} · {d.connectivity.startsWith('online') ? (d.connectivity === 'online-relay' ? 'Online (Relay)' : 'Online') : 'nicht erreichbar'}</option>)}
+              </select>
+              {target && (
+                <>
+                  <small>Clips</small>
+                  <select className="sm-input" aria-label="Anzahl Clips" value={remoteClips} onChange={(e) => setRemoteClips(Number(e.target.value))} style={{ width: 'auto' }}>
+                    {[3, 5, 8, 10, 15].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </>
+              )}
+            </div>
+          )}
+          {target && <small>Nur Links: {target.name} lädt das Video selbst und verarbeitet es mit seinen Modellen. Dateien bitte lokal verarbeiten.</small>}
+          {remoteMsg && <small role="status">{remoteMsg}</small>}
         </div>
       </motion.div>
+      {remote && remote.jobs.length > 0 && (
+        <section className="sm-glass" aria-label="Remote-Aufträge" style={{ padding: 16, display: 'grid', gap: 10 }}>
+          <small style={{ color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 0.6, fontSize: 10.5 }}>Auf anderen Rechnern</small>
+          <RemoteJobsList overview={remote} onOpen={(hash) => void openProject(hash).then((to) => to && go(to))} />
+        </section>
+      )}
       <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
       {isTwitchUrl(link) && <TwitchPanel info={tw.info} error={tw.error} loading={tw.loading} section={section} setSection={setSection} busy={importing} onLast={(m) => void lastMinutes(m)} onLiveBuffer={liveBuffer} />}
       {(importing || importError) && (

@@ -23,7 +23,7 @@ afterAll(async () => { await testnet.destroy(); await rm(dir, { recursive: true,
 async function makeHost(name: string): Promise<RemoteHost> {
   const keys = await loadIdentity(join(dir, name), sealer)
   const trust = await new TrustStore(join(dir, name, 'trust.json')).load()
-  const h = new RemoteHost({ keys, name, platform: name === 'mac' ? 'darwin' : 'win32', trust, bootstrap: testnet.bootstrap, bindHost: '127.0.0.1', heartbeatMs: 300, offlineAfterMs: 1500 })
+  const h = new RemoteHost({ keys, name, platform: name === 'mac' ? 'darwin' : 'win32', trust, bootstrap: testnet.bootstrap, bindHost: '127.0.0.1', heartbeatMs: 300, offlineAfterMs: 1500, nudgeMs: 10_000 })
   await h.start()
   return h
 }
@@ -59,7 +59,10 @@ describe('Remote-Host (echtes P2P im Testnetz)', () => {
 
     // Authentisierte Kontrollnachricht
     const got = new Promise<[string, RemoteMessage]>((r) => mac.once('message', (from: string, m: RemoteMessage) => r([from, m])))
-    expect(win.send(mac.deviceId, { type: 'JobAccepted', jobId: 'job-1' })).toBe(true)
+    // Zustellung ist nur „best effort“ (Verbindungswechsel möglich) – fachliche Nachrichten werden wiederholt, wie in jobs.ts
+    let delivered = false
+    void got.then(() => { delivered = true })
+    while (!delivered) { win.send(mac.deviceId, { type: 'JobAccepted', jobId: 'job-1' }); await new Promise((r) => setTimeout(r, 500)) }
     const [from, m] = await got
     expect(m.type).toBe('JobAccepted')
     expect(from).toBe(win.deviceId)

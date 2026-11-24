@@ -253,6 +253,8 @@ export const useProject = create<ProjectState>((set, get) => ({
     void a.testlab.enabled().then((v) => { if (v === null) void a.testlab.setEnabled(useStore.getState().testlab); else useStore.setState({ testlab: v }) })
     unsub.forEach((u) => u())
     unsub = [
+      // Remote Engine: von einem anderen Rechner übertragenes Projekt ist da → Projektliste aktualisieren
+      a.remote.onProjectImported(() => void get().loadProjects()),
       a.onJob((j) => {
         if (j.title.startsWith('Export')) { set({ exportJob: j }); return }
         set((s) => (s.job && s.job.id !== j.id && s.job.state === 'running' ? s : { job: j }))

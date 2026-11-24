@@ -313,6 +313,14 @@ const api = {
       confirmPairing: (deviceId: string, accept: boolean): Promise<RemoteOverview> => ipcRenderer.invoke('remote:confirmPairing', deviceId, accept),
       unpair: (deviceId: string): Promise<RemoteOverview> => ipcRenderer.invoke('remote:unpair', deviceId),
       testConnection: (deviceId: string): Promise<{ ok: boolean; ms: number | null; route: string }> => ipcRenderer.invoke('remote:testConnection', deviceId),
+      submitUrl: (deviceId: string, url: string, opts: { contentType?: string; wanted?: number; engine?: string; frame?: string; query?: string; title?: string }): Promise<string> => ipcRenderer.invoke('remote:submitUrl', deviceId, url, opts),
+      cancelJob: (jobId: string): Promise<boolean> => ipcRenderer.invoke('remote:cancelJob', jobId),
+      forgetJob: (jobId: string): Promise<RemoteOverview> => ipcRenderer.invoke('remote:forgetJob', jobId),
+      onProjectImported: (cb: (hash: string) => void): (() => void) => {
+        const l = (_e: Electron.IpcRendererEvent, h: string): void => cb(h)
+        ipcRenderer.on('remote:projectImported', l)
+        return () => ipcRenderer.removeListener('remote:projectImported', l)
+      },
       onOverview: (cb: (o: RemoteOverview) => void): (() => void) => {
         const l = (_e: Electron.IpcRendererEvent, o: RemoteOverview): void => cb(o)
         ipcRenderer.on('remote:overview', l)

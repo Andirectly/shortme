@@ -33,4 +33,30 @@ export interface RemoteOverview {
   devices: RemoteDeviceView[]
   invite?: { code: string; expiresAt: string }
   pairRequests: Array<{ deviceId: string; name: string; platform: string; fingerprint: string }>
+  /** Von hier an andere Geräte gesendete Aufträge. */
+  jobs: RemoteJobView[]
+  /** Auf diesem Rechner für andere Geräte laufende Aufträge. */
+  workerJobs: Array<{ jobId: string; from: string; url: string; compute: string; stage?: string; error?: string; published: number; pendingOffers: number; updatedAt: string }>
+}
+
+export interface RemoteJobView {
+  jobId: string
+  deviceId: string
+  deviceName: string
+  url: string
+  title: string
+  createdAt: string
+  /** Zustand der Verarbeitung auf dem Worker (zuletzt bekannt, wenn offline). */
+  compute: string
+  stage?: string
+  progress?: number
+  lastUpdateAt?: string
+  rejected?: { code: string; message: string }
+  workerOnline: boolean
+  projectHash?: string
+  projectImported: boolean
+  bundleDone: number
+  bundleTotal?: number
+  clipsReady: number
+  clipsPending: number
 }
