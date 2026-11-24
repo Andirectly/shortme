@@ -1,0 +1,5 @@
+Vendored from AlterSend (https://github.com/denislupookov/altersend), tag v2.1.0, commit 8c23d5b7d50cedae6c9dae66f82b1e235070c16a.
+AlterSend
+Copyright 2024 AlterSend
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+Changes for ShortMe: #fs/#path import aliases replaced by node:fs/promises and node:path; relative imports flattened.
