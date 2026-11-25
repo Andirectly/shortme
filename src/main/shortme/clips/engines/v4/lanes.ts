@@ -173,9 +173,9 @@ export function contrastScores(z: Record<string, Float32Array>, pos: string[], n
   return Object.fromEntries(pos.map((q) => [q, Float32Array.from(z[q], (v, i) => v - 0.5 * negMax[i])]))
 }
 
-export async function crossModalLane(s: EmbedSession, o: { hash: string; video: string; duration: number; profile: V4Profile; queries: V4Query[]; max: number; tracer: Tracer; signal?: AbortSignal; onProgress?: (f: number, m: string) => void }): Promise<LaneResult & { vectors: Npy2D; wins: Array<{ start: number; end: number }> }> {
+export async function crossModalLane(s: EmbedSession, o: { hash: string; video: string; duration: number; profile: V4Profile; queries: V4Query[]; max: number; tracer: Tracer; signal?: AbortSignal; onProgress?: (f: number, m: string) => void; /** Engine 6: eigener Index (ein Decode, Redundanzreduktion); fehlt er, baut v3 wie bisher */ index?: () => Promise<Awaited<ReturnType<typeof buildIndex>>> }): Promise<LaneResult & { vectors: Npy2D; wins: Array<{ start: number; end: number }> }> {
   const t0 = Date.now()
-  const idx = await buildIndex(s, { hash: o.hash, video: o.video, durationSec: o.duration, cfg: o.profile.embed, signal: o.signal, onProgress: (f, m) => o.onProgress?.(f * 0.9, m) })
+  const idx = o.index ? await o.index() : await buildIndex(s, { hash: o.hash, video: o.video, durationSec: o.duration, cfg: o.profile.embed, signal: o.signal, onProgress: (f, m) => o.onProgress?.(f * 0.9, m) })
   await o.tracer.record({ role: 'video_embedding', modelRevision: `${V3_EMBED_MODEL.id}@${V3_EMBED_MODEL.revision}`, realInputModalities: ['video'], actualMediaWindowIds: idx.wins.map((w) => `w${w.index}`).slice(0, 2000), success: true, validatedOutput: true, wallClockMs: Date.now() - t0, status: `${idx.wins.length} Fenster, ${idx.meta.failed.length} Lücken, cached=${idx.cached}`, input: { frames: o.profile.embed.frames, windowSec: o.profile.embed.windowSec, hopSec: o.profile.embed.hopSec, fingerprint: idx.meta.fingerprint }, output: { dimension: idx.meta.dimension, windows: idx.wins.length } })
   const qPath = join(idx.dir, `v4-queries-${Date.now().toString(36)}.npy`)
   const t1 = Date.now()

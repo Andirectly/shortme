@@ -1,0 +1,69 @@
+{
+ "video": "solo",
+ "durationSec": 619,
+ "windows": 78,
+ "results": [
+  {
+   "variant": "A v3 (Sprung je Bild)",
+   "width": 448,
+   "sec": 19.6,
+   "embedded": 78,
+   "agreeTop5": 1,
+   "meanCos": 1
+  },
+  {
+   "variant": "B Einzeldecode",
+   "width": 448,
+   "sec": 9.3,
+   "decodeSec": 6.7,
+   "embedSec": 2.6,
+   "embedded": 78,
+   "agreeTop5": 0.817,
+   "meanCos": 0.973,
+   "reasons": {
+    "embedded": 78
+   }
+  },
+  {
+   "variant": "B+Redundanz",
+   "width": 448,
+   "sec": 9.3,
+   "decodeSec": 6.7,
+   "embedSec": 2.6,
+   "embedded": 78,
+   "agreeTop5": 0.817,
+   "meanCos": 0.973,
+   "reasons": {
+    "embedded": 1,
+    "changed": 77
+   }
+  },
+  {
+   "variant": "B 320",
+   "width": 320,
+   "sec": 9.2,
+   "decodeSec": 6.7,
+   "embedSec": 2.5,
+   "embedded": 78,
+   "agreeTop5": 0.683,
+   "meanCos": 0.966,
+   "reasons": {
+    "embedded": 78
+   }
+  },
+  {
+   "variant": "B+Redundanz 320",
+   "width": 320,
+   "sec": 9.2,
+   "decodeSec": 6.7,
+   "embedSec": 2.5,
+   "embedded": 78,
+   "agreeTop5": 0.683,
+   "meanCos": 0.966,
+   "reasons": {
+    "embedded": 1,
+    "changed": 77
+   }
+  }
+ ]
+}
