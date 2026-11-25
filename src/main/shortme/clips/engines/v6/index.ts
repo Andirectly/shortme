@@ -42,7 +42,7 @@ import { planSpeech, planWordless, type V6CutPlan } from './plan'
 import { decideV6, judgeEditorial, observeRendered, technicalCheck, V6_AUDIT_REVISION, type OutputAudit } from './audit'
 import { buildV6Index } from './visualIndex'
 import { Profiler } from './profiler'
-import { V6_ALGORITHM_REVISION, V6_BUDGET, V6_INDEX, V6_PIPELINE_VERSION, v6Revisions } from './revisions'
+import { V6_ALGORITHM_REVISION, V6_AV_DEDUPE, V6_BUDGET, V6_INDEX, V6_PIPELINE_VERSION, v6Revisions } from './revisions'
 
 export type V6State = 'created' | 'indexing' | 'discovering' | 'ranking' | 'investigating' | 'planning' | 'rendering' | 'verifying' | 'completed' | 'incomplete' | 'cancelled' | 'failed'
 
@@ -51,6 +51,9 @@ const langOf = (t: Transcript): string => { const s = t.words.slice(0, 600).map(
 
 interface Planned { cand: V6Candidate; rank: number; decision: RankDecision | null; plan: V6CutPlan; clip: ShortmeClip; reserve: boolean; inv: InvestigationResult | null }
 interface Attempt { attemptId: string; round: number; plan: V6CutPlan; clip: ShortmeClip; path: string; sha256: string; inputFingerprint: string; durationSec: number; rendered: Rendered; audit?: OutputAudit; measured?: Criterion[] }
+
+/** Schalter für Messläufe: SHORTME_V6_AVDEDUPE=on|off überschreibt den Standard (nur Benchmark, nie still in der App). */
+const avDedupe = (): { threshold: number; maxGapSec: number } | null => (process.env.SHORTME_V6_AVDEDUPE === 'on' ? { threshold: 0.035, maxGapSec: 6 } : process.env.SHORTME_V6_AVDEDUPE === 'off' ? null : V6_AV_DEDUPE)
 
 export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome> {
   const A = adapterFor()
@@ -253,7 +256,7 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
       await prof.phase('av-observe-output', () => A.withAv(req.runId, async (s) => {
         for (const [k, a] of list.entries()) {
           report('compare', 0.6 * (k / Math.max(1, list.length)), `Ausgabe ${k + 1}/${list.length} ansehen und anhören …`)
-          const packets = await observeRendered(s, a.path, a.durationSec, hasAudio, join(tmp, a.attemptId), signal)
+          const packets = await observeRendered(s, a.path, a.durationSec, hasAudio, join(tmp, a.attemptId), signal, avDedupe() ?? undefined)
           prof.count('av:packets', packets.length)
           const m = await measuredCriteria(a.rendered, wav, hasAudio, edges, signal)
           // keine pauschale Gesichtsquoten-Strafe für Gameplay/wortlose Clips: dort ist der Ausschnitt Gameplay bzw. Ganzes Bild

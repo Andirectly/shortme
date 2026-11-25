@@ -117,3 +117,12 @@ describe('Engine 6 – Registry und Remote', () => {
     expect(isUnsupportedEngine('default', 'darwin')).toBe(false)
   })
 })
+
+import { keepSeconds } from '../src/main/shortme/clips/engines/v6/frames'
+describe('Engine 6 – Redundanz in AV-Paketen', () => {
+  it('statisch → nur Kontrollbilder; Wechsel wird gezeigt; erste/letzte Sekunde immer', () => {
+    const s = (v: number): number[] => new Array(576).fill(v)
+    const sigs = [...Array(14).fill(0).map(() => s(100)), s(200), ...Array(5).fill(0).map(() => s(200))]
+    expect(keepSeconds(sigs, { threshold: 0.035, maxGapSec: 6 })).toEqual([0, 6, 12, 14, 19])
+  })
+})

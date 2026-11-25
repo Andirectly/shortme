@@ -19,6 +19,9 @@ export const V6_BUDGET = {
   cutCandidates: 2
 }
 
+/** Redundanzreduktion in den AV-Prüfpaketen (P0-Mechanismus): Standard nur nach Messung aktiv (docs/ENGINE_V6_DECISIONS.md). */
+export const V6_AV_DEDUPE: { threshold: number; maxGapSec: number } | null = null
+
 /** Bildindex: Einzeldecode, 448 px (gemessen: 320 px spart keine Zeit und verschlechtert Treffer), Redundanzreduktion AUS (gemessen: schlechtere Treffer). */
 export const V6_INDEX = { windowSec: 8, hopSec: 8, frames: 4, frameWidth: 448, dedupe: false, sameThreshold: 0.035, maxGapSec: 40 }
 
@@ -26,5 +29,5 @@ export const v6Revisions = (platform: string = process.platform): string[] => [
   `pipeline:${V6_PIPELINE_VERSION}`, V6_ALGORITHM_REVISION, V6_RANK_PROMPT, V6_PLAN_REVISION, V6_AUDIT_REVISION, V6_EXTRACTOR_REVISION, V6_SIGNATURE_REVISION,
   `speech:${V2_PROMPT_REVISION}`, `embed:${V3_EMBED_MODEL.id}@${V3_EMBED_MODEL.revision.slice(0, 8)}`,
   platform === 'darwin' ? `av:${MAC_AV_MODEL.id}@${MAC_AV_MODEL.revision.slice(0, 8)}` : `av:${V3_AV_MODEL.id}@${V3_AV_MODEL.revision.slice(0, 8)}`,
-  `index:${V6_INDEX.frameWidth}/${V6_INDEX.dedupe ? 'dedupe' : 'full'}`, `budget:${JSON.stringify(V6_BUDGET)}`
+  `index:${V6_INDEX.frameWidth}/${V6_INDEX.dedupe ? 'dedupe' : 'full'}`, `avdedupe:${V6_AV_DEDUPE ? JSON.stringify(V6_AV_DEDUPE) : 'off'}`, `budget:${JSON.stringify(V6_BUDGET)}`
 ]

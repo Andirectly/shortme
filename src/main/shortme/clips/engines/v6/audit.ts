@@ -10,6 +10,7 @@ import { chatJson, isObj } from '../../llm'
 import { parseModelJson, type Criterion } from '../v4/core'
 import { cutAv } from '../v4/media'
 import type { AvSession } from '../v3/avWorker'
+import { keepSeconds, secondSignatures } from './frames'
 
 export const V6_AUDIT_REVISION = 'audit-v1'
 export const PACKET_MAX_SEC = 40
@@ -17,7 +18,7 @@ export type CritState = 'pass' | 'fail' | 'unknown' | 'not-applicable'
 export const EDITORIAL_CRITERIA = ['hook', 'standalone', 'payoff', 'natural-end', 'essential-event'] as const
 
 export interface Technical { ok: boolean; durationSec: number; width: number; height: number; streams: string[]; decodeErrors: string[]; reason: string }
-export interface PacketObs { id: string; start: number; end: number; ok: boolean; observations: Array<{ segmentIds: string[]; kind: string; what: string }>; wordCutAtStart: boolean | null; wordCutAtEnd: boolean | null; subjectVisible: 'yes' | 'no' | 'partly' | null; confidence: string; error?: string; ms: number }
+export interface PacketObs { id: string; start: number; end: number; ok: boolean; /** gezeigte Bildsekunden (Redundanzreduktion), sonst alle */ framesUsed?: number; framesTotal?: number; observations: Array<{ segmentIds: string[]; kind: string; what: string }>; wordCutAtStart: boolean | null; wordCutAtEnd: boolean | null; subjectVisible: 'yes' | 'no' | 'partly' | null; confidence: string; error?: string; ms: number }
 export interface OutputAudit {
   clipId: string; attemptId: string; planFingerprint: string; sha256: string; auditRevision: string; models: Record<string, string>
   technical: Technical; packets: PacketObs[]; coverage: { outputSec: number; observedSec: number; packets: number; failedPackets: number }
@@ -80,7 +81,7 @@ export function validatePacket(x: unknown, allowed: string[]): Omit<PacketObs, '
 }
 
 /** AV-Beobachtung der ganzen Ausgabedatei. Ein Paket wird höchstens zweimal versucht (zweiter Versuch mit leichter Temperatur); sonst `ok: false` (Lücke). */
-export async function observeRendered(s: AvSession, path: string, durationSec: number, hasAudio: boolean, tmpDir: string, signal?: AbortSignal): Promise<PacketObs[]> {
+export async function observeRendered(s: AvSession, path: string, durationSec: number, hasAudio: boolean, tmpDir: string, signal?: AbortSignal, dedupe?: { threshold: number; maxGapSec: number }): Promise<PacketObs[]> {
   await mkdir(tmpDir, { recursive: true })
   const ps = packetsFor(durationSec)
   const out: PacketObs[] = []
@@ -93,9 +94,10 @@ export async function observeRendered(s: AvSession, path: string, durationSec: n
       if (ps.length > 1) await cutAv(path, p.start, p.end - p.start, file, hasAudio, signal)
       const input = ps.length > 1 ? file : path
       const prompt = observePrompt(p, durationSec, i === 0, i === ps.length - 1)
+      const keepFrames = dedupe ? keepSeconds(await secondSignatures(input, signal), dedupe) : undefined
       for (let attempt = 0; attempt < 2; attempt++) {
-        const r = await s.worker.request<{ text: string }>('analyze_av', { path: input, prompt: attempt ? `${prompt}\nLetzte Antwort ungültig (${err}). Nur gültiges JSON.` : prompt, maxNewTokens: 320, temperature: attempt ? 0.3 : 0 }, { runId: s.runId, timeoutMs: 240_000, signal })
-        try { out.push({ id: p.id, start: p.start, end: p.end, ok: true, ...validatePacket(parseModelJson(r.text), segIds(p)), ms: Date.now() - t0 }); err = ''; break } catch (e) { err = String(e instanceof Error ? e.message : e).slice(0, 100) }
+        const r = await s.worker.request<{ text: string; framesUsed?: number; framesTotal?: number }>('analyze_av', { path: input, prompt: attempt ? `${prompt}\nLetzte Antwort ungültig (${err}). Nur gültiges JSON.` : prompt, maxNewTokens: 320, temperature: attempt ? 0.3 : 0, ...(keepFrames ? { keepFrames } : {}) }, { runId: s.runId, timeoutMs: 240_000, signal })
+        try { out.push({ id: p.id, start: p.start, end: p.end, ok: true, ...validatePacket(parseModelJson(r.text), segIds(p)), ms: Date.now() - t0, framesUsed: r.framesUsed, framesTotal: r.framesTotal }); err = ''; break } catch (e) { err = String(e instanceof Error ? e.message : e).slice(0, 100) }
       }
     } catch (e) { if (signal?.aborted) throw e; err = String(e instanceof Error ? e.message : e).slice(0, 200) } finally { await rm(file, { force: true }).catch(() => undefined) }
     if (err) out.push({ id: p.id, start: p.start, end: p.end, ok: false, observations: [], wordCutAtStart: null, wordCutAtEnd: null, subjectVisible: null, confidence: 'unknown', error: err, ms: Date.now() - t0 })

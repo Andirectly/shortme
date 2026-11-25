@@ -460,8 +460,22 @@ def op_analyze_av(req, p):
         raise WorkerError("bad-media", f"Ausschnitt hat {len(frames)} Sekunden (erlaubt 1–75)")
     contents = []
     has_audio = bool(audio_chunks) and len(audio_chunks) == len(frames)
+    # Engine 6 (optional): keepFrames = Sekunden, deren Bild mitgeht (zeitliche Redundanzreduktion); der Ton bleibt vollständig.
+    keep = p.get("keepFrames")
+    keep_set = {int(k) for k in keep if isinstance(k, (int, float))} if isinstance(keep, list) and keep else None
+    used = 0
     for i, f in enumerate(frames):
-        contents += [f, audio_chunks[i]] if has_audio else [f]  # ohne Tonspur nur Bilder, kein erfundener Ton
+        show = keep_set is None or i in keep_set or not has_audio
+        used += 1 if show else 0
+        contents += ([f] if show else []) + ([audio_chunks[i]] if has_audio else [])  # ohne Tonspur nur Bilder, kein erfundener Ton
+    # Engine 6 (optional): Original-Ausschnitte (ROI) zusätzlich zum Gesamtbild, je mit Beschriftung
+    extra = p.get("extraImages")
+    if isinstance(extra, list) and extra:
+        from PIL import Image  # type: ignore
+
+        for e in extra[:4]:
+            if isinstance(e, dict) and isinstance(e.get("path"), str):
+                contents += [str(e.get("label", "Ausschnitt"))[:120], Image.open(inside(e["path"], _args.allowed_root)).convert("RGB")]
     msgs = [{"role": "user", "content": contents + [prompt]}]
     torch.cuda.reset_peak_memory_stats()
     # inference_mode: ohne ihn behielt MiniCPM-o Zwischenwerte, der VRAM wuchs je Aufruf bis zur Auslagerung (gemessen: 32 GB voll nach 8 Aufrufen)
@@ -476,7 +490,7 @@ def op_analyze_av(req, p):
 
     gc.collect()
     torch.cuda.empty_cache()
-    return {"text": text if isinstance(text, str) else str(text), "seconds": round(time.time() - t0, 2), "hasAudio": has_audio, "vramPeakBytes": peak, "vramAllocatedBytes": int(torch.cuda.memory_allocated())}
+    return {"text": text if isinstance(text, str) else str(text), "seconds": round(time.time() - t0, 2), "hasAudio": has_audio, "vramPeakBytes": peak, "vramAllocatedBytes": int(torch.cuda.memory_allocated()), "framesTotal": len(frames), "framesUsed": used}
 
 
 # gemessen (M1 Pro, 40-s-Ausschnitt): 20 Bilder 38 s / 11,5 GB Spitze, ~10 Bilder 21 s / 8,1 GB, 8 Bilder 20 s / 7,5 GB → 12 (ergibt ~10) für 16 GB
