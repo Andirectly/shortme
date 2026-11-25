@@ -40,12 +40,17 @@ const sha256 = (b: Buffer): string => createHash('sha256').update(b).digest('hex
 export interface RuntimeStatus { state: 'missing' | 'outdated' | 'ready'; detail: string; python?: string }
 
 /** Ist die Umgebung vorhanden und passt sie zur gelockten Liste? (Hash der Liste steht im Marker.) */
+/**
+ * Prüfsumme einer Lock-Datei unabhängig von Zeilenenden: der Windows-CI-Build packt sie mit CRLF, lokale Builds mit LF – sonst hielt jede
+ * App-Version die Laufzeit der anderen für veraltet und installierte neu (gemessen: 0.52.0-Update am 25.11.). Geschrieben wird die LF-Form.
+ */
+export const lockHashes = (text: string): { lf: string; accepted: string[] } => { const lf = text.replace(/\r\n/g, '\n'); return { lf: sha256(Buffer.from(lf)), accepted: [sha256(Buffer.from(lf)), sha256(Buffer.from(lf.replace(/\n/g, '\r\n')))] } }
+
 export async function runtimeStatus(): Promise<RuntimeStatus> {
   if (!existsSync(pythonExe())) return { state: 'missing', detail: 'Python-Laufzeit nicht installiert' }
   try {
     const m = JSON.parse(await readFile(markerFile(), 'utf8')) as { lockSha256?: string; torch?: string }
-    const cur = sha256(await readFile(lockFile()))
-    if (m.lockSha256 !== cur) return { state: 'outdated', detail: 'Laufzeit passt nicht zur gelockten Paketliste (Reparatur nötig)', python: pythonExe() }
+    if (!lockHashes(await readFile(lockFile(), 'utf8')).accepted.includes(m.lockSha256 ?? '')) return { state: 'outdated', detail: 'Laufzeit passt nicht zur gelockten Paketliste (Reparatur nötig)', python: pythonExe() }
     return { state: 'ready', detail: `Python-Laufzeit bereit (torch ${m.torch ?? '?'})`, python: pythonExe() }
   } catch { return { state: 'missing', detail: 'Laufzeit unvollständig (kein Marker) – Reparatur nötig' } }
 }
@@ -94,7 +99,7 @@ export async function installRuntime(onLine: (l: string) => void, signal?: Abort
     p.on('close', () => resolve(out.trim()))
     p.on('error', () => resolve(''))
   })
-  await writeFileAtomic(markerFile(), JSON.stringify({ lockSha256: sha256(await readFile(lockFile())), torch, uv: UV_VERSION, installedAt: new Date().toISOString() }))
+  await writeFileAtomic(markerFile(), JSON.stringify({ lockSha256: lockHashes(await readFile(lockFile(), 'utf8')).lf, torch, uv: UV_VERSION, installedAt: new Date().toISOString() }))
   return runtimeStatus()
 }
 
@@ -110,7 +115,7 @@ export async function avRuntimeStatus(): Promise<RuntimeStatus> {
   if (!existsSync(avPythonExe())) return { state: 'missing', detail: WIN ? 'AV-Laufzeit (MiniCPM-o, Lighthouse) nicht installiert' : 'AV-Laufzeit (Gemma 4 über MLX) nicht installiert' }
   try {
     const m = JSON.parse(await readFile(avMarker(), 'utf8')) as { lockSha256?: string; torch?: string }
-    if (m.lockSha256 !== sha256(await readFile(avLockFile()))) return { state: 'outdated', detail: 'AV-Laufzeit passt nicht zur Paketliste (Reparatur nötig)', python: avPythonExe() }
+    if (!lockHashes(await readFile(avLockFile(), 'utf8')).accepted.includes(m.lockSha256 ?? '')) return { state: 'outdated', detail: 'AV-Laufzeit passt nicht zur Paketliste (Reparatur nötig)', python: avPythonExe() }
     return { state: 'ready', detail: `AV-Laufzeit bereit (${WIN ? 'torch' : 'mlx'} ${m.torch ?? '?'})`, python: avPythonExe() }
   } catch { return { state: 'missing', detail: 'AV-Laufzeit unvollständig (kein Marker) – Reparatur nötig' } }
 }
@@ -130,6 +135,6 @@ export async function installAvRuntime(onLine: (l: string) => void, signal?: Abo
     p.on('close', () => resolve(out.trim()))
     p.on('error', () => resolve(''))
   })
-  await writeFileAtomic(avMarker(), JSON.stringify({ lockSha256: sha256(await readFile(avLockFile())), torch, uv: UV_VERSION, installedAt: new Date().toISOString() }))
+  await writeFileAtomic(avMarker(), JSON.stringify({ lockSha256: lockHashes(await readFile(avLockFile(), 'utf8')).lf, torch, uv: UV_VERSION, installedAt: new Date().toISOString() }))
   return avRuntimeStatus()
 }
