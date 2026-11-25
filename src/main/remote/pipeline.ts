@@ -16,13 +16,18 @@ import { safeFileName } from '../shortme/render/profiles'
 import { probeVideo } from '../pipeline/ffmpeg'
 import { addExport } from '../upload/store'
 import { clipRevision } from '@shared/review'
-import { ENGINE_LABEL, type SelectionEngineId } from '@shared/engine'
+import { ENGINE_LABEL, isUnsupportedEngine, type SelectionEngineId } from '@shared/engine'
 import type { ContentType, FrameChoice } from '@shared/videoKind'
 import type { ClientStore, Pipeline, RemoteJobSettings } from './jobs'
 
 const MIN_FREE_BYTES = 5 * 1024 ** 3
 const CONTENT: ContentType[] = ['podcast', 'vlog', 'solo', 'stream', 'talk']
 const FRAMES: FrameChoice[] = ['smart', 'fit', 'split', 'fixed', 'stream']
+
+/** Ausdrücklich angeforderte Engine, die es hier nicht gibt (andere Plattform, ältere Version) → Ablehnung statt stiller Ersatz durch die Standard-Engine. */
+export function unsupportedEngine(s: RemoteJobSettings): string | null {
+  return isUnsupportedEngine(s.engine, process.platform) ? s.engine! : null
+}
 
 async function engineFor(s: RemoteJobSettings): Promise<SelectionEngineId> {
   return s.engine && isLocalEngine(s.engine as SelectionEngineId) ? (s.engine as SelectionEngineId) : loadDefaultEngine()
@@ -46,6 +51,8 @@ function awaitJob(id: string, signal: AbortSignal): Promise<void> {
 
 export const realPipeline: Pipeline = {
   async preflight(s) {
+    const bad = unsupportedEngine(s)
+    if (bad) return { ok: false, code: 'VERSION_INCOMPATIBLE', message: `Der Worker kennt die Engine „${bad}“ nicht (andere Plattform oder ältere Shortme-Version). Bitte dort aktualisieren oder eine andere Engine wählen.` }
     const engine = await engineFor(s)
     const missing = await missingModelsFor(engine)
     if (missing.length) return { ok: false, code: 'MODEL_MISSING', message: `Auf dem Worker fehlen Modelle für ${ENGINE_LABEL[engine]}: ${missing.map((m) => m.name).join(', ')}` }

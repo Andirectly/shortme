@@ -6,6 +6,8 @@ export type SelectionEngineId = 'legacy' | 'multimodal-v2' | 'adaptive-v3' | 'en
 export const ENGINE_IDS: SelectionEngineId[] = ['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4', 'engine-mac']
 /** Welche Engines auf welchem System laufen können (Engine 3/4 brauchen CUDA, die Mac-Engine Apple Silicon). */
 export const enginesFor = (platform: string): SelectionEngineId[] => platform === 'darwin' ? ['engine-mac'] : ['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4']
+/** Remote: ausdrücklich angeforderte Engine, die auf diesem System fehlt (andere Plattform/ältere Version) → ablehnen statt still ersetzen. */
+export const isUnsupportedEngine = (e: string | undefined, platform: string): boolean => !!e && e !== 'default' && !enginesFor(platform).includes(e as SelectionEngineId)
 export const ENGINE_LABEL: Record<SelectionEngineId, string> = { legacy: 'Engine 1 – Original', 'multimodal-v2': 'Engine 2 – Multimodal', 'adaptive-v3': 'Engine 3 – Adaptive AI', engine4: 'Engine 4', 'engine-mac': 'Engine Mac' }
 /** Kurzbeschreibung für den Erstellen-Dialog. */
 export const ENGINE_BLURB: Record<SelectionEngineId, string> = {

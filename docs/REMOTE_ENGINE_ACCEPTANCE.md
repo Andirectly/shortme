@@ -38,21 +38,21 @@ Grundlage: `SHORTME_REMOTE_ENGINE_V4_CLAUDE_CODE.md` (24.11.2026) + Plan V3. Erg
 | Gate | Ergebnis | Nachweis / Grund |
 |---|---|---|
 | G0 Transport-Spike | **teilweise** | PASS (Container): Kopplung, Nachricht, Ping, 5-MB-Datei SHA-256 gleich, Neustart ohne Re-Pairing, Unpair, Fremdgerät, falscher Code – echtes HyperDHT-Testnetz (`tests/remoteHost.test.ts`); native Module laden + verbinden in Electron 35.7.5. NOT RUN: gepackte Mac/Windows-Builds, Resume nach Abbruch, getrennte Anschlüsse. BLOCKED: Relay. safeStorage: Electron 35 nur synchron (shortcut markiert). |
-| G1 Pairing/Worker | NOT RUN (Hardware) | Code + UI vorhanden; im Container verweigert die App korrekt den Start ohne Schlüsselbund (geprüft per CDP). |
-| G2 Remote-Job | teilweise | PASS im Testnetz mit Stellvertreter-Pipeline (`tests/remoteJobs.test.ts`): Annahme, Dedup, Heimnetz-Link + falscher Absender abgelehnt. Echte Pipeline verdrahtet, aber NOT RUN (keine Modelle/GPU hier). |
-| G3 Einzelclip-Übertragung | teilweise | PASS im Testnetz: nur `verified` wird veröffentlicht, Client 12-h-Offline-Fall verkürzt (offline während Render → Nachlieferung ohne Duplikat), Quittungen leeren Outbox. |
+| G1 Pairing/Worker | **PASS (Windows, ein Rechner, zwei Profile)** / BLOCKED (Mac) | 25.11.: installierte 0.52.0 (A) ↔ zweites Profil (B, `CUTAWAN_USER_DATA`), echtes HyperDHT: Code, gleicher Fingerabdruck beidseitig, Bestätigung, „Verbindung testen“ direkt 1 ms; Neustart beider → ohne neuen Code online. Mac nicht erreichbar (keine Mac-Sitzung online). |
+| G2 Remote-Job | **PASS (Windows)** / BLOCKED (Mac) | 25.11.: A → B YouTube-Link (27 min Vlog), B: Download 0:20, ASR 2 min, Engine 4 ~20 min, Render; echte Modelle (Parakeet, Qwen3-14B, MiniCPM-o, Embedding). |
+| G3 Einzelclip-Übertragung | **PASS (Windows)** | A war während Render/Veröffentlichung offline (16:00–16:03); nach Neustart von A: Projekt importiert, 2 freigegebene Clips als Exporte, 2 „zur Prüfung“ nur im Projekt; keine Duplikate (2 Exporte, 2 eindeutige Clip-IDs). |
 | G4 Editierbare Projekte | Abweichung | Ganzes Projekt + ganze Quelle werden übertragen (voll editierbar, Re-Render lokal). ±30-s-Proxys und Remote-Re-Render: NOT DONE (shortcut in `jobs.ts`). |
-| G5/G6 | NOT RUN | Hardware-Abnahme auf Mac + Windows steht aus. |
+| G5/G6 | teilweise | Windows-Hardware: siehe Tests unten (PASS). Mac ↔ Windows über zwei Rechner: BLOCKED (MacBook in dieser Sitzung nicht erreichbar) – Restliste unten. |
 
 ## Tests T01–T28
 | Test | Ergebnis |
 |---|---|
-| T02 Pairing + Neustart | PASS nur im Testnetz (Unit/Integration), NOT RUN auf Hardware |
+| T02 Pairing + Neustart | PASS im Testnetz; **PASS auf Windows-Hardware (zwei Profile)**, Mac BLOCKED |
 | T03 LAN / getrennte Anschlüsse | NOT RUN |
 | T04 Relay | BLOCKED (kein freigegebener Relay) |
-| T05 Fenster/Tray/Login | NOT RUN (Code vorhanden) |
-| T07/T08 Link-Job je Richtung | NOT RUN (Hardware); Logik PASS im Testnetz |
-| T09 Origin offline | PASS im Testnetz (verkürzt) |
+| T05 Fenster/Tray/Login | PASS auf Windows (Login simuliert per `--hidden`), Mac NOT RUN |
+| T07/T08 Link-Job je Richtung | T07 PASS auf Windows (A → B, echte Engine 4); T08 NOT RUN |
+| T09 Origin offline | PASS im Testnetz und auf Windows-Hardware (3 min offline, keine Duplikate) |
 | T10 Worker-Neustart | teilweise: abgeschlossene Jobs werden nicht neu gestartet (Test); laufende starten nach Neustart die Stage neu (Code, NOT RUN) |
 | T12 Einzelclip vor Gesamtende | Logik PASS (Clip wird je Render veröffentlicht) |
 | T13 Review/Repair/alter Hash | PASS (Unit: releaseGate; Testnetz: needs-review-Clip nicht veröffentlicht) |
@@ -64,6 +64,28 @@ Grundlage: `SHORTME_REMOTE_ENGINE_V4_CLAUDE_CODE.md` (24.11.2026) + Plan V3. Erg
 | alle übrigen | NOT RUN |
 
 Lokale Regression: gesamte Suite 1187 PASS / 19 FAIL – die 19 schlagen identisch auf der Basis 0.51.0 fehl (Container ohne passende Medien/FFmpeg-Fixtures), nicht durch Remote verursacht.
+
+## Hardware-Abnahme Windows (25.11.2026, RTX 5090, installierte 0.52.0 aus dem Release + zweites Profil)
+Aufbau: A = installierte App (`Shortme.exe`, Release-Build v0.52.0), B = zweite Instanz mit eigenem Profil und Datenordner (`CUTAWAN_USER_DATA`, `SHORTME_DATA`, Modelle per Verknüpfung) – eigene Geräteidentität, echtes HyperDHT, gleicher Rechner (also kein Netzwerk-Test über zwei Anschlüsse). Gesteuert per CDP.
+
+| Test | Ergebnis | Beobachtung |
+|---|---|---|
+| Worker aktivieren | PASS | beide `enabled`, eigene deviceId |
+| Koppeln mit Code | PASS | Code von A, B tritt bei, beide sehen `84ED-62BF-5C56`, beidseitig bestätigt |
+| Verbindung testen | PASS | `ok, 1 ms, direct` in beide Richtungen |
+| T02 Neustart beider Apps | PASS | ohne neuen Code wieder online, Test `ok` |
+| T05 Fenster schließen | PASS | Prozess läuft weiter, B erreicht A (`ok, 1 ms`); Tray-Symbol nicht per Screenshot geprüft |
+| T05 Nach der Anmeldung starten | PASS (simuliert) | Run-Eintrag `Shortme.exe --hidden` gesetzt/entfernt; Start mit `--hidden`: kein Fenster, Worker erreichbar. Echte Ab-/Anmeldung nicht durchgeführt |
+| T07 Link-Job A → B (echte Engine) | PASS | Engine 4, 27-min-Vlog, Fortschritt in A sichtbar (Download → Transkription → Analyse → Render) |
+| T09 Origin offline | PASS | A 3 min offline während Render/Veröffentlichung, danach Nachlieferung ohne Duplikat |
+| Projekt öffnen | PASS | Clipliste mit 4 Clips (2 KI-geprüft, 2 zur Prüfung), „Im Editor“ lädt Video/Untertitel/Zeitleiste |
+| T08 Richtung B → A, T03 zwei Anschlüsse, T04 Relay, Mac ↔ Windows | NOT RUN / BLOCKED | MacBook nicht erreichbar; Relay weiterhin nicht freigegeben |
+
+Gefundene und behobene Fehler:
+- Eigenes Profil (`CUTAWAN_USER_DATA`) startete nicht neben der normalen App: die Einzelinstanz-Sperre lief vor `app.setPath('userData')` → Sperre jetzt je Profil (Commit bdc8c0c).
+- Engine-Anfrage, die der Worker nicht kennt (andere Plattform, ältere Version), wurde still durch die Standard-Engine ersetzt → Worker lehnt jetzt mit `VERSION_INCOMPATIBLE` ab (`isUnsupportedEngine`, Branch `feat/engine6`; Worker ≤ 0.52 bleiben betroffen).
+- Beobachtung (nicht behoben): Fortschritt der Remote-Analyse springt zwischen Unterstufen von 1,0 auf 0,5 zurück („Analyse“); dasselbe Video wurde vorher lokal schon einmal importiert – der Remote-Download ergab einen anderen Datei-Hash und damit ein zweites Projekt (kein Doppelimport desselben Jobs).
+- Die vollständige Liste T01–T28 (Spezifikation `SHORTME_REMOTE_ENGINE_V4_CLAUDE_CODE.md`) liegt nicht im Repo; nicht aufgeführte Nummern bleiben NOT RUN.
 
 ## Selbst prüfen (auf beiden Rechnern)
 1. Branch holen, `npm install`, `npm run package` (Windows) bzw. `npm run package -- --mac --publish never` (Mac), installieren.
