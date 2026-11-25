@@ -8,8 +8,4 @@ mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
 CUTAWAN_USER_DATA="$OUT/profile" CUTAWAN_PACKAGE_CHECK="$OUT/pipeline" \
   "$APP/Contents/MacOS/Shortme"
-CUTAWAN_USER_DATA="$OUT/wizard-profile" CUTAWAN_SMOKE="$OUT" CUTAWAN_SMOKE_WIZARD=1 \
-  "$APP/Contents/MacOS/Shortme"
-CUTAWAN_USER_DATA="$OUT/update-profile" CUTAWAN_SMOKE="$OUT" \
-  CUTAWAN_SMOKE_UPDATES=1 CUTAWAN_FAKE_LATEST=99.0.0 \
-  "$APP/Contents/MacOS/Shortme"
+# UI-Smoketests (Einrichtung/Updates) entfallen: sie prüften Elemente der alten Cutawan-Oberfläche.

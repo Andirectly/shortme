@@ -154,7 +154,9 @@ async function stopHost(): Promise<void> {
 
 function applyLoginItem(): void {
   if (!app.isPackaged) return // Entwicklung: keinen Autostart für electron.exe eintragen
-  app.setLoginItemSettings({ openAtLogin: settings.enabled && settings.startAtLogin, openAsHidden: true, args: ['--hidden'] })
+  const want = settings.enabled && settings.startAtLogin
+  if (app.getLoginItemSettings({ args: ['--hidden'] }).openAtLogin === want) return // nur bei Änderung ins System schreiben
+  app.setLoginItemSettings({ openAtLogin: want, openAsHidden: true, args: ['--hidden'] })
 }
 
 function updateTray(o: RemoteOverview): void {
