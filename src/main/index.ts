@@ -19,7 +19,10 @@ import { validatePackage } from './packageValidation'
 import { killOrphanYtDlp, stopAllYtDlp, ytDlpPath } from './pipeline/ytdlp'
 import { initRemote, keepRunningInBackground, startedHidden } from './remote/service'
 
-// Eine Instanz je Benutzer: zwei Instanzen würden mit derselben Geräteidentität konkurrieren.
+// Profilpfad VOR der Sperre setzen: die Sperre gilt je userData-Ordner. Sonst blockierte ein eigenes Profil (CUTAWAN_USER_DATA, eigene Geräteidentität) die normale App.
+app.setName('Cutawan')
+app.setPath('userData', resolveUserDataPath(app.getPath('appData'), process.env.CUTAWAN_USER_DATA))
+// Eine Instanz je Profil: zwei Instanzen würden mit derselben Geräteidentität konkurrieren.
 const singleInstance = process.env.CUTAWAN_PACKAGE_CHECK || process.env.CUTAWAN_SMOKE ? true : app.requestSingleInstanceLock()
 if (!singleInstance) app.quit()
 
@@ -31,9 +34,6 @@ function showMainWindow(): void {
   win.focus()
 }
 app.on('second-instance', () => { if (app.isReady()) showMainWindow() })
-
-app.setName('Cutawan')
-app.setPath('userData', resolveUserDataPath(app.getPath('appData'), process.env.CUTAWAN_USER_DATA))
 
 // Backstop: a stray rejection or throw in a background task (pipeline stages,
 // network calls) would otherwise take the whole app down by Node's default.
