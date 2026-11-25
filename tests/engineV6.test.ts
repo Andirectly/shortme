@@ -126,3 +126,18 @@ describe('Engine 6 – Redundanz in AV-Paketen', () => {
     expect(keepSeconds(sigs, { threshold: 0.035, maxGapSec: 6 })).toEqual([0, 6, 12, 14, 19])
   })
 })
+
+import { isDetailQuestion, validateBox } from '../src/main/shortme/clips/engines/v6/roi'
+describe('Engine 6 – ROI', () => {
+  it('nur gültige Boxen (innerhalb, 0,5–60 % Fläche), mit Rand erweitert', () => {
+    expect(validateBox({ x: 0.1, y: 0.6, w: 0.3, h: 0.2 })).toMatchObject({ x: expect.closeTo(0.055, 3), w: expect.closeTo(0.39, 3) })
+    expect(validateBox({ x: 0.9, y: 0, w: 0.3, h: 0.2 })).toBeNull()
+    expect(validateBox({ x: 0, y: 0, w: 1, h: 1 })).toBeNull()
+    expect(validateBox({ x: 0.1, y: 0.1, w: 0.01, h: 0.01 })).toBeNull()
+    expect(validateBox(null)).toBeNull()
+  })
+  it('Detailfrage erkannt', () => {
+    expect(isDetailQuestion('Ist der Punktestand im HUD zu sehen?')).toBe(true)
+    expect(isDetailQuestion('Lacht das Publikum?')).toBe(false)
+  })
+})

@@ -41,6 +41,7 @@ import { buildCandidate, rankCandidates, V6_RANK_PROMPT, type RankDecision, type
 import { planSpeech, planWordless, type V6CutPlan } from './plan'
 import { decideV6, judgeEditorial, observeRendered, technicalCheck, V6_AUDIT_REVISION, type OutputAudit } from './audit'
 import { buildV6Index } from './visualIndex'
+import { detailZoom, isDetailQuestion, type RoiResult } from './roi'
 import { Profiler } from './profiler'
 import { V6_ALGORITHM_REVISION, V6_AV_DEDUPE, V6_BUDGET, V6_INDEX, V6_PIPELINE_VERSION, v6Revisions } from './revisions'
 
@@ -162,6 +163,7 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
     const planned: Planned[] = []
     const attempts: Attempt[] = []
     const reserveQueue: V6Candidate[] = []
+    const rois: Array<{ candidate: string; question: string } & RoiResult> = []
     let repairsLeft = B.repairsGlobal
     let investigatedWordless = 0
     const target = wanted + B.reserves
@@ -215,6 +217,15 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
             } catch (e) { if (signal?.aborted) throw e; fail(`investigate ${c.id}`, e) }
           }
           if (isWordless) investigatedWordless++
+          // Detail-Zoom: nur bei konkreter Detailfrage (Schrift, HUD, Objekt, Ausdruck …), Ausschnitt aus dem Original
+          if (inv && d?.question && isDetailQuestion(d.question)) {
+            try {
+              const r = await detailZoom(s, { video: project.sourcePath, span: { start: Math.max(0, g.anchor - 8), end: Math.min(dur, g.anchor + 12) }, question: d.question, hasAudio, tmpDir: join(tmp, 'roi'), signal })
+              rois.push({ candidate: c.id, question: d.question, ...r })
+              prof.count('av:roi-calls', r.calls)
+              if (r.visible === false) { await tracer.log('v6-selection.jsonl', { candidate: c.id, skipped: `Detail im Originalausschnitt nicht erkennbar: ${d.question}` }); continue }
+            } catch (e) { if (signal?.aborted) throw e; fail(`roi ${c.id}`, e) }
+          }
           // ungeklärt (keine beobachtete Kernrolle) oder Widerspruch: bleibt unknown → nicht geschnitten, nächste Reserve
           if (!inv || inv.graph.contradiction || !inv.graph.nodes.some((n) => n.state === 'observed' && n.role !== 'context' && n.role !== 'unknown')) { await tracer.log('v6-selection.jsonl', { candidate: c.id, skipped: inv ? (inv.graph.contradiction ? 'Widerspruch' : 'Kernereignis nicht beobachtet') : 'Untersuchung fehlgeschlagen' }); continue }
         }
@@ -241,6 +252,7 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
         planned.push({ cand: c, rank, decision: d, plan, clip: clip0, reserve: rank > wanted, inv })
       }
     }))
+    await save('roi.json', rois)
     await save('plans.json', planned.map((p) => ({ rank: p.rank, candidate: p.cand.id, reserve: p.reserve, decision: p.decision, plan: p.plan, investigated: !!p.inv })))
 
     // F Render (wie der Export) – CPU/FFmpeg, ohne GPU-Modell
