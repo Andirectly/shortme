@@ -19,6 +19,8 @@ export interface Clip {
   title: string
   hook: string
   score: number
+  /** Engine 6: redaktioneller Rang (ersetzt die Punktzahl in der Anzeige) */
+  rank?: number
   duration: number
   faceRatio: number
   thumb: string

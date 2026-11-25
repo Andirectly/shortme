@@ -79,6 +79,22 @@ export interface ClipV2Info {
   uncertainty: string[]
 }
 
+/** Engine 6: Rang ist ein Rangwert, keine Qualitäts- oder Viralitätswahrscheinlichkeit. */
+export interface ClipV6Info {
+  editorialRank: number
+  rankReason: string
+  decision: 'use' | 'investigate' | 'reject'
+  /** Vergleichsläufe, in denen der Kandidat bewertet wurde */
+  comparisons: string[]
+  reserve: boolean
+  planFingerprint: string
+  attemptId: string
+  /** geprüfte Ausgabedatei; der Export verwendet sie unverändert, solange `inputFingerprint` passt */
+  artifact: { path: string; sha256: string; inputFingerprint: string }
+  audit: { status: 'verified' | 'needs-review' | 'rejected'; technical: 'pass' | 'fail'; editorial: 'pass' | 'needs-review' | 'fail' | 'unknown'; revision: string; coverage: { outputSec: number; observedSec: number; packets: number; failedPackets: number } }
+  question?: string
+}
+
 export interface ShortmeClip {
   id: string
   /** „Most replayed“-Stärke 0..1 über den Clip (nur YouTube-Importe). */
@@ -101,12 +117,14 @@ export interface ShortmeClip {
   /** Schlüsselwörter für Untertitel (Wortindex im Transkript). */
   tags: Array<{ word: number; kind: ClipTagKind }>
   /** `llm`/`texttiling`: bisherige Engine, `v2`: neue Engine (Details in `v2`). */
-  source: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4'
+  source: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4' | 'v6'
   /** Engine und Lauf, zu denen der Clip gehört (fehlt bei alten Projekten = bisherige Engine). */
   engine?: SelectionEngineId
   runId?: string
   /** Neue Engine: Ereignis, Schnittvariante, Prüfung und Belege des Vorschlags. */
   v2?: ClipV2Info
+  /** Nur Engine 6: redaktioneller Rang (getrennt von technischen Prüfkriterien) und Bindung der Prüfung an genau eine Datei. */
+  v6?: ClipV6Info
   /**
    * Automatisch entfernte Abschnitte innerhalb des Clips (Quellsekunden) – getrennt von manuell gelöschten Wörtern (`cutWords` im Editor),
    * damit nichts doppelt angewendet wird. Im Editor sichtbar und wiederherstellbar.
@@ -159,7 +177,7 @@ export interface ShortmeClips {
   hash: string
   query: string
   createdAt: string
-  mode: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4'
+  mode: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4' | 'v6'
   /** Engine und Lauf der angezeigten Clipliste. */
   engine?: SelectionEngineId
   runId?: string

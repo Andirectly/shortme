@@ -165,4 +165,4 @@ export function blindOrder(ids: string[], seed: string): string[] {
 }
 
 /** Anzeigeform eines clip-recheck (Quelle: main/shortme/clips/engines/recheck.ts). Eigene Art, nie mit Quellanalyse-Matches vermischt. */
-export interface ClipRecheckView { kind: 'clip-recheck'; recheckId: string; clipId: string; fromRunId: string; byEngine: 'multimodal-v2' | 'legacy' | 'engine4' | 'engine-mac'; at: string; status: 'done' | 'unavailable' | 'failed'; note: string; qualityLabel?: string; reasons?: string; uncertain?: string[]; unchecked?: string[]; observations?: string[] }
+export interface ClipRecheckView { kind: 'clip-recheck'; recheckId: string; clipId: string; fromRunId: string; byEngine: 'multimodal-v2' | 'legacy' | 'engine4' | 'engine-mac' | 'engine6'; at: string; status: 'done' | 'unavailable' | 'failed'; note: string; qualityLabel?: string; reasons?: string; uncertain?: string[]; unchecked?: string[]; observations?: string[] }

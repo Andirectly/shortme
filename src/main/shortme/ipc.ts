@@ -22,7 +22,7 @@ import type { SelectionEngineId, V3Profile } from '../../shared/engine'
 import { loadPersons, personsFile, replanWithPersons } from './clips/persons'
 import { writeFileAtomic } from './atomic'
 import { defaultExportRoot, exportRoot, setExportRoot } from './exportDir'
-import { modelsView, decide, activeModelId, testlabFlag, setTestlabEnabled } from '../testlab/registry'
+import { modelsView, decide, testlabFlag, setTestlabEnabled } from '../testlab/registry'
 import { labSources, runLab } from '../testlab/lab'
 import { prepareRemotionBrowser } from '../remotion/render'
 import type { LabRunRequest } from '../../shared/models'
@@ -36,6 +36,7 @@ import { makeThumbs, thumbPath } from './clips/thumbs'
 import { existsSync } from 'node:fs'
 import { ensureLayoutInput, ensureShots, ensureSignals, loadLayoutInput } from './clips/analysis'
 import { exportClip } from './render/exporter'
+import { exportEffective } from './render/exportOne'
 import { addExport } from '../upload/store'
 import { deleteClip } from './corrections'
 import { logCorrection } from './corrections'
@@ -69,13 +70,10 @@ export async function withStills(r: ImportResult): Promise<ImportResult & { post
 /** Clips mit allen Editor-Operationen rendern (gemeinsam für Export und Remote-Worker). */
 export async function renderClips(meta: NonNullable<Awaited<ReturnType<typeof loadMeta>>>, transcript: NonNullable<Awaited<ReturnType<typeof loadTranscript>>>, clips: NonNullable<Awaited<ReturnType<typeof findClip>>>['clip'][], outDir: string, opts: { srt?: boolean; captions?: boolean } | undefined, signal: AbortSignal, report: (stage: string, progress: number, message: string) => void, onRendered?: (clip: NonNullable<Awaited<ReturnType<typeof findClip>>>['clip'], exp: { path: string; durationSec: number; title: string }) => Promise<void>): Promise<{ noTitle: string[] }> {
   const hash = meta.hash
-  const signals = await ensureSignals(meta)
   const noTitle: string[] = []
   for (let i = 0; i < clips.length; i++) {
-    // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen
-    const st = stateOf(baseState(clips[i], undefined, await loadStyle()), await loadEdits(hash, clips[i].id))
-    const eff = effectiveClip(clips[i], transcript.words, st, (await loadLayoutInput(hash, clips[i].id)) ?? (await ensureLayoutInput(meta, clips[i])))
-    const exp = await exportClip(meta, eff, transcript, signals, { outDir, style: effectivePreset(await allPresets(), st.caption), srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, coldOpenSec: (await loadStyle()).coldOpenSec ?? 0, hook: st.hook.enabled, renderer: (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' : 'tscaps', seamCaption: st.caption.style.caption?.y === undefined, seamTitle: st.caption.style.title?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text, signal, onProgress: (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`) })
+    // Editor-Operationen anwenden: Beschnitt, herausgeschnittene Wörter, Hook, Untertitel-Stil, Layout-Überschreibungen (gemeinsam mit Engine 6: render/exportOne.ts)
+    const { exp, eff, st } = await exportEffective(meta, transcript, clips[i], outDir, opts, signal, (f, m) => report('export', (i + f) / clips.length, `${clips[i].title}: ${m}`))
     if (exp.titleDropped) noTitle.push(`${eff.title}: ${exp.titleDropped}`)
     await logCorrection(hash, clips[i].id, [{ kind: 'export', durationSec: +exp.durationSec.toFixed(1) }])
     await addExport({ hash, clipId: clips[i].id, title: eff.title, hookText: st.hook.text || eff.hookText, path: exp.path, durationSec: exp.durationSec })

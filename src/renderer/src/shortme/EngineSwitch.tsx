@@ -54,7 +54,7 @@ export function RuntimeInstall({ onDone }: { onDone: () => void }): React.JSX.El
 
 /** Gut sichtbares Kennzeichen, welche Engine gemeint ist (neue Engine hervorgehoben). */
 export function EngineBadge({ engine, prefix }: { engine: SelectionEngineId; prefix?: string }): React.JSX.Element {
-  const bg = engine === 'engine-mac' ? '#d97706' : engine === 'engine4' ? '#0f9d74' : engine === 'adaptive-v3' ? '#7c3aed' : engine === 'multimodal-v2' ? '#3b6df0' : 'rgba(255,255,255,0.16)'
+  const bg = engine === 'engine6' ? '#db2777' : engine === 'engine-mac' ? '#d97706' : engine === 'engine4' ? '#0f9d74' : engine === 'adaptive-v3' ? '#7c3aed' : engine === 'multimodal-v2' ? '#3b6df0' : 'rgba(255,255,255,0.16)'
   return <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: bg, color: '#fff' }}>{prefix}{ENGINE_LABEL[engine]}</span>
 }
 

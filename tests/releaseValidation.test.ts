@@ -14,9 +14,8 @@ it('allows complete releases and blocks missing or corrupt platform installers',
   directories.push(dir)
   const payload = Buffer.from('fixture release bytes')
   const manifests = {
-    'latest-mac.yml': [`Cutawan-${version}-arm64.dmg`, `Cutawan-${version}-arm64-mac.zip`],
-    'latest.yml': [`Cutawan-Setup-${version}.exe`],
-    'latest-linux.yml': [`Cutawan-${version}.AppImage`]
+    'latest-mac.yml': [`Shortme-${version}-arm64.dmg`, `Shortme-${version}-arm64.zip`],
+    'latest.yml': [`Shortme-Setup-${version}.exe`]
   }
   for (const [name, files] of Object.entries(manifests)) {
     for (const file of files) await writeFile(join(dir, file), payload)

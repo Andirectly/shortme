@@ -57,7 +57,7 @@ export function chooseRepresentatives(wins: Array<{ start: number; end: number; 
     const w = wins[i]
     if (!c.dedupe || rep < 0 || !w.frameSigs.length) { rep = i; out.push({ representedBy: i, reason: 'embedded' }); continue }
     const r = wins[rep]
-    const cut = cuts.some((t) => t > r.start && t < w.end)
+    const cut = cuts.some((t) => (t >= r.end && t < w.end) || (t > w.start && t < w.end))
     const inner = w.frameSigs.some((s, k) => k > 0 && meanAbsDiff(s, w.frameSigs[k - 1]) >= c.sameThreshold)
     const diff = r.frameSigs.length ? Math.max(...w.frameSigs.map((s) => Math.min(...r.frameSigs.map((q) => meanAbsDiff(s, q))))) : 1
     if (cut) { rep = i; out.push({ representedBy: i, reason: 'scene-cut' }) }
