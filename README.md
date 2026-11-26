@@ -41,6 +41,7 @@
 | 💬 **Animierte Untertitel** | Wort für Wort mit Hervorhebung, eigene Stile und Vorlagen (Stil-Studio), Titel-Einblendung und optionaler Cold Opener. |
 | 🎥 **Smarter Bildausschnitt** | Folgt dem Sprecher, wechselt bei Sprecherwechsel, nutzt Split-Layouts und findet Facecams in Streams. |
 | ✅ **Geprüft, nicht geraten** | Jeder Clip wird als fertige Datei angesehen und angehört (Technik, Bild/Ton, Inhalt) – der Export übernimmt genau diese Datei. |
+| 🏷️ **Nur Untertitel** | Fertiges Short ohne Untertitel? Ablegen, „Nur Untertitel“ wählen – das Video bleibt unverändert (kein Schnitt), Shortme transkribiert und brennt Untertitel ein. |
 | 🛠️ **Voller Editor** | Wörter und Pausen schneiden, Layout korrigieren, Stil ändern – alles nicht-destruktiv mit Undo/Redo. |
 | 📡 **Live & Links** | YouTube- und Twitch-Links laden, laufende Streams mitschneiden („letzte 3 Minuten sichern“). |
 | 🖥️ **Auf anderem Rechner rechnen** | Mac und Windows-PC koppeln und das schwere Video auf dem stärkeren Gerät verarbeiten (Peer-to-Peer, verschlüsselt). |

@@ -123,6 +123,8 @@ export interface ShortmeClip {
   runId?: string
   /** Neue Engine: Ereignis, Schnittvariante, Prüfung und Belege des Vorschlags. */
   v2?: ClipV2Info
+  /** „Nur Untertitel“: fertiges Video, wird nie geschnitten (keine Pausenschnitte, kein Cold Opener, kein Hook) – nur Untertitel kommen dazu. */
+  captionOnly?: boolean
   /** Nur Engine 6: redaktioneller Rang (getrennt von technischen Prüfkriterien) und Bindung der Prüfung an genau eine Datei. */
   v6?: ClipV6Info
   /**

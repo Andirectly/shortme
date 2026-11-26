@@ -21,6 +21,8 @@ export interface Clip {
   score: number
   /** Engine 6: redaktioneller Rang (ersetzt die Punktzahl in der Anzeige) */
   rank?: number
+  /** „Nur Untertitel“: Plakette statt Score/Rang */
+  badge?: string
   duration: number
   faceRatio: number
   thumb: string

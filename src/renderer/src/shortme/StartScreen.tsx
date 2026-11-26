@@ -228,6 +228,9 @@ function CreateSheet(): React.JSX.Element {
   useEffect(() => { void loadPresets() }, [loadPresets])
   const [diarize, setDiarize] = useState(false)
   const [adv, setAdv] = useState(false)
+  // „Nur Untertitel“: fertiges Video wird nicht geschnitten, es bekommt nur Untertitel (ein Clip über das ganze Video)
+  const [captionsOnly, setCaptionsOnly] = useState(false)
+  const startCaptionOnly = useProject((s) => s.startCaptionOnly)
   const { bounce, reduced } = useSprings()
   const y = useMotionValue(0)
 
@@ -245,7 +248,7 @@ function CreateSheet(): React.JSX.Element {
     if (projected > 260 || info.velocity.y > 800) openSheet(false)
     else animate(y, 0, { type: 'spring', duration: 0.3, bounce: 0.2, velocity: info.velocity.y })
   }
-  const start = async (): Promise<void> => { if (hasApi && !(await startTranscribe(diarize, opts.query, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined))) return; openSheet(false); go('processing') }
+  const start = async (): Promise<void> => { if (hasApi && !(await (captionsOnly ? startCaptionOnly(diarize) : startTranscribe(diarize, opts.query, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined)))) return; openSheet(false); go('processing') }
   const stop = { onPointerDownCapture: (e: React.PointerEvent) => e.stopPropagation() }
 
   return (
@@ -284,8 +287,14 @@ function CreateSheet(): React.JSX.Element {
             </div>
             {/* breite Ansicht in Gruppen statt langer Liste; Startknopf bleibt unten fest */}
             <div style={{ overflowY: 'auto', padding: '0 24px 12px' }} {...stop}>
+              <Row label="Was soll Shortme tun?" hint="Fertiges Short ohne Untertitel? Dann „Nur Untertitel“">
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <Segmented options={['Clips finden', 'Nur Untertitel']} value={captionsOnly ? 'Nur Untertitel' : 'Clips finden'} onChange={(v) => setCaptionsOnly(v === 'Nur Untertitel')} />
+                  {captionsOnly && <small>Das Video bleibt unverändert (kein Schnitt, keine Pausen entfernt). Shortme transkribiert es und blendet Untertitel ein; Stil und Wörter kannst du danach im Editor ändern.</small>}
+                </div>
+              </Row>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '0 32px', alignItems: 'start' }}>
-              <section>
+              {!captionsOnly && <section>
                 <h3 style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-2)', margin: '6px 0 2px' }}>Clip-Ziel</h3>
               <Row label="Was ist das für ein Video?" toggle={suggesting ? <small>wird eingeschätzt …</small> : kindSource && kindSource !== 'manual' ? <span className="sm-tag" title={kindReason}>{kindSource === 'remembered' ? 'zuletzt gewählt' : 'erkannt'}</span> : undefined}>
                 <Segmented options={CONTENT_TYPES.map((c) => c.label)} value={contentLabel(contentType)} onChange={(n) => void setContentType(CONTENT_TYPES.find((c) => c.label === n)!.id)} />
@@ -311,11 +320,11 @@ function CreateSheet(): React.JSX.Element {
                   {startEngine !== 'legacy' && startMissing.length === 0 && <small style={{ color: 'var(--ok)' }}>{ENGINE_LABEL[startEngine]} gewählt · Voraussetzungen installiert</small>}
                 </div>
               </Row>
-              </section>
+              </section>}
               <section>
                 <h3 style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-2)', margin: '6px 0 2px' }}>Look</h3>
-              <Row label="Format"><Segmented options={['9:16', '1:1', '16:9']} value={opts.format} onChange={(format) => setOpts({ format })} /></Row>
-              <Row label="Bildausschnitt"><Segmented options={Object.values(FRAME_LABELS)} value={frame} onChange={setFrame} /></Row>
+              {!captionsOnly && <Row label="Format"><Segmented options={['9:16', '1:1', '16:9']} value={opts.format} onChange={(format) => setOpts({ format })} /></Row>}
+              {!captionsOnly && <Row label="Bildausschnitt"><Segmented options={Object.values(FRAME_LABELS)} value={frame} onChange={setFrame} /></Row>}
               <Row label="Untertitel">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
                   {allPresets.map((p) => <PresetTile key={p.id} preset={p} selected={opts.captions === 'preset' && (style.presetId ?? presetId) === p.id} onClick={() => { setPreset(p.id); setOpts({ captions: 'preset' }); void saveStyle({ ...style, presetId: p.id, style: {} }) }} />)}
@@ -325,15 +334,15 @@ function CreateSheet(): React.JSX.Element {
                   </button>
                 </div>
               </Row>
-              <Row label="Titel einblenden" hint="Standard für alle neuen Clips; pro Clip im Editor änderbar"><Switch on={!!style.titleEnabled} onChange={(b) => void saveStyle({ ...style, titleEnabled: b })} label="Titel einblenden" /></Row>
-              {window.cutawan?.platform === 'darwin' && <Row label="Cold Opener" hint="starker Moment des Clips vorneweg, danach der Clip von Anfang; 0 = aus (Engine Mac)">
+              {!captionsOnly && <Row label="Titel einblenden" hint="Standard für alle neuen Clips; pro Clip im Editor änderbar"><Switch on={!!style.titleEnabled} onChange={(b) => void saveStyle({ ...style, titleEnabled: b })} label="Titel einblenden" /></Row>}
+              {!captionsOnly && window.cutawan?.platform === 'darwin' && <Row label="Cold Opener" hint="starker Moment des Clips vorneweg, danach der Clip von Anfang; 0 = aus (Engine Mac)">
                 <Segmented options={['Aus', '1 s', '2 s', '3 s', '4 s', '5 s']} value={style.coldOpenSec ? `${style.coldOpenSec} s` : 'Aus'} onChange={(v) => void saveStyle({ ...style, coldOpenSec: v === 'Aus' ? 0 : Number(v.split(' ')[0]) })} />
               </Row>}
               </section>
               </div>
               <section>
                 <h3 style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-2)', margin: '6px 0 2px' }}>Feintuning</h3>
-              <Row label="Sprechpausen entfernen"><Switch on={opts.removePauses} onChange={(removePauses) => setOpts({ removePauses })} label="Sprechpausen entfernen" /></Row>
+              {!captionsOnly && <Row label="Sprechpausen entfernen"><Switch on={opts.removePauses} onChange={(removePauses) => setOpts({ removePauses })} label="Sprechpausen entfernen" /></Row>}
               <div style={{ borderTop: '1px solid var(--edge)', paddingTop: 12 }}>
                 <Pill pressed={adv} onClick={() => setAdv(!adv)}>Erweitert <ChevronDown size={14} style={{ transform: adv ? 'rotate(180deg)' : 'none' }} /></Pill>
                 {adv && (
@@ -350,9 +359,9 @@ function CreateSheet(): React.JSX.Element {
               </section>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 24px', borderTop: '1px solid var(--edge)' }}>
-              {imported && <small style={{ marginRight: 'auto', alignSelf: 'center' }} title="Grobe Schätzung; sie passt sich nach dem ersten kompletten Lauf an diesen Rechner an.">Dauer etwa {fmtEta(totalSec(estimateStages(imported.meta.durationSec, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined, startEngine === 'engine-mac' ? 1 : getSpeed(), startEngine, startProfile)))}</small>}
+              {imported && !captionsOnly && <small style={{ marginRight: 'auto', alignSelf: 'center' }} title="Grobe Schätzung; sie passt sich nach dem ersten kompletten Lauf an diesen Rechner an.">Dauer etwa {fmtEta(totalSec(estimateStages(imported.meta.durationSec, opts.count && opts.count !== 'Auto' ? Number(opts.count) : undefined, startEngine === 'engine-mac' ? 1 : getSpeed(), startEngine, startProfile)))}</small>}
               <Button variant="secondary" onClick={() => openSheet(false)}>Abbrechen</Button>
-              <Button variant="primary" disabled={(!!imported && !imported.preflight.ok) || (startEngine !== 'legacy' && startMissing.length > 0)} onClick={() => void start()}><Sparkles size={16} /> Clips finden</Button>
+              <Button variant="primary" disabled={(!!imported && !imported.preflight.ok) || (!captionsOnly && startEngine !== 'legacy' && startMissing.length > 0)} onClick={() => void start()}><Sparkles size={16} /> {captionsOnly ? 'Untertitel erstellen' : 'Clips finden'}</Button>
             </div>
           </motion.div>
         </>

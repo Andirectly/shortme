@@ -67,6 +67,8 @@ interface ProjectState {
   suggest: () => Promise<void>
   clearImport: () => void
   startTranscribe: (diarize: boolean, query?: string, wanted?: number) => Promise<boolean>
+  /** „Nur Untertitel“: transkribieren und einen Clip über das ganze Video anlegen (fertiges Video, wird nicht geschnitten). */
+  startCaptionOnly: (diarize: boolean) => Promise<boolean>
   exportClips: (clipIds: string[], presetId: string, srt: boolean) => Promise<boolean>
   exportJob: ShortmeJob | null
   /** „Wer ist wer?“ */
@@ -343,6 +345,14 @@ export const useProject = create<ProjectState>((set, get) => ({
     }
   },
   clearImport: () => set({ imported: null, importError: '', contentType: 'podcast', kindSource: null, kindReason: '' }),
+  startCaptionOnly: async (diarize) => {
+    const a = api()
+    const imp = get().imported
+    if (!a || !imp) return false
+    const job = await a.captionOnly(imp.meta.hash, { diarize })
+    set({ job, clipsFile: null, transcript: null })
+    return true
+  },
   startTranscribe: async (diarize, query, wanted) => {
     const a = api()
     const imp = get().imported

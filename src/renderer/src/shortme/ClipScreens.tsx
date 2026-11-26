@@ -80,7 +80,7 @@ function DemoProcessing(): React.JSX.Element {
             <AnimatePresence>
               {ready.map((c) => (
                 <motion.div key={c.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{ width: 96, aspectRatio: '9/16', borderRadius: 10, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover', position: 'relative', border: '1px solid var(--edge)' }}>
-                  <span style={{ position: 'absolute', top: 6, left: 6 }}><Score v={c.rank ? `#${c.rank}` : c.score} /></span>
+                  <span style={{ position: 'absolute', top: 6, left: 6 }}><Score v={c.badge ?? (c.rank ? `#${c.rank}` : c.score)} /></span>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -111,7 +111,7 @@ function ClipCard({ c, selected, focused, onSelect, onFocus, onOpen, pct, info }
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.3), transparent 30%, transparent 60%, rgba(0,0,0,0.7))' }} />
         {c.pending && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 15, background: 'rgba(0,0,0,0.35)' }}>{pct}&nbsp;%</div>}
       </div>
-      <button className="sm-score" style={{ position: 'absolute', top: 10, left: 10, border: 0 }} aria-label={c.rank ? `Rang ${c.rank}, Details` : `Score ${c.score}, Details`} onClick={(e) => { e.stopPropagation(); onFocus() }}>{c.rank ? `#${c.rank}` : c.score}</button>
+      <button className="sm-score" style={{ position: 'absolute', top: 10, left: 10, border: 0 }} aria-label={c.badge ?? (c.rank ? `Rang ${c.rank}, Details` : `Score ${c.score}, Details`)} onClick={(e) => { e.stopPropagation(); onFocus() }}>{c.badge ?? (c.rank ? `#${c.rank}` : c.score)}</button>
       <button aria-label="Auswählen" aria-pressed={selected} onClick={onSelect} style={{ position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: '50%', border: '1.5px solid #fff', background: selected ? 'var(--accent)' : 'rgba(0,0,0,0.35)', display: 'grid', placeItems: 'center' }}>{selected && <Check size={14} />}</button>
       <div onClick={onFocus} style={{ padding: '10px 12px 12px', display: 'grid', gap: 4, cursor: 'pointer' }}>
         <h3 style={{ fontSize: 14, lineHeight: 1.25 }}>{c.title}</h3>
@@ -161,7 +161,7 @@ function ClipInspector({ c, info, real, hash, srcPath, pos, onOpen, onReview, on
       </div>
       <div style={{ display: 'grid', gap: 4 }}>
         <h2 style={{ fontSize: 20, lineHeight: 1.25 }}>{c.title}</h2>
-        <small style={{ fontVariantNumeric: 'tabular-nums' }}>{c.rank ? `Rang ${c.rank}` : `Score ${c.score}`} · {c.duration} s{info ? ` · Quelle ${mmss(info.start)}–${mmss(info.end)}` : ''}{c.v4RunId ? ` · ${c.v4Label ?? 'Engine 4'}` : ''}</small>
+        <small style={{ fontVariantNumeric: 'tabular-nums' }}>{c.badge ?? (c.rank ? `Rang ${c.rank}` : `Score ${c.score}`)} · {c.duration} s{info ? ` · Quelle ${mmss(info.start)}–${mmss(info.end)}` : ''}{c.v4RunId ? ` · ${c.v4Label ?? 'Engine 4'}` : ''}</small>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <Button variant="primary" onClick={onOpen} style={{ flex: 1 }}><Pencil size={14} /> Im Editor</Button>
@@ -281,7 +281,7 @@ export function ClipsScreen(): React.JSX.Element {
               <div style={{ width: 54, aspectRatio: '9/16', borderRadius: 8, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover' }} />
               <div style={{ display: 'grid', gap: 4 }}><h3>{c.title}</h3><small>{tidyCut(c.reason)}</small>{infos.get(c.id) && !c.pending && <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><QualityBadge status={infos.get(c.id)!.q.status} stale={infos.get(c.id)!.q.stale} /><ReviewBadge view={infos.get(c.id)!.view} /><small style={{ color: 'var(--text-2)' }}>Quelle {mmss(infos.get(c.id)!.start)}–{mmss(infos.get(c.id)!.end)}</small></div>}</div>
               <small>{c.duration} s</small>
-              <Score v={c.rank ? `#${c.rank}` : c.score} />
+              <Score v={c.badge ?? (c.rank ? `#${c.rank}` : c.score)} />
             </motion.div>
           ))}
         </div>
@@ -342,6 +342,7 @@ function RealProcessing(): React.JSX.Element {
   const projects = useProject((s) => s.projects)
   const count = useStore((s) => s.opts.count)
   const go = useStore((s) => s.go)
+  const openClip = useStore((s) => s.openClip)
   // Engine-Kennzeichen immer frisch für DIESEN Job holen (der Hauptprozess legt die Wahl vor dem Jobstart fest)
   useEffect(() => { void loadEngine(job.hash) }, [job.id, job.hash, loadEngine])
   const dur = imported?.meta.hash === job.hash ? imported.meta.durationSec : projects.find((p) => p.hash === job.hash)?.durationSec ?? 3600
@@ -363,6 +364,8 @@ function RealProcessing(): React.JSX.Element {
   const busy = job.state === 'running' || job.state === 'queued'
   // nur Clips, die DIESER Lauf gerade veröffentlicht (noch mit ausstehendem Bildausschnitt) – nicht die Anzeige eines früheren Laufs
   const provisional = useProject((s) => (s.clipsFile?.hash === job.hash && s.clipsFile.clips.some((c) => c.pending) ? s.clipsFile.clips.length : 0))
+  // „Nur Untertitel“: nach dem Transkribieren gibt es genau einen Clip über das ganze Video → direkt in den Editor
+  const captionOnlyClip = useProject((s) => (s.clipsFile?.hash === job.hash ? s.clipsFile.clips.find((x) => x.captionOnly) : undefined))
   const projDur = dur
   const title = job.state === 'done' ? 'Clips gefunden' : job.state === 'paused' ? 'Pausiert' : job.state === 'stopped' ? 'Gestoppt' : job.state === 'error' ? 'Fehler' : job.state === 'queued' ? 'Wartet …' : 'Clips werden erstellt …'
   return (
@@ -398,7 +401,7 @@ function RealProcessing(): React.JSX.Element {
           {['paused', 'stopped', 'error'].includes(job.state) && <Button variant="secondary" onClick={() => void resume()}><Play size={15} /> Fortsetzen</Button>}
           {busy && <Button variant="secondary" onClick={() => void stop()} title="Lauf beenden; bereits fertige Ergebnisse bleiben im Projekt"><Square size={14} /> Beenden, Ergebnisse behalten</Button>}
           <Button variant="secondary" onClick={() => { if (window.confirm('Lauf abbrechen und alle Ergebnisse dieses Projekts verwerfen?')) { void discard(); go('start') } }} title="Abbrechen und Ergebnisse verwerfen"><Trash2 size={15} /> Verwerfen</Button>
-          {job.state === 'done' && <Button variant="primary" onClick={() => go('clips')}>Weiter</Button>}
+          {job.state === 'done' && <Button variant="primary" onClick={() => (captionOnlyClip ? openClip(captionOnlyClip.id) : go('clips'))}>{captionOnlyClip ? 'Im Editor öffnen' : 'Weiter'}</Button>}
         </div>
       </div>
     </div>

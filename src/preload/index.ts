@@ -181,6 +181,7 @@ const api = {
   shortme: {
     importFile: (path: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importFile', path),
     importUrl: (url: string): Promise<ShortmeImport> => ipcRenderer.invoke('shortme:importUrl', url),
+    captionOnly: (hash: string, opts?: { diarize?: boolean }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:captionOnly', hash, opts),
     transcribe: (hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice; engine?: SelectionEngineId; profile?: V3Profile }): Promise<ShortmeJob> => ipcRenderer.invoke('shortme:transcribe', hash, opts),
     engineState: (hash: string): Promise<{ state: AnalysisState; busy: boolean }> => ipcRenderer.invoke('shortme:engineState', hash),
     engineSelect: (req: { hash: string; engine: SelectionEngineId; query?: string; contentType?: string | null; frame?: string | null; wanted?: number | null; profile?: string | null }): Promise<EngineSwitchResult> => ipcRenderer.invoke('shortme:engineSelect', req),

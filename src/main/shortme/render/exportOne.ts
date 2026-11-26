@@ -29,7 +29,9 @@ export async function exportEffective(meta: ProjectMeta, transcript: Transcript,
   const eff = effectiveClip(clip, transcript.words, st, layoutInput)
   const preset = effectivePreset(await allPresets(), st.caption)
   const renderer = (await activeModelId('renderer')) === 'remotion_renderer' ? 'remotion' as const : 'tscaps' as const
-  const params = { style: preset, srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, coldOpenSec: style.coldOpenSec ?? 0, hook: st.hook.enabled, renderer, seamCaption: st.caption.style.caption?.y === undefined, seamTitle: st.caption.style.title?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text }
+  // „Nur Untertitel“: fertiges Video bleibt unverändert – keine Pausenschnitte, kein Cold Opener, kein Hook (nur wenn gesetzt: Fingerabdrücke anderer Clips bleiben gleich)
+  const only = clip.captionOnly ? { removePauses: false } : {}
+  const params = { ...only, style: preset, srt: !!opts?.srt, captions: opts?.captions !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, coldOpenSec: clip.captionOnly ? 0 : style.coldOpenSec ?? 0, hook: clip.captionOnly ? false : st.hook.enabled, renderer, seamCaption: st.caption.style.caption?.y === undefined, seamTitle: st.caption.style.title?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text }
   const inputFingerprint = createHash('sha256').update(JSON.stringify([EXPORT_PIPELINE_REVISION, meta.hash, eff.start, eff.end, eff.shots, eff.title, eff.firstWord, eff.lastWord, (eff as { autoCuts?: unknown }).autoCuts ?? null, params])).digest('hex').slice(0, 24)
   // Engine 6: unveränderte, geprüfte Datei wiederverwenden (gleiche Eingaben UND unveränderter Inhalt); sonst neu rendern – der alte Prüfstatus gilt dann nicht
   const art = clip.v6?.artifact

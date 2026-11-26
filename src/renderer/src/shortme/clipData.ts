@@ -18,6 +18,7 @@ export function toUiClip(c: ShortmeClip, thumb: string | null): Clip {
     pending: c.pending,
     // Engine 6: redaktioneller Rang statt Punktzahl (Rangwert, keine Qualitäts- oder Viralitätswahrscheinlichkeit)
     ...(c.v6 ? { rank: c.v6.editorialRank } : {}),
+    ...(c.captionOnly ? { badge: 'Untertitel' } : {}),
     ...(isV4Pipeline(c.engine ?? '') && c.runId ? { v4RunId: c.runId, v4Label: c.engine === 'engine-mac' ? 'Engine Mac' : 'Engine 4' } : {}),
     reason: c.reason, criteria: v2 ? [] : LABELS.map(([k, label]) => ({ label, value: c.criteria[k] })),
     ...(v2 ? { notes: [...(c.v6 ? [`Rang ${c.v6.editorialRank}: ${c.v6.rankReason}`, `Prüfung der exportierten Datei: ${c.v6.audit.coverage.packets} Pakete, ${Math.round(c.v6.audit.coverage.observedSec)} von ${Math.round(c.v6.audit.coverage.outputSec)} s angesehen und angehört · Technik ${c.v6.audit.technical === 'pass' ? 'in Ordnung' : 'fehlerhaft'}`] : []), v2.eventNote, `Schnitt: ${VERIFY[v2.verification] ?? v2.verification}${cut > 0 ? ` · ${Math.round(cut)} s automatisch gekürzt` : ''}`, `Belege: ${v2.modalities.join(', ') || 'keine'}`, ...v2.uncertainty.slice(0, 3)] } : {})

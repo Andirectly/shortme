@@ -36,6 +36,7 @@ import { makeThumbs, thumbPath } from './clips/thumbs'
 import { existsSync } from 'node:fs'
 import { ensureLayoutInput, ensureShots, ensureSignals, loadLayoutInput } from './clips/analysis'
 import { exportClip } from './render/exporter'
+import { publishCaptionOnly } from './clips/captionOnly'
 import { exportEffective } from './render/exportOne'
 import { addExport } from '../upload/store'
 import { deleteClip } from './corrections'
@@ -137,6 +138,18 @@ export function registerShortmeIpc(): void {
     return { changed: true, scenes: scenes.length, others: known.length }
   })
   /** Verarbeitung: Transkription (0–55 %), dann Analyse + Clip-Auswahl (55–100 %). */
+  /** „Nur Untertitel“: transkribieren und einen Clip über das ganze Video anlegen (keine Clip-Suche, kein Schnitt). */
+  ipcMain.handle('shortme:captionOnly', async (_e, hash: string, opts: { diarize?: boolean } | undefined) => {
+    const meta = await loadMeta(hash)
+    if (!meta) throw new Error('Projekt nicht gefunden')
+    if (hasActiveJob(jobs, hash)) throw new Error('Für dieses Projekt läuft schon eine Analyse.')
+    return jobs.enqueue(hash, meta.title, async ({ signal, report }) => {
+      const t = await runTranscription(meta, { diarize: !!opts?.diarize, signal, onProgress: (p) => report(p.stage, p.fraction, p.message) })
+      report('layout', 0.5, 'Clip anlegen …')
+      await publishCaptionOnly(meta, t, signal)
+      report('layout', 1, 'Fertig')
+    }, () => discardProject(hash))
+  })
   ipcMain.handle('shortme:transcribe', async (_e, hash: string, opts: { diarize?: boolean; query?: string; wanted?: number; contentType?: ContentType; frame?: FrameChoice; engine?: SelectionEngineId; profile?: V3Profile }) => {
     const meta = await loadMeta(hash)
     if (!meta) throw new Error('Projekt nicht gefunden')
@@ -340,7 +353,7 @@ ${meta.sourcePath}` }
     const st = stateOf(baseState(clip, presetId, await loadStyle()), sanitizeLog(rawLog, clipId))
     const eff = effectiveClip(clip, transcript.words, st, (await loadLayoutInput(hash, clipId)) ?? (await ensureLayoutInput(meta, clip)))
     const signals = await ensureSignals(meta)
-    const plan = planExport(eff, transcript, signals, true, eff.removed)
+    const plan = planExport(eff, transcript, signals, !clip.captionOnly, eff.removed)
     return { start: eff.start, end: eff.end, duration: plan.duration, cuts: plan.cuts, shots: eff.shots ?? [], pieces: plan.pieces.map((p) => ({ src0: p.src0, src1: p.src1, out0: p.out0, zoom: p.zoom, shot: p.shot })) }
   })
   ipcMain.handle('shortme:jobs', () => jobs.list())
