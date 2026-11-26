@@ -29,7 +29,8 @@ Progressiver Import (Kap. 21), separate Low-Res-Rendition (Kap. 6/8 Variante D),
 ## UNTESTED
 - **Mac (Apple Silicon, M1 Pro 16 GB)** – deshalb ausgeblendet: Adapter (Qwen3.5/mlx_vlm, Gemma 4 `analyze_av`, Embedding) existieren, aber kein einziger Lauf. Speicherbedarf, Paketgrößen (≤ 30 s Ton für Gemma!) und Frame-Limits sind nicht angepasst – `observeRendered` nutzt 40-s-Pakete wie Windows. Vor Mac-Nutzung prüfen.
 - Menschliche Blindbewertung: Paket liegt bereit (`C:\Claude Apps\Shortme-blind\solo`), noch nicht bewertet. Modellurteile (`verified`) sind **kein** Qualitätsnachweis.
-- Nur 2 Quellen (solo 10 min, Podcast 12 min, je 1 Lauf); keine Streams/Gameplay/stille Pointen/4K/VFR-Läufe; keine Wiederholungen → keine P50/P95.
+- Gepackte App (0.53.0) auf einem 6-min-Stream-Mitschnitt: Lauf vollständig, aber nur 2 Clips/1 geprüft (siehe Benchmark) – Stream/Gameplay nicht belegt
+- Nur 2 Vergleichsquellen (solo 10 min, Podcast 12 min, je 1 Lauf); keine Streams/Gameplay/stille Pointen/4K/VFR-Läufe; keine Wiederholungen → keine P50/P95.
 - Remote-Übertragung von Engine-6-Läufen (Hash/Release-Gate) nicht durchgespielt.
 - AV-Redundanzreduktion (`SHORTME_V6_AVDEDUPE=on`) nicht gemessen → bleibt aus.
 

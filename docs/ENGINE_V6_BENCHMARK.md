@@ -17,6 +17,8 @@
 | Podcast 12 min | Engine 4 | 1156 s | 10 | 1 | nicht gemessen | – |
 | Podcast 12 min | **Engine 6** | **775 s (−33 %)** | 7 (3 fehlen) | 4 | 476 s | 3 (Untersuchungsantworten ungültig) |
 
+**Gepackte App (Release 0.53.0, Installer-Build, Commit 0e23bb7)**: Twitch-Mitschnitt „trymacs“ 5:54 min (Stream-Ausschnitt, überwiegend Gameplay), Wunsch 6, Engine 6: 591 s, 2 Clips geliefert, 1 `verified`, 4 Plätze unbesetzt (6 von 8 geprüften Kandidaten `rejected`: hook/standalone/payoff), 1 Teilfehler, 14 Renderversuche, 6 Reparaturen. Kein Engine-4-Vergleich auf dieser Quelle. Das zeigt: Der Lauf ist im gepackten Programm vollständig lauffähig, aber auf Gameplay-/Stream-Material ist die Ausbeute gering und der Zeitaufwand im Verhältnis zur Länge hoch – dort ist Engine 6 nicht belegt besser.
+
 Weitere Messwerte Engine 6 (solo Lauf 3 / Podcast): Peak-VRAM laut nvidia-smi 28,9 / 29,4 GB (Gesamtbelegung der GPU inkl. Desktop; auf 12/16-GB-Karten nicht getestet), Peak-RSS Hauptprozess 373 / 390 MB (Python-Worker nicht eingerechnet), Swap nicht erfasst (unbekannt). Warm (Caches da) solo: 650 s – der Gewinn liegt also nicht am Cache, sondern an der Pipeline.
 
 Phasen solo Lauf 3 (grob): Index/Suche ~100 s, Ranking ~35 s, AV-Untersuchung + Planung ~270 s (Render überlappt), Ausgabeprüfung (AV + Urteil) ~140 s, Reparatur 3×.
