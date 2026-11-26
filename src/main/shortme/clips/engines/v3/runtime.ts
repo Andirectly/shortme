@@ -120,6 +120,12 @@ export async function avRuntimeStatus(): Promise<RuntimeStatus> {
   } catch { return { state: 'missing', detail: 'AV-Laufzeit unvollständig (kein Marker) – Reparatur nötig' } }
 }
 
+/**
+ * pip-Argumente der AV-Umgebung. Windows: die Liste ist ein vollständiger Freeze (inkl. Git-Pakete ohne Hashes) – ohne `--no-deps` löst uv die Abhängigkeiten
+ * von `lighthouse` (verlangt numpy<=1.23.5, die Liste hat 1.26.4) neu auf und scheitert auf frischen Rechnern. Mac: alles aus PyPI mit Hashes.
+ */
+export const avPipArgs = (win: boolean, python: string, torchIndex: string[], lock: string): string[] => ['pip', 'install', '--python', python, ...(win ? ['--no-deps'] : ['--require-hashes']), ...torchIndex, '-r', lock]
+
 export async function installAvRuntime(onLine: (l: string) => void, signal?: AbortSignal): Promise<RuntimeStatus> {
   await mkdir(runtimeRoot(), { recursive: true })
   await ensureUv(onLine, signal)
@@ -127,7 +133,7 @@ export async function installAvRuntime(onLine: (l: string) => void, signal?: Abo
   await run(uvExe(), ['venv', avVenvDir(), '--python', '3.12', '--allow-existing'], onLine, signal)
   onLine('AV-Pakete installieren (mehrere GB) …')
   // Windows: Lighthouse/CLIP kommen als Git-Commit (ohne Hashes); Mac: alles aus PyPI mit Hashes
-  await run(uvExe(), ['pip', 'install', '--python', avPythonExe(), ...(WIN ? [] : ['--require-hashes']), ...torchIndex(), '-r', avLockFile()], onLine, signal)
+  await run(uvExe(), avPipArgs(WIN, avPythonExe(), torchIndex(), avLockFile()), onLine, signal)
   const torch = await new Promise<string>((resolve) => {
     let out = ''
     const p = spawn(avPythonExe(), ['-c', WIN ? 'import torch;print(torch.__version__)' : 'import mlx.core as m;print(m.__version__)'], { windowsHide: true })

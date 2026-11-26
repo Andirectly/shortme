@@ -13,3 +13,11 @@ describe('Lock-Prüfsumme unabhängig von Zeilenenden', () => {
     expect(lockHashes(lf).accepted).not.toContain(h('torch==2.9.0\n'))
   })
 })
+
+import { avPipArgs } from '../src/main/shortme/clips/engines/v3/runtime'
+describe('AV-Laufzeit: pip-Argumente', () => {
+  it('Windows ohne Neuauflösung (--no-deps), Mac mit Hashes', () => {
+    expect(avPipArgs(true, 'py', ['--extra-index-url', 'x'], 'lock.txt')).toEqual(['pip', 'install', '--python', 'py', '--no-deps', '--extra-index-url', 'x', '-r', 'lock.txt'])
+    expect(avPipArgs(false, 'py', [], 'lock.txt')).toEqual(['pip', 'install', '--python', 'py', '--require-hashes', '-r', 'lock.txt'])
+  })
+})
