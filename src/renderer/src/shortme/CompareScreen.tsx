@@ -109,7 +109,7 @@ export function CompareScreen(): React.JSX.Element {
                 <option value="">Clip wählen …</option>
                 {Object.entries(cmp.clips).map(([id, k]) => <option key={id} value={id}>{id.slice(-12)} · {mmss(k.start)}–{mmss(k.end)} · {k.title.slice(0, 40)}</option>)}
               </select>
-              {(['engine4', 'engine-mac', 'multimodal-v2', 'legacy'] as const).filter((e) => localEngines().includes(e)).map((e) => <Button key={e} variant="secondary" disabled={!rcClip || rcBusy} onClick={() => { setRcBusy(true); void api()!.compareRecheck(hash, c.comparisonId, rcClip, e).then(setRechecks).catch((x: unknown) => setErr(String(x))).finally(() => setRcBusy(false)) }}>{rcBusy ? 'Prüft …' : `Mit ${ENGINE_LABEL[e]} prüfen`}</Button>)}
+              {(['engine6', 'engine4', 'engine-mac', 'multimodal-v2', 'legacy'] as const).filter((e) => localEngines().includes(e)).map((e) => <Button key={e} variant="secondary" disabled={!rcClip || rcBusy} onClick={() => { setRcBusy(true); void api()!.compareRecheck(hash, c.comparisonId, rcClip, e).then(setRechecks).catch((x: unknown) => setErr(String(x))).finally(() => setRcBusy(false)) }}>{rcBusy ? 'Prüft …' : `Mit ${ENGINE_LABEL[e]} prüfen`}</Button>)}
             </div>
             {rechecks.map((r) => <small key={r.recheckId} style={{ display: 'block' }}><b>Clip-Recheck · {ENGINE_LABEL[r.byEngine]} · {r.clipId.slice(-12)}</b>: {r.status === 'done' ? `${r.qualityLabel ?? ''} – ${r.reasons ?? ''}` : r.note}{r.uncertain?.length ? ` (unsicher: ${r.uncertain.join('; ')})` : ''}</small>)}
           </div>

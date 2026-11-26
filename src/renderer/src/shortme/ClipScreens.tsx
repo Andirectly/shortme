@@ -80,7 +80,7 @@ function DemoProcessing(): React.JSX.Element {
             <AnimatePresence>
               {ready.map((c) => (
                 <motion.div key={c.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{ width: 96, aspectRatio: '9/16', borderRadius: 10, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover', position: 'relative', border: '1px solid var(--edge)' }}>
-                  <span style={{ position: 'absolute', top: 6, left: 6 }}><Score v={c.score} /></span>
+                  <span style={{ position: 'absolute', top: 6, left: 6 }}><Score v={c.rank ? `#${c.rank}` : c.score} /></span>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -110,7 +110,7 @@ function ClipCard({ c, selected, focused, onSelect, onFocus, onOpen, pct, info }
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.3), transparent 30%, transparent 60%, rgba(0,0,0,0.7))' }} />
         {c.pending && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 15, background: 'rgba(0,0,0,0.35)' }}>{pct}&nbsp;%</div>}
       </div>
-      <button className="sm-score" style={{ position: 'absolute', top: 10, left: 10, border: 0 }} aria-label={`Score ${c.score}, Details`} onClick={(e) => { e.stopPropagation(); onFocus() }}>{c.score}</button>
+      <button className="sm-score" style={{ position: 'absolute', top: 10, left: 10, border: 0 }} aria-label={c.rank ? `Rang ${c.rank}, Details` : `Score ${c.score}, Details`} onClick={(e) => { e.stopPropagation(); onFocus() }}>{c.rank ? `#${c.rank}` : c.score}</button>
       <button aria-label="Auswählen" aria-pressed={selected} onClick={onSelect} style={{ position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: '50%', border: '1.5px solid #fff', background: selected ? 'var(--accent)' : 'rgba(0,0,0,0.35)', display: 'grid', placeItems: 'center' }}>{selected && <Check size={14} />}</button>
       <div onClick={onFocus} style={{ padding: '10px 12px 12px', display: 'grid', gap: 4, cursor: 'pointer' }}>
         <h3 style={{ fontSize: 14, lineHeight: 1.25 }}>{c.title}</h3>
@@ -160,7 +160,7 @@ function ClipInspector({ c, info, real, hash, srcPath, pos, onOpen, onReview, on
       </div>
       <div style={{ display: 'grid', gap: 4 }}>
         <h2 style={{ fontSize: 20, lineHeight: 1.25 }}>{c.title}</h2>
-        <small style={{ fontVariantNumeric: 'tabular-nums' }}>Score {c.score} · {c.duration} s{info ? ` · Quelle ${mmss(info.start)}–${mmss(info.end)}` : ''}{c.v4RunId ? ` · ${c.v4Label ?? 'Engine 4'}` : ''}</small>
+        <small style={{ fontVariantNumeric: 'tabular-nums' }}>{c.rank ? `Rang ${c.rank}` : `Score ${c.score}`} · {c.duration} s{info ? ` · Quelle ${mmss(info.start)}–${mmss(info.end)}` : ''}{c.v4RunId ? ` · ${c.v4Label ?? 'Engine 4'}` : ''}</small>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <Button variant="primary" onClick={onOpen} style={{ flex: 1 }}><Pencil size={14} /> Im Editor</Button>
@@ -249,7 +249,7 @@ export function ClipsScreen(): React.JSX.Element {
   return (
     <div style={{ display: 'grid', gap: 18, paddingTop: 12, paddingBottom: 90 }}>
       <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 16 }}>
-        <div><h1>{title ?? PROJECTS[0].name}</h1><small>{pending ? `${list.length - pending} von ${list.length} fertig · Analyse läuft` : `${list.length} Clips · nach Score sortiert`}
+        <div><h1>{title ?? PROJECTS[0].name}</h1><small>{pending ? `${list.length - pending} von ${list.length} fertig · Analyse läuft` : `${list.length} Clips · nach ${list.some((c) => c.rank) ? "Rang" : "Score"} sortiert`}
           {!pending && timing && <span title={timing.stages.map((s) => `${STAGE_TIME_LABEL[s.stage] ?? s.stage}: ${fmtDur(s.sec)}`).join('\n')}> · Laufzeit {fmtDur(timing.totalSec)}</span>}</small></div>
         <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
           <EngineBar />
@@ -280,7 +280,7 @@ export function ClipsScreen(): React.JSX.Element {
               <div style={{ width: 54, aspectRatio: '9/16', borderRadius: 8, backgroundImage: `url(${c.thumb})`, backgroundSize: 'cover' }} />
               <div style={{ display: 'grid', gap: 4 }}><h3>{c.title}</h3><small>{tidyCut(c.reason)}</small>{infos.get(c.id) && !c.pending && <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}><QualityBadge status={infos.get(c.id)!.q.status} stale={infos.get(c.id)!.q.stale} /><ReviewBadge view={infos.get(c.id)!.view} /><small style={{ color: 'var(--text-2)' }}>Quelle {mmss(infos.get(c.id)!.start)}–{mmss(infos.get(c.id)!.end)}</small></div>}</div>
               <small>{c.duration} s</small>
-              <Score v={c.score} />
+              <Score v={c.rank ? `#${c.rank}` : c.score} />
             </motion.div>
           ))}
         </div>

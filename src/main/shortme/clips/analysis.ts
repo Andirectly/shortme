@@ -8,29 +8,24 @@ import { writeFileAtomic } from '../atomic'
 import { loadTranscript } from '../transcription'
 import { signalsFromWav, type Signals } from './signals'
 import { detectShots, refineCuts } from './scenes'
-import { snapShotsToCuts } from '../../../shared/shots'
 import { collecting, notifyLearnChange } from '../../learn/store'
 import { applyAcceptedRules } from '../../learn/rules'
 import { fetchTrend } from '../../learn/trend'
 import type { CandTrace } from './select'
 import { makeThumbs } from './thumbs'
 import { layoutForClip } from '../layout/run'
+import { layoutClip, prepareLayout } from './clipLayout'
 import { applyPersons, buildPersons } from './persons'
 import { loadHeat } from './heat'
 import { loadChatSignal } from '../../twitch/chat'
-import { loadProfile, channelLayout } from '../profiles'
+import { loadProfile } from '../profiles'
 import { applySecondPass, secondPassKind } from './secondPass'
-import { findFacecam } from '../layout/facecam'
-import { classifyScenes } from '../layout/streamScenes'
-import { mergeStreamScenes, scenesOf } from '../layout/streamShots'
-import { defaultStream, type StreamLayout } from '../../../shared/streamLayout'
 import type { ContentType, FrameChoice } from '../../../shared/videoKind'
-import { guardEmptyShots, type PlanOptions } from '../../../shared/layoutPlan'
 import { overlapsSilence } from '../../twitch/silence'
 import { detectAudioEvents, loadEvents, saveEvents, yamnetAvailable, type AudioEvent } from './audioEvents'
 import { loadTopics, saveTopics, type TopicMap } from './topics'
 import type { PlanInput } from '../../../shared/layoutPlan'
-import { displayedRunId, LEGACY_RUN_ID, newRunId, V2_ENGINE_VERSION, V3_ENGINE_VERSION, V4_ENGINE_VERSION, hasProfiles, isV3Profile, type RunInfo, type SelectionEngineId, type V3Profile } from '../../../shared/engine'
+import { displayedRunId, LEGACY_RUN_ID, newRunId, V2_ENGINE_VERSION, V3_ENGINE_VERSION, V4_ENGINE_VERSION, V6_ENGINE_VERSION, hasProfiles, isV3Profile, type RunInfo, type SelectionEngineId, type V3Profile } from '../../../shared/engine'
 import { clipsPathFor, loadState, patchRun, registerRun, showRun } from './engines/state'
 import { analysisFingerprint } from './engines/control'
 import { engineRevisions, runSelection } from './engines'
@@ -89,7 +84,7 @@ export interface ClipsFile {
   query: string
   createdAt: string
   /** `llm`/`texttiling`: bisherige Engine; `v2`: neue Engine (eigene Datenverträge, siehe `engine`/`runId`). */
-  mode: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4'
+  mode: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4' | 'v6'
   engine?: SelectionEngineId
   runId?: string
   clips: ShortmeClip[]
@@ -169,7 +164,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   const signals = await ensureSignals(meta)
   // Engine Mac braucht Kamerawechsel erst für Schnittkanten/Render (nach Sprachsuche und Beobachtung): TransNetV2 (CPU, ~5 min bei 26 min Video)
   // läuft parallel zu den GPU-Schritten statt davor
-  const lateShots = opts.engine === 'engine-mac'
+  const lateShots = opts.engine === 'engine-mac' || opts.engine === 'engine6'
   if (!lateShots) report('shots', 0, 'Kamerawechsel erkennen …')
   const shotsP = ensureShots(meta, opts.signal, lateShots ? undefined : (f) => report('shots', f, 'Kamerawechsel erkennen …'))
   shotsP.catch(() => undefined) // Fehler kommt beim Abwarten an
@@ -191,11 +186,11 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   // Engine und Lauf stehen ab hier fest. Legacy schreibt wie bisher nach clips.json, die neue Engine in ihren eigenen Lauf-Ordner.
   const engine: SelectionEngineId = opts.engine ?? 'legacy'
   const v3Profile: V3Profile = isV3Profile(opts.profile) ? opts.profile : 'balanced'
-  const runId = engine === 'legacy' ? LEGACY_RUN_ID : newRunId(Math.random, Date.now, engine === 'engine-mac' ? 'vm' : engine === 'engine4' ? 'v4' : engine === 'adaptive-v3' ? 'v3' : 'v2')
+  const runId = engine === 'legacy' ? LEGACY_RUN_ID : newRunId(Math.random, Date.now, engine === 'engine6' ? 'v6' : engine === 'engine-mac' ? 'vm' : engine === 'engine4' ? 'v4' : engine === 'adaptive-v3' ? 'v3' : 'v2')
   const clipsPath = clipsPathFor(meta.hash, runId)
   if (engine !== 'legacy') {
     const run: RunInfo = {
-      runId, engineId: engine, engineVersion: engine === 'engine4' || engine === 'engine-mac' ? V4_ENGINE_VERSION : engine === 'adaptive-v3' ? V3_ENGINE_VERSION : V2_ENGINE_VERSION, schema: 1, createdAt: new Date().toISOString(), status: 'running',
+      runId, engineId: engine, engineVersion: engine === 'engine6' ? V6_ENGINE_VERSION : engine === 'engine4' || engine === 'engine-mac' ? V4_ENGINE_VERSION : engine === 'adaptive-v3' ? V3_ENGINE_VERSION : V2_ENGINE_VERSION, schema: 1, createdAt: new Date().toISOString(), status: 'running',
       fingerprint: analysisFingerprint({ hash: meta.hash, engine, transcriptVersion: t.version, wordCount: t.words.length, asrModel: t.model, query: opts.query, contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, revisions: engineRevisions(engine, v3Profile) }),
       options: { query: opts.query ?? '', contentType: opts.contentType ?? null, frame, wanted: opts.wanted ?? null, minSec: 15, maxSec: 75, ...(hasProfiles(engine) ? { profile: v3Profile } : {}) }, models: {}, modalities: {}
     }
@@ -206,7 +201,7 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   let trace: CandTrace[]
   let runPatch: Awaited<ReturnType<typeof runSelection>>['run']
   try {
-    const out = await runSelection({ engine, runId, input, options: sel, noLlm: opts.noLlm, profile: v3Profile, contentType: opts.contentType ?? null, signal: opts.signal, report, project: { hash: meta.hash, sourcePath: meta.sourcePath, durationSec: meta.durationSec, hasAudio: meta.hasAudio } })
+    const out = await runSelection({ engine, runId, input, options: sel, noLlm: opts.noLlm, profile: v3Profile, contentType: opts.contentType ?? null, signal: opts.signal, report, project: { hash: meta.hash, sourcePath: meta.sourcePath, durationSec: meta.durationSec, hasAudio: meta.hasAudio }, layout: { frame, tracking: profile.tracking } })
     clips = out.clips; mode = out.mode; trace = out.trace ?? []; runPatch = out.run
     if (lateShots) cuts = await shotsP
   } catch (e) {
@@ -231,22 +226,15 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
   if (silent.length) clips = clips.filter((c) => !overlapsSilence(silent, c.start, c.end))
   // Tracking & Layouts (M5): Gesichtsquote fließt ins Ranking ein
   // Layout-Analyse (Gesichter, Spuren, Sprecher) je Clip – zwei Clips gleichzeitig: Decodieren (FFmpeg) und Inferenz überlappen sich
-  const plan: Partial<PlanOptions> = { allowSplit: profile.tracking.split && frame !== 'fixed', follow: frame === 'fixed' ? 'fixed' : profile.tracking.follow }
+  // Engine 6 hat den Ausschnitt vor Render und Prüfung festgelegt (Plan eingefroren): keine zweite Planung, keine Gesichtsquoten-Strafe, Reihenfolge = redaktioneller Rang
+  const frozen = engine === 'engine6'
   // Facecam + Gameplay: Layout des Kanals (gespeichert) oder Facecam im Video finden; ohne Facecam bleibt es beim Gameplay-Ausschnitt
-  let streamBase: StreamLayout | null = null
-  const otherCams: StreamLayout[] = [] // weitere Facecams (andere Streamer-Ansichten), über alle Clips des Laufs geteilt
-  if (frame === 'stream') {
-    report('layout', 0, 'Facecam suchen …')
-    const dims = { width: meta.width, height: meta.height }
-    streamBase = await channelLayout(meta.twitch?.channel)
-    if (!streamBase) { const found = await findFacecam(meta.sourcePath, 0, meta.durationSec, 14, opts.signal).catch(() => null); if (found) streamBase = defaultStream(dims, found.cam) }
-    report('layout', 0, streamBase ? 'Facecam gefunden' : 'Keine Facecam gefunden – Gameplay-Ausschnitt')
-  }
+  const lctx = frozen ? null : await prepareLayout(meta, cuts, frame, profile.tracking, opts.signal, (m) => report('layout', 0, m))
   // Fortschrittliche Übersicht: Clips sofort veröffentlichen (ausgegraut), jeder wird fertig, sobald sein Layout berechnet ist
   await mkdir(dirname(clipsPath), { recursive: true })
   const meta0 = { engine, runId }
   let writing: Promise<unknown> = Promise.resolve()
-  const publish = (): Promise<unknown> => (writing = writing.then(() => writeFileAtomic(clipsPath, JSON.stringify({ version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, ...meta0, clips: [...clips].sort((x, y) => y.score - x.score) } satisfies ClipsFile, null, 1))))
+  const publish = (): Promise<unknown> => (writing = writing.then(() => writeFileAtomic(clipsPath, JSON.stringify({ version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, ...meta0, clips: frozen ? [...clips] : [...clips].sort((x, y) => y.score - x.score) } satisfies ClipsFile, null, 1))))
   clips = clips.map((c) => ({ ...c, pending: true }))
   await publish()
   // Ab hier gibt es Clips dieses Laufs: sie erscheinen fortlaufend in der Übersicht (bis dahin blieb die bisherige Anzeige stehen)
@@ -258,23 +246,12 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     for (;;) {
       const i = nextClip++
       if (i >= clips.length) return
-      const l = await layoutForClip(meta, clips[i], cuts, opts.signal, undefined, plan)
-      layouts[i] = l
-      await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(l.input))
-      let shots = snapShotsToCuts(guardEmptyShots(l.shots, l.input), clips[i].start, cuts) // Sicherheitsnetz: keine Person im Ausschnitt → Ganzes Bild; Wechsel exakt auf den Videoschnitt
-      let penalty = l.penalty
-      let stream: StreamLayout | undefined
-      if (frame === 'fit') shots = [{ start: 0, end: clips[i].end - clips[i].start, layout: 'fit', cx: 0.5, zoom: 1 }]
-      else if (frame === 'stream') {
-        penalty = 0 // Gesichtsquote sagt bei Streams nichts: das Gameplay ist der Inhalt
-        if (streamBase) {
-          const base = streamBase
-          const scenes = await classifyScenes(meta.sourcePath, scenesOf(clips[i].start, clips[i].end, cuts), base, { width: meta.width, height: meta.height }, otherCams, opts.signal)
-          shots = mergeStreamScenes(clips[i].start, clips[i].end, shots, scenes, base)
-          stream = base
-        } else shots = [{ start: 0, end: clips[i].end - clips[i].start, layout: 'fixed', cx: 0.5, zoom: 1 }]
+      if (!frozen) {
+        const r = await layoutClip(lctx!, clips[i])
+        layouts[i] = r.layout
+        await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(r.layout.input))
+        clips[i] = { ...r.clip, score: Math.max(0, clips[i].score - r.penalty) }
       }
-      clips[i] = { ...clips[i], shots, faceRatio: l.faceRatio, score: Math.max(0, clips[i].score - penalty), ...(stream ? { stream } : {}) }
       await makeThumbs(meta, [clips[i]], opts.signal)
       clips[i] = { ...clips[i], pending: undefined }
       await publish()
@@ -290,11 +267,11 @@ export async function runAnalysis(meta: ProjectMeta, opts: AnalysisOptions = {})
     throw e
   }
   // Personen über das ganze Video (Wiedererkennung) → persons.json; Plan-Eingaben tragen die Personen
-  if (layouts.some((l) => l.identities.length)) {
+  if (layouts.some((l) => l?.identities.length)) {
     const pf = await buildPersons(meta, clips, layouts).catch((e) => { console.error('Personen-Zuordnung fehlgeschlagen:', e); return null })
     if (pf) for (let i = 0; i < clips.length; i++) await writeFileAtomic(layoutFile(meta.hash, clips[i].id), JSON.stringify(applyPersons(layouts[i].input, clips[i].id, pf)))
   }
-  clips.sort((x, y) => y.score - x.score)
+  if (!frozen) clips.sort((x, y) => y.score - x.score)
   const file: ClipsFile = { version: 1, hash: meta.hash, query: opts.query ?? '', createdAt: new Date().toISOString(), mode, ...meta0, clips, ...(opts.timing ? { timing: opts.timing() } : {}) }
   await writeFileAtomic(clipsPath, JSON.stringify(file, null, 1))
   if (engine === 'legacy') {

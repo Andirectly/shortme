@@ -39,7 +39,7 @@ export function Switch({ on, onChange, label }: { on: boolean; onChange: (b: boo
   )
 }
 
-export const Score = ({ v }: { v: number }): React.JSX.Element => <span className="sm-score">{v}</span>
+export const Score = ({ v }: { v: number | string }): React.JSX.Element => <span className="sm-score">{v}</span>
 
 /** Zeile mit Titel; toggle steht rechts in der Titelzeile (z. B. Schalter). hint wird bewusst nicht angezeigt (keine Erklärtexte). */
 /** off: Unterregler bleiben sichtbar (kein Springen der Oberfläche), sind aber abgeblendet und gesperrt. */

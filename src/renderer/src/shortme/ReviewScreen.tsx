@@ -189,7 +189,7 @@ export function ReviewScreen(): React.JSX.Element {
           <div className="sm-glass" style={{ padding: 18, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', minWidth: 0, overflowWrap: 'anywhere', gap: 12, alignContent: 'start' }}>
             <small style={{ color: 'var(--text-2)' }}>Clip {idx + 1} von {list.length}</small>
             <h2 style={{ fontSize: 20, lineHeight: 1.25 }}>{c.title}</h2>
-            <small style={{ fontVariantNumeric: 'tabular-nums' }}>Länge {Math.round(c.end - c.start)} s · Quelle {mmss(c.start)}–{mmss(c.end)}{typeof c.score === 'number' ? ` · Score ${c.score}` : ''}</small>
+            <small style={{ fontVariantNumeric: 'tabular-nums' }}>Länge {Math.round(c.end - c.start)} s · Quelle {mmss(c.start)}–{mmss(c.end)}{c.v6 ? ` · Rang ${c.v6.editorialRank}` : typeof c.score === 'number' ? ` · Score ${c.score}` : ''}</small>
             {c.reason && <small style={{ color: 'var(--text-1)' }} title="Begründung der Auswahl – keine Qualitätsgarantie">{tidyCut(c.reason)}</small>}
             <div style={{ display: 'grid', gap: 6, justifyItems: 'start' }}>
               <QualityBadge status={cur!.q.status} stale={cur!.q.stale} />

@@ -17,7 +17,7 @@ export interface ClipRecheck {
   recheckId: string
   clipId: string
   fromRunId: string
-  byEngine: 'multimodal-v2' | 'legacy' | 'engine4' | 'engine-mac'
+  byEngine: 'multimodal-v2' | 'legacy' | 'engine4' | 'engine-mac' | 'engine6'
   outputSha256?: string
   at: string
   status: 'done' | 'unavailable' | 'failed'
@@ -36,6 +36,17 @@ export async function recheckClip(hash: string, clip: ShortmeClip, fromRunId: st
   const meta = await loadMeta(hash)
   const t = await loadTranscript(hash)
   if (!meta) return { ...base, status: 'failed', note: 'Projekt nicht gefunden' }
+  if (byEngine === 'engine6') {
+    if (!t) return { ...base, status: 'failed', note: 'Transkript fehlt' }
+    try {
+      const { recheckV6 } = await import('./v6/recheck')
+      const a = await recheckV6(meta, t, clip, projectFile(hash, `analysis/rechecks/${base.recheckId}`), signal)
+      return { ...base, status: 'done', note: `Neuprüfung des aktuellen Clips durch Engine 6 (Datei wie Export, ${a.coverage.packets} Prüfpakete über ${Math.round(a.coverage.observedSec)} von ${Math.round(a.coverage.outputSec)} s, Technik ${a.technicalStatus}). Keine Entdeckung.`, qualityLabel: a.status, reasons: a.criteria.map((c) => `${c.id}: ${c.state}`).join(', '), uncertain: a.criteria.filter((c) => c.state === 'unknown').map((c) => `${c.id}: ${c.reason}`), outputSha256: a.sha256, observations: a.criteria.map((c) => `${c.id}/${c.state}: ${c.reason}`.slice(0, 300)) }
+    } catch (e) {
+      if (signal?.aborted) throw e
+      return { ...base, status: 'failed', note: `Engine-6-Recheck fehlgeschlagen: ${e instanceof Error ? e.message.slice(0, 200) : String(e)}` }
+    }
+  }
   if (byEngine === 'engine4' || byEngine === 'engine-mac') {
     // Engine 4: den Clip so rendern, wie er ist (seine Stücke, Untertitel, Ausschnitt), und am fertigen Ergebnis mit Bild+Ton prüfen – keine Entdeckung
     if (!t) return { ...base, status: 'failed', note: 'Transkript fehlt' }

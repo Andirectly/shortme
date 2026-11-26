@@ -13,6 +13,7 @@ import { v2MissingModels } from './clips/engines/v2/models'
 import { v3MissingModels } from './clips/engines/v3/models'
 import { v4MissingModels } from './clips/engines/v4/models'
 import { mac2MissingModels } from './clips/engines/mac2/models'
+import { v6MissingModels } from './clips/engines/v6/adapters'
 import { v4Provenance } from './clips/engines/v4/provenance'
 import { installAvRuntime, installRuntime, runtimeStatus } from './clips/engines/v3/runtime'
 import { addOverride, addRecheck, listRechecks, addReview, clipIndex, blindPresentation, createComparison, getComparison, listComparisons } from './clips/compare'
@@ -23,7 +24,7 @@ import type { ContentType, FrameChoice } from '../../shared/videoKind'
 const ACTIVE = ['queued', 'running', 'paused']
 
 /** Fehlende Pflichtvoraussetzungen der Engine (leer = bereit). */
-export const missingModelsFor = (engine: SelectionEngineId): Promise<Array<{ id: string; name: string; sizeBytes: number }>> => (engine === 'multimodal-v2' ? v2MissingModels() : engine === 'adaptive-v3' ? v3MissingModels() : engine === 'engine4' ? v4MissingModels() : engine === 'engine-mac' ? mac2MissingModels() : Promise.resolve([]))
+export const missingModelsFor = (engine: SelectionEngineId): Promise<Array<{ id: string; name: string; sizeBytes: number }>> => (engine === 'multimodal-v2' ? v2MissingModels() : engine === 'adaptive-v3' ? v3MissingModels() : engine === 'engine4' ? v4MissingModels() : engine === 'engine-mac' ? mac2MissingModels() : engine === 'engine6' ? v6MissingModels() : Promise.resolve([]))
 
 export const hasActiveJob = (jobs: JobQueue, hash: string): boolean => jobs.list().some((j) => j.hash === hash && ACTIVE.includes(j.state))
 
@@ -48,7 +49,7 @@ export function registerEngineControlIpc(jobs: JobQueue): void {
   ipcMain.handle('shortme:v3RuntimeStatus', () => runtimeStatus())
   ipcMain.handle('shortme:compareCreate', (_e, hash: string, runIds: string[]) => createComparison(hash, runIds))
   ipcMain.handle('shortme:compareRechecks', (_e, hash: string, id: string) => listRechecks(hash, id))
-  ipcMain.handle('shortme:compareRecheck', (_e, hash: string, id: string, clipId: string, engine: 'multimodal-v2' | 'legacy' | 'engine4' | 'engine-mac') => addRecheck(hash, id, clipId, engine))
+  ipcMain.handle('shortme:compareRecheck', (_e, hash: string, id: string, clipId: string, engine: 'multimodal-v2' | 'legacy' | 'engine4' | 'engine-mac' | 'engine6') => addRecheck(hash, id, clipId, engine))
   ipcMain.handle('shortme:v4Provenance', (_e, hash: string, runId: string, clipId: string) => v4Provenance(hash, runId, clipId))
   ipcMain.handle('shortme:compareList', (_e, hash: string) => listComparisons(hash))
   ipcMain.handle('shortme:compareGet', async (_e, hash: string, id: string) => { const c = await getComparison(hash, id); return c ? { c, clips: await clipIndex(hash, c), sourcePath: (await loadMeta(hash))?.sourcePath ?? null } : null })

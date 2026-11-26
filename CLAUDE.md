@@ -112,3 +112,10 @@ Für Suchen in Referenz-Repos einen Subagenten nutzen, der nur eine kurze Zusamm
 - Spuren 0.48: Chat-Spur (`chatLane`, Spitzen = verschiedene Schreiber je 10 s gegen 5-min-Median, Spam eines Nutzers zählt einmal) in Engine 4 + Mac; Spur-Gewichte aus Review-Freigaben (`learnedLaneWeights`, erst ab 30 Entscheidungen, 0,7–1,3, Spuren aus `v2.eventNote`); Sprachsuche-Cache `analysis/cache/speech-<key>.json`; Mac-Endprüfung kürzen → docs/MAC-AUFTRAG-ENDPRUEFUNG.md
 - Remote-Abnahme (Windows, 25.11.): zwei Profile auf einem Rechner (`CUTAWAN_USER_DATA` + `SHORTME_DATA`, Modelle per Junction) = echte Kopplung/Jobs über HyperDHT; Einzelinstanz-Sperre muss NACH `setPath('userData')` kommen; Worker lehnt unbekannte Engines ab (`isUnsupportedEngine`), nie stiller Ersatz; Dev-Instanz braucht vorher `npm install` (hyperswarm u. a.)
 - Laufzeit-Lock: Windows-CI packt `requirements*.lock.txt` mit CRLF, lokale Builds mit LF → Prüfsumme über normalisierte Zeilenenden (`lockHashes`), sonst installiert jede Version die Python-Laufzeit neu
+
+## Arbeitsweise (Token sparen, Qualität nie opfern)
+- Hauptagent Opus; Haiku-Subagent `log-reader` (.claude/agents) für große Logs/Lauf-Ordner/Dateisuchen, Sonnet für Standardarbeit (UI, IPC, Tests, Doku); Delegieren nur wenn es Gesamtkosten senkt
+- Fortschritt in `docs/ENGINE_V6_PROGRESS.md` pflegen (erledigt, Entscheidungen, nächster Schritt) und vor Kontextkürzung speichern; PDF nicht erneut komplett lesen
+- Volle Test-/Build-Logs auf Platte (`> log 2>&1`), nur Fehlerzeilen lesen; gezielte Tests beim Entwickeln, volle Suite an Meilensteinen
+
+- Engine 6 (Windows, solo/Podcast kalt gegen Engine 4): −55 %/−33 % Zeit, weniger Clips aber mehr „geprüft“; Hebel = Render überlappt mit AV-Planung + Host-Schnitt aus Satz-IDs + Reserven nur bei Bedarf; neue Python-Operationen nie `len(frames)` nach `del frames`; Recheck/Export: geprüfte Datei nur bei gleichem Fingerabdruck+SHA wiederverwenden (Recheck `reuse:false`, sonst fehlen Untertitelwörter); Mac: Engine 6 ausgeblendet bis getestet (`ENGINE6_ON_MAC`); Stand `docs/ENGINE_V6_STATUS.md`

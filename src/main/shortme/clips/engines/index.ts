@@ -8,10 +8,13 @@ import { v2Revisions } from './v2/revisions'
 import { v3Revisions } from './v3/revisions'
 import { v4Revisions } from './v4/revisions'
 import { mac2Revisions } from './mac2/revisions'
+import { v6Revisions } from './v6/revisions'
+import type { FrameChoice } from '../../../../shared/videoKind'
+import type { PlanOptions } from '../../../../shared/layoutPlan'
 
 export interface SelectionOutcome {
   clips: ShortmeClip[]
-  mode: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4'
+  mode: 'llm' | 'texttiling' | 'v2' | 'v3' | 'v4' | 'v6'
   /** Nur Legacy: Kandidaten-Spur für das Lernen. */
   trace?: CandTrace[]
   /** Nur V2: Angaben zum Lauf (Modalitäten, Abdeckung, Modelle). */
@@ -32,6 +35,8 @@ export interface SelectionRequest {
   report: (stage: string, fraction: number, message: string) => void
   /** Projektdaten, die nur die neue Engine braucht. */
   project: { hash: string; sourcePath: string; durationSec: number; hasAudio: boolean }
+  /** Bildausschnitt-Wahl und Tracking aus dem Inhaltsprofil (Engine 6 plant den Ausschnitt vor dem Render). */
+  layout?: { frame: FrameChoice; tracking: { split: boolean; follow: PlanOptions['follow'] } }
 }
 
 /** Legacy: bisheriges Verfahren (LLM-Auswahl, bei fehlendem/fehlerhaftem Modell TextTiling). Ergebnis und Ablauf unverändert. */
@@ -53,7 +58,7 @@ async function selectLegacy(req: SelectionRequest): Promise<SelectionOutcome> {
 
 /** Modell-/Prompt-/Algorithmusversionen der Engine für den Eingabefingerabdruck (Legacy: keine, sein Ergebnis hängt nicht an solchen Revisionen). */
 export function engineRevisions(engine: SelectionEngineId, profile: V3Profile = 'balanced'): string[] {
-  return engine === 'multimodal-v2' ? v2Revisions() : engine === 'adaptive-v3' ? v3Revisions(profile) : engine === 'engine4' ? v4Revisions(profile) : engine === 'engine-mac' ? mac2Revisions() : []
+  return engine === 'multimodal-v2' ? v2Revisions() : engine === 'adaptive-v3' ? v3Revisions(profile) : engine === 'engine4' ? v4Revisions(profile) : engine === 'engine-mac' ? mac2Revisions() : engine === 'engine6' ? v6Revisions() : []
 }
 
 export async function runSelection(req: SelectionRequest): Promise<SelectionOutcome> {
@@ -69,6 +74,11 @@ export async function runSelection(req: SelectionRequest): Promise<SelectionOutc
     // Eigener Orchestrator (v4/), ruft weder runPipeline (Engine 2/3) noch selectV3 auf
     const { selectV4 } = await import('./v4')
     return selectV4(req)
+  }
+  if (req.engine === 'engine6') {
+    // Eigener Orchestrator (v6/): nutzt v4-Bausteine, ist aber KEINE v4-Pipeline (isV4Pipeline bleibt false)
+    const { selectV6 } = await import('./v6')
+    return selectV6(req)
   }
   if (req.engine === 'engine-mac') {
     // Standard auf dem Mac: eigener Ablauf (LFM3-Omni beobachtet, Qwen3.5 plant und prüft); keine Weiterleitung an Engine 4

@@ -18,8 +18,9 @@ const defaultFile = (): string => join(dataRoot(), 'engine-default.json')
 export const isLocalEngine = (e: unknown): e is SelectionEngineId => enginesFor(process.platform).includes(e as SelectionEngineId)
 
 export async function loadDefaultEngine(): Promise<SelectionEngineId> {
-  if (process.platform === 'darwin') return 'engine-mac'
-  try { const e = (JSON.parse(await readFile(defaultFile(), 'utf8')) as { engine?: unknown }).engine; return isLocalEngine(e) ? e : 'adaptive-v3' } catch { return 'adaptive-v3' }
+  // Mac: Engine Mac bleibt Standard, eine ausdrücklich gespeicherte Wahl (z. B. Engine 6) wird aber nicht still überschrieben
+  const fallback: SelectionEngineId = process.platform === 'darwin' ? 'engine-mac' : 'adaptive-v3'
+  try { const e = (JSON.parse(await readFile(defaultFile(), 'utf8')) as { engine?: unknown }).engine; return isLocalEngine(e) ? e : fallback } catch { return fallback }
 }
 export async function saveDefaultEngine(engine: SelectionEngineId): Promise<SelectionEngineId> {
   if (!isLocalEngine(engine)) throw new Error('Diese Engine läuft auf diesem System nicht')
