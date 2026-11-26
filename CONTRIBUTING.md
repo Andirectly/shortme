@@ -1,6 +1,6 @@
-# Contributing to Cutawan
+# Contributing to Shortme
 
-Thanks for looking. Cutawan is a TypeScript Electron app and contributions are
+Thanks for looking. Shortme is a TypeScript Electron app and contributions are
 genuinely welcome, whether that is a bug report, a caption style or a new
 pipeline stage.
 
@@ -10,8 +10,8 @@ You need **Node.js 20+**. FFmpeg is bundled, so there is nothing else to
 install.
 
 ```bash
-git clone https://github.com/JeremySNR/cutawan.git
-cd cutawan
+git clone https://github.com/Andirectly/shortme.git
+cd shortme
 npm install
 npm run dev
 ```
@@ -49,7 +49,7 @@ visible effect), add the `no release notes` label instead.
 These lines are what people read: the release workflow publishes a version's
 section as its GitHub release notes, the app shows the same text in Settings →
 Updates before someone updates, and again as "What's new" after they do. So
-write them for someone using Cutawan, not for a code reviewer:
+write them for someone using Shortme, not for a code reviewer:
 
 - Say what changed for them: "Clips appear as soon as they're scored" rather
   than "Move eager reframe out of analyzeProject".
