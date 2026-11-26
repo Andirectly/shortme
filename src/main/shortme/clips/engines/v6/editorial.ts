@@ -5,7 +5,7 @@ import type { Sentence } from '../../sentences'
 import { chatJson, isObj, loadPrompt } from '../../llm'
 import type { Lane, Span } from '../v4/core'
 
-export const V6_RANK_PROMPT = 'v6/rank@2'
+export const V6_RANK_PROMPT = 'v6/rank@3'
 export type Decision = 'use' | 'investigate' | 'reject'
 export const DECISIONS: Decision[] = ['use', 'investigate', 'reject']
 
@@ -142,13 +142,13 @@ export interface RankingResult { order: string[]; decisions: Map<string, RankDec
  * weiter, bis höchstens 6 übrig sind (kein O(n²)-Turnier). Restliche Kandidaten folgen nach Gruppenrang. Fehlgeschlagene Gruppen bleiben „unvollständig“
  * und werden nicht als bewertet gezählt.
  */
-export async function rankCandidates(url: string, cands: V6Candidate[], o: { query?: string; seed: number; maxChars: number; signal?: AbortSignal; model?: string; onRound?: (r: RankRound) => void }): Promise<RankingResult> {
+export async function rankCandidates(url: string, cands: V6Candidate[], o: { query?: string; /** Sprache der Titel (Deutsch/Englisch), aus dem Transkript erkannt */ lang?: string; seed: number; maxChars: number; signal?: AbortSignal; model?: string; onRound?: (r: RankRound) => void }): Promise<RankingResult> {
   const rounds: RankRound[] = []
   const decisions = new Map<string, RankDecision>()
   const incomplete: string[] = []
   const call = async (label: string, list: V6Candidate[], seed: number): Promise<RankDecision[] | null> => {
     const order = shuffled(list, seed)
-    const prompt = await loadPrompt('v6/rank', { n: order.length, query: o.query ? `Der Nutzer sucht besonders: ${o.query}` : '', candidates: order.map(candidateBlock).join('\n\n') })
+    const prompt = await loadPrompt('v6/rank', { lang: o.lang ?? 'des Kandidatentextes', n: order.length, query: o.query ? `Der Nutzer sucht besonders: ${o.query}` : '', candidates: order.map(candidateBlock).join('\n\n') })
     const t0 = Date.now()
     const sids = [...new Set(order.flatMap((c) => c.sentences))].sort((a, b) => a - b)
     try {

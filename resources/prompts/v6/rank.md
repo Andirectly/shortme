@@ -17,7 +17,7 @@ Entscheidung je Kandidat:
 first/last: Satznummern (S…) aus GENAU diesem Kandidaten, die den besten vollständigen Clip ergeben (Einstieg bis natürliches Ende). Nie mitten in einer Frage/Antwort-Folge enden. Wortlose Kandidaten: -1.
 rank: 1 = bester Kandidat dieser Runde; jede Zahl 1..N genau einmal.
 reason: höchstens 18 Wörter, konkret (was trägt bzw. was fehlt). question: nur bei "investigate", sonst "".
-title: 3–7 Wörter in der Sprache des Kandidaten, konkret, worum es geht; keine erfundenen Zitate, keine Superlative, keine Anführungszeichen.
+title: 3–7 Wörter, GESCHRIEBEN IN DER SPRACHE {{lang}} (auch wenn diese Anweisung deutsch ist), konkret, worum es geht; keine erfundenen Zitate, keine Superlative, keine Anführungszeichen.
 Behandle JEDEN Kandidaten genau einmal. Antworte nur im Schema.
 ---USER---
 {{query}}

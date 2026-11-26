@@ -10,7 +10,7 @@ import { SoloClip, SyncPlayers, type SyncMember } from './CompareSync'
 
 type Info = Record<string, { title: string; start: number; end: number; score: number; autoCuts: Array<{ start: number; end: number }> }>
 const api = (): Window['cutawan']['shortme'] | null => (typeof window !== 'undefined' ? window.cutawan?.shortme ?? null : null)
-const mmss = (s: number): string => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
+const mmss = (s: number): string => `${Math.floor(Math.round(s) / 60)}:${String(Math.round(s) % 60).padStart(2, '0')}`
 const LETTER = ['A', 'B', 'C', 'D']
 const CHOICE: Array<[string, 'a' | 'b' | 'c' | 'd' | 'tie' | 'all-weak']> = [['A', 'a'], ['B', 'b'], ['C', 'c'], ['D', 'd'], ['Gleich gut', 'tie'], ['Alle schwach', 'all-weak']]
 

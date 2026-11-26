@@ -4,7 +4,7 @@ import { STATUS_LABEL, type WbOverview, type WbProject, type WbStatus, type Work
 import { Button, Switch } from './ui'
 
 const api = (): Window['cutawan']['shortme']['learn'] | null => (typeof window !== 'undefined' ? window.cutawan?.shortme?.learn ?? null : null)
-const mmss = (s: number): string => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
+const mmss = (s: number): string => `${Math.floor(Math.round(s) / 60)}:${String(Math.round(s) % 60).padStart(2, '0')}`
 const gb = (b: number): string => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`)
 const pct = (x: number | null): string => (x === null ? '–' : `${Math.round(x * 100)} %`)
 const sec = (x: number | null): string => (x === null ? '–' : `${x > 0 ? '+' : ''}${x.toFixed(1)} s`)

@@ -140,11 +140,12 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
     await setState('ranking')
     report('rate', 0, `Redaktionelles Ranking (${cands.length} Kandidaten, vollständiger Wortlaut) …`)
     const seed = parseInt(src.sha256.slice(0, 8), 16)
-    const rkey = checkpointKey([src.sha256, cands.map((c) => [c.id, c.text, c.wordless, c.lanes]), req.options.query ?? '', V6_RANK_PROMPT, A.models.text, seed])
+    const lang = langOf(t)
+    const rkey = checkpointKey([src.sha256, cands.map((c) => [c.id, c.text, c.wordless, c.lanes]), req.options.query ?? '', V6_RANK_PROMPT, A.models.text, seed, lang])
     let ranking = await loadCheckpoint<{ order: string[]; decisions: Array<[string, RankDecision]>; rounds: unknown[]; incomplete: string[] }>(project.hash, 'v6-rank', rkey)
     if (ranking) prof.count('cache:ranking')
     else {
-      const r = await prof.phase('ranking', () => A.withText((url, model) => rankCandidates(url, cands, { query: req.options.query, seed, maxChars: B.rankMaxChars, signal, model, onRound: (x) => report('rate', 0.5, `Ranking ${x.round}: ${x.ok ? 'gültig' : 'ungültig – ' + x.error}`) })))
+      const r = await prof.phase('ranking', () => A.withText((url, model) => rankCandidates(url, cands, { query: req.options.query, lang, seed, maxChars: B.rankMaxChars, signal, model, onRound: (x) => report('rate', 0.5, `Ranking ${x.round}: ${x.ok ? 'gültig' : 'ungültig – ' + x.error}`) })))
       ranking = { order: r.order, decisions: [...r.decisions], rounds: r.rounds, incomplete: r.incomplete }
       if (!r.incomplete.length) await saveCheckpoint(project.hash, 'v6-rank', rkey, ranking)
       prof.count('rank:rounds', r.rounds.length)

@@ -6,7 +6,7 @@ import { useProject } from './projectStore'
 
 const api = (): Window['cutawan']['shortme']['upload'] | null => (typeof window !== 'undefined' ? window.cutawan?.shortme?.upload ?? null : null)
 const errText = (e: unknown): string => (e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e))
-const mmss = (s: number): string => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
+const mmss = (s: number): string => `${Math.floor(Math.round(s) / 60)}:${String(Math.round(s) % 60).padStart(2, '0')}`
 const day = (iso: string): string => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) }
 const LABEL: Record<UploadJob['state'], string> = { wartend: 'Wartet', laedt: 'Lädt hoch', entwurf: 'Entwurf gesendet', fehler: 'Fehler' }
 type StatusFilter = 'alle' | 'neu' | 'gesendet' | 'fehler'

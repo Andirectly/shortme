@@ -93,7 +93,8 @@ function DemoProcessing(): React.JSX.Element {
 
 /** Gemessene Laufzeit je Stufe (Tooltip an „Laufzeit“). */
 const STAGE_TIME_LABEL: Record<string, string> = { audio: 'Ton/Video vorbereiten', asr: 'Transkription', gaps: 'Transkription (Lücken)', speakers: 'Sprecher', finalize: 'Transkript abschließen', signals: 'Signale', shots: 'Kamerawechsel', topics: 'Themen (LLM)', llm: 'Themen (LLM)', candidates: 'Suche (alle Spuren)', rate: 'Nachuntersuchung (Bild+Ton)', snap: 'Schnitte prüfen', compare: 'Rendern und prüfen', proofread: 'Korrektur', layout: 'Bildausschnitt', thumbs: 'Vorschaubilder' }
-const fmtDur = (s: number): string => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : s >= 60 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')} min` : `${Math.round(s)} s`)
+// erst runden, dann teilen: 179,6 s ist 3:00, nicht „2:60“
+const fmtDur = (s: number): string => { const t = Math.round(s), m = Math.round(t / 60); return t >= 3600 ? `${Math.floor(m / 60)} h ${m % 60} min` : t >= 60 ? `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')} min` : `${t} s` }
 
 /** Je Clip aus den echten Clipdaten: Quellzeit, KI-Prüfung (mit Befunden) und Nutzerfreigabe – drei getrennte Angaben. */
 interface CardInfo { start: number; end: number; q: { status: QualityStatus; findings: string[]; stale: boolean }; view?: ReviewView }
