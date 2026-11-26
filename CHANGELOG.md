@@ -6,6 +6,24 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.53.0] - 2026-11-26
+
+### Added
+
+- Engine 6 (Windows, optional – nicht Standard): sucht über Sprache, Ton, Bild und Chat, ordnet die Kandidaten redaktionell nach ihrem vollständigen Wortlaut, untersucht nur offene Fragen in Bild und Ton (bei Bedarf mit Originalausschnitt) und prüft die tatsächlich exportierte Datei in ganzer Länge (Technik, Bild/Ton, Inhalt). Im Test auf zwei Videos (10 und 12 Min) 55 % bzw. 33 % schneller als Engine 4 bei gleich vielen oder mehr geprüften Clips, liefert aber weniger Clips, weil nur Clips ohne Mindestmangel veröffentlicht werden. Eine menschliche Qualitätsbewertung steht noch aus.
+- Clipliste bei Engine 6: „#Rang“ statt Punktzahl, Sortierung nach Rang; der Export übernimmt die geprüfte Datei unverändert, solange du nichts änderst (nach einer Bearbeitung wird neu gerendert und der Prüfstatus gilt nicht mehr).
+- Engine-Vergleich und „Clip prüfen“ kennen Engine 6.
+
+### Changed
+
+- Remote: Eine angeforderte Engine, die der andere Rechner nicht kennt (andere Plattform oder ältere Version), wird dort mit klarer Meldung abgelehnt statt still durch die Standard-Engine ersetzt.
+
+### Fixed
+
+- Ein zweites Shortme-Profil (eigene Geräteidentität) blockierte die normale App wegen der Einzelinstanz-Sperre.
+- Python-Laufzeit wurde nach jedem Update neu installiert, weil die Prüfsumme der Paketliste von den Zeilenenden abhing.
+- Release-Prüfung im Test auf die Shortme-Dateinamen angepasst.
+
 ## [0.52.0] - 2026-11-24
 
 ### Added
