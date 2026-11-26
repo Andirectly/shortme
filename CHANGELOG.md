@@ -6,6 +6,12 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.53.1] - 2026-11-26
+
+### Fixed
+
+- Mac: In den Einstellungen meldete „Neu starten und installieren“ nach dem Laden eines Updates „No downloaded update to install“. Der Knopf heißt jetzt „Installer öffnen“, öffnet den geprüften Installer (DMG) und erklärt das Ersetzen der App. (Dieses Update muss einmal von Hand per DMG installiert werden; danach funktioniert der Knopf.)
+
 ## [0.53.0] - 2026-11-26
 
 ### Added

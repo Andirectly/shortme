@@ -206,11 +206,15 @@ function UpdateSettings(): React.JSX.Element {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <small style={{ flex: 1 }}>{res ? `Version ${res.currentVersion}${res.latestVersion ? (res.updateAvailable ? ` · neu: ${res.latestVersion}` : ' · aktuell') : ''}` : 'Version prüfen'}</small>
           {ready
-            ? <Button variant="primary" disabled={busy} onClick={() => void run(() => api.installUpdate())}>Neu starten und installieren</Button>
+            ? (dl.mode === 'manual'
+              // Mac (ad-hoc signiert): kein Neustart-Update, sondern den geprüften Installer (DMG) öffnen
+              ? <Button variant="primary" disabled={busy} onClick={() => void run(() => api.openUpdateInstaller())}>Installer öffnen</Button>
+              : <Button variant="primary" disabled={busy} onClick={() => void run(() => api.installUpdate())}>Neu starten und installieren</Button>)
             : res?.updateAvailable && !downloading
               ? <Button variant="primary" disabled={busy} onClick={() => void run(() => api.downloadUpdate())}>Update laden</Button>
               : <Button variant="secondary" disabled={busy || downloading} onClick={() => void run(async () => setRes(await api.checkForUpdates()))}>Nach Updates suchen</Button>}
         </div>
+        {ready && dl.mode === 'manual' && <small>Installer geladen und geprüft. Im geöffneten Fenster Shortme in „Programme“ ziehen (Ersetzen bestätigen), dann Shortme neu starten.</small>}
         {downloading && <div className="sm-bar" aria-label="Update-Download"><i style={{ width: `${Math.max(dl.progress, 0.02) * 100}%` }} /></div>}
         {err && <small role="alert" style={{ color: 'var(--warn)' }}>{err}</small>}
       </div>
