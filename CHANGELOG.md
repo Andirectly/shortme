@@ -6,6 +6,12 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.53.3] - 2026-11-27
+
+### Fixed
+
+- Transkript und Untertitel lagen bei manchen Videos neben der Sprache, vor allem bei Live-Mitschnitten: Der Ton wurde ohne Zeitachsen-Ausgleich extrahiert und lief dem Bild um etwa 0,3 s pro Minute davon (bei 15 Minuten bis zu 5 s). Neue Projekte sind korrekt. Bestehende Projekte werden beim nächsten Start einer Analyse („Neu berechnen“) geprüft; weicht der Ton ab, wird er neu erzeugt und das Video neu transkribiert – die Clips müssen danach neu gefunden werden.
+
 ## [0.53.2] - 2026-11-26
 
 ### Fixed
