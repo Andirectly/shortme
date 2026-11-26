@@ -6,6 +6,14 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.53.2] - 2026-11-26
+
+### Fixed
+
+- Windows: Die Installation der Bild-und-Ton-Laufzeit (Engine 3/4/6) brach auf frischen Rechnern mit „requirements are unsatisfiable“ (lighthouse/numpy) ab. Die Paketliste wird jetzt exakt wie festgelegt installiert.
+- Engine 6: Titel stehen in der Sprache des Videos (bei englischen Videos kamen deutsche Titel).
+- Laufzeit-Anzeigen zeigten „2:60 min“ statt „3:00 min“ (Rundungsfehler in Clipliste, Upload, Werkbank und Vergleich).
+
 ## [0.53.1] - 2026-11-26
 
 ### Fixed
