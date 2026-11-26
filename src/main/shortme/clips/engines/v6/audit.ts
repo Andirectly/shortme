@@ -161,3 +161,16 @@ export function decideV6(tech: Technical, coverageOk: boolean, crit: Criterion[]
   if (crit.some((c) => ['dead-air', 'audio-seam', 'crop-safety'].includes(c.id) && c.state === 'fail')) return 'needs-review'
   return 'verified'
 }
+
+/**
+ * Ausschnitt-Kriterium (Kap. 12: keine pauschale Gesichtsflächen-Strafe). Stellen ohne Person sind schon der Rückfall „Ganzes Bild“ (guardEmptyShots) – kein
+ * Verlust des Motivs. Nur bei mehr als 35 % der Clipzeit ohne Person bleibt es offen (unknown, nicht fail); Stream/Ganzes Bild/wortlos: nicht anwendbar.
+ */
+export function cropSafety(c: Criterion, a: { clip: { shots?: Array<{ start: number; end: number; auto?: string }> }; durationSec: number; plan: { wordless: boolean } }, frame: string): Criterion {
+  if (frame === 'stream' || frame === 'fit' || a.plan.wordless) return { ...c, state: 'not-applicable', reason: 'Ausschnitt ohne Personenpflicht (Stream/Ganzes Bild/wortlos)' }
+  const empty = (a.clip.shots ?? []).filter((x) => x.auto === 'empty').reduce((n, x) => n + (x.end - x.start), 0)
+  const share = a.durationSec > 0 ? empty / a.durationSec : 0
+  if (empty <= 0) return { ...c, state: 'pass' }
+  const pct = Math.round(share * 100)
+  return share > 0.35 ? { ...c, state: 'unknown', reason: `${pct} % der Clipzeit ohne Person (Rückfall Ganzes Bild)` } : { ...c, state: 'pass', reason: `${Math.round(empty * 10) / 10} s ohne Person im Rückfall Ganzes Bild (${pct} %)` }
+}

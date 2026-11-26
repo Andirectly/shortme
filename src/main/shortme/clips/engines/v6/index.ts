@@ -39,7 +39,7 @@ import { exportEffective } from '../../../render/exportOne'
 import { adapterFor, hardwareProfile, v6MissingModels } from './adapters'
 import { buildCandidate, rankCandidates, V6_RANK_PROMPT, type RankDecision, type V6Candidate } from './editorial'
 import { planSpeech, planWordless, type V6CutPlan } from './plan'
-import { decideV6, judgeEditorial, observeRendered, technicalCheck, V6_AUDIT_REVISION, type OutputAudit } from './audit'
+import { cropSafety, decideV6, judgeEditorial, observeRendered, technicalCheck, V6_AUDIT_REVISION, type OutputAudit } from './audit'
 import { buildV6Index } from './visualIndex'
 import { detailZoom, isDetailQuestion, type RoiResult } from './roi'
 import { Profiler } from './profiler'
@@ -50,7 +50,7 @@ export type V6State = 'created' | 'indexing' | 'discovering' | 'ranking' | 'inve
 const GERMAN = /\b(und|der|die|das|ist|nicht|ich|wir|aber|auch|mit|ein|eine|dass)\b/gi
 const langOf = (t: Transcript): string => { const s = t.words.slice(0, 600).map((w) => w.w).join(' '); return (s.match(GERMAN)?.length ?? 0) > 15 ? 'Deutsch' : 'Englisch' }
 
-interface Planned { cand: V6Candidate; rank: number; decision: RankDecision | null; plan: V6CutPlan; clip: ShortmeClip; reserve: boolean; inv: InvestigationResult | null }
+interface Planned { cand: V6Candidate; rank: number; decision: RankDecision | null; plan: V6CutPlan; clip: ShortmeClip; reserve: boolean; inv: InvestigationResult | null; /** Render läuft schon (CPU) während das AV-Modell weitere Kandidaten untersucht; Reserven erst bei Bedarf */ rp?: Promise<Attempt | null> }
 interface Attempt { attemptId: string; round: number; plan: V6CutPlan; clip: ShortmeClip; path: string; sha256: string; inputFingerprint: string; durationSec: number; rendered: Rendered; audit?: OutputAudit; measured?: Criterion[] }
 
 /** Schalter für Messläufe: SHORTME_V6_AVDEDUPE=on|off überschreibt den Standard (nur Benchmark, nie still in der App). */
@@ -191,6 +191,14 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
       return a
     }
 
+    // Renderkette: höchstens ein Render gleichzeitig (CPU/FFmpeg, Layout), überlappt mit der GPU-Arbeit; Fehler werden gemeldet, nie verschluckt
+    let renderChain: Promise<unknown> = Promise.resolve()
+    const startRender = (p: Planned): Promise<Attempt | null> => {
+      const run = renderChain.then(() => prof.phase(`render ${p.clip.id}`, () => renderAttempt(p, p.plan, 0), true)).catch((e) => { if (signal?.aborted) throw e; fail(`render ${p.clip.id}`, e); return null })
+      renderChain = run.catch(() => undefined)
+      return run
+    }
+
     await setState('investigating')
     // D Untersuchung + E Plan (AV-Modell): Gewinner + Reserven, wortlose Kandidaten auf reservierten Plätzen
     await prof.phase('av-investigate-plan', () => A.withAv(req.runId, async (s) => {
@@ -249,7 +257,9 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
         if (planned.some((p) => { const a0 = p.plan.segments[0], b0 = plan!.segments[0]; const ov = Math.max(0, Math.min(a0.end, b0.end) - Math.max(a0.start, b0.start)); return ov / Math.min(a0.end - a0.start, b0.end - b0.start) > 0.5 })) { await tracer.log('v6-selection.jsonl', { candidate: c.id, skipped: 'Überlappung mit besser gereihtem Clip' }); continue }
         const rank = planned.length + 1
         const clip0 = clipFor(`${req.runId}-c${rank}`, { id: c.id, startEdgeId: 'plan', endEdgeId: 'plan', span: plan.segments[0], prefilter: 0 }, t, [], { title: d?.title || c.text.split('\n')[0]?.replace(/^S\d+:\s*/, '').split(/\s+/).slice(0, 7).join(' ') || 'Clip', runId: req.runId })
-        planned.push({ cand: c, rank, decision: d, plan, clip: clip0, reserve: rank > wanted, inv })
+        const pl: Planned = { cand: c, rank, decision: d, plan, clip: clip0, reserve: rank > wanted, inv }
+        planned.push(pl)
+        if (!pl.reserve) pl.rp = startRender(pl)
       }
     }))
     await save('roi.json', rois)
@@ -257,9 +267,10 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
 
     // F Render (wie der Export) – CPU/FFmpeg, ohne GPU-Modell
     await setState('rendering')
-    for (const [k, p] of planned.entries()) {
-      report('snap', k / Math.max(1, planned.length), `Clip ${k + 1}/${planned.length} rendern (wie Export) …`)
-      try { await prof.phase(`render ${p.clip.id}`, () => renderAttempt(p, p.plan, 0)) } catch (e) { if (signal?.aborted) throw e; fail(`render ${p.clip.id}`, e) }
+    const open = planned.filter((p) => p.rp)
+    for (const [k, p] of open.entries()) {
+      report('snap', k / Math.max(1, open.length), `Clip ${k + 1}/${open.length} fertig rendern (läuft seit der Planung) …`)
+      await prof.phase(`render-wait ${p.clip.id}`, () => p.rp!)
     }
 
     // G Prüfung: AV-Pakete über jede ganze Ausgabedatei (eine AV-Sitzung), dann redaktionelles Urteil (eine Textsitzung)
@@ -272,7 +283,7 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
           prof.count('av:packets', packets.length)
           const m = await measuredCriteria(a.rendered, wav, hasAudio, edges, signal)
           // keine pauschale Gesichtsquoten-Strafe für Gameplay/wortlose Clips: dort ist der Ausschnitt Gameplay bzw. Ganzes Bild
-          const measured = m.criteria.map((c) => (c.id === 'crop-safety' && (lctx.frame === 'stream' || lctx.frame === 'fit' || a.plan.wordless) ? { ...c, state: 'not-applicable' as const, reason: 'Ausschnitt ohne Personenpflicht (Stream/Ganzes Bild/wortlos)' } : c))
+          const measured = m.criteria.map((c) => (c.id === 'crop-safety' ? cropSafety(c, a, lctx.frame) : c))
           ;(a as Attempt & { packets: typeof packets }).packets = packets
           a.measured = measured
         }
@@ -298,8 +309,21 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
         }
       }))
     }
-    const first = attempts.filter((a) => a.round === 0)
-    if (first.length) await observe(first)
+    const round0 = (): Attempt[] => attempts.filter((a) => a.round === 0)
+    if (round0().length) await observe(round0())
+    // Reserven erst bei Bedarf (Kap. 9/13): fehlen brauchbare (nicht abgelehnte) Clips, die nächste Reserve rendern und prüfen
+    const needMore = wanted - round0().filter((a) => a.audit && a.audit.status !== 'rejected').length
+    const reservesNow = planned.filter((p) => p.reserve && !p.rp).slice(0, Math.max(0, needMore))
+    if (reservesNow.length) {
+      await setState('rendering')
+      for (const p of reservesNow) p.rp = startRender(p)
+      await Promise.all(reservesNow.map((p) => p.rp))
+      await setState('verifying')
+      const fresh = round0().filter((a) => !a.audit)
+      if (fresh.length) await observe(fresh)
+      prof.count('reserve:activated', reservesNow.length)
+    }
+    const first = round0()
 
     // Gezielte Reparatur: höchstens eine je Clip, globales Budget; nur konkreter Mangel; schlechtere Reparatur überschreibt nichts
     const rankStatus = (s?: OutputAudit['status']): number => (s === 'verified' ? 0 : s === 'needs-review' ? 1 : 2)

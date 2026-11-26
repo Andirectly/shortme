@@ -46,7 +46,7 @@ export async function detailZoom(s: AvSession, o: { video: string; span: { start
     'Antworte NUR als JSON: {"second": 3, "box": {"x": 0.1, "y": 0.6, "w": 0.3, "h": 0.2}}'
   ].join('\n')
   const r1 = await s.worker.request<{ text: string }>('analyze_av', { path: file, prompt: ask1, maxNewTokens: 80, temperature: 0 }, { runId: s.runId, timeoutMs: 180_000, signal: o.signal })
-  let box: Box | null = null, second: number | null = null
+  let box: Box | null, second: number | null = null
   try { const j = parseModelJson(r1.text) as Record<string, unknown>; box = validateBox(j.box); const sec = Number(j.second); second = Number.isFinite(sec) && sec >= 0 && sec <= win.end - win.start ? sec : null } catch { box = null }
   if (!box || second === null) return { asked: true, box: null, second: null, cropPath: null, answer: '', visible: null, reason: 'keine gültige Region genannt – Detail bleibt unknown', calls: 1 }
   const crop = join(o.tmpDir, `roi-${Math.round(win.start * 10)}-${Math.round(second * 10)}.png`)

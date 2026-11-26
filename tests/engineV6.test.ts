@@ -141,3 +141,16 @@ describe('Engine 6 – ROI', () => {
     expect(isDetailQuestion('Lacht das Publikum?')).toBe(false)
   })
 })
+
+import { cropSafety } from '../src/main/shortme/clips/engines/v6/audit'
+describe('Engine 6 – Ausschnitt-Kriterium', () => {
+  const c = { id: 'crop-safety', state: 'fail' as const, reason: 'x', evidenceIds: [] }
+  const a = (empty: number, wordless = false) => ({ clip: { shots: [{ start: 0, end: 20 - empty }, ...(empty ? [{ start: 20 - empty, end: 20, auto: 'empty' }] : [])] }, durationSec: 20, plan: { wordless } })
+  it('Rückfall Ganzes Bild ist kein Fehler; viel davon bleibt offen; Stream/wortlos nicht anwendbar', () => {
+    expect(cropSafety(c, a(0), 'smart').state).toBe('pass')
+    expect(cropSafety(c, a(3), 'smart').state).toBe('pass')
+    expect(cropSafety(c, a(10), 'smart').state).toBe('unknown')
+    expect(cropSafety(c, a(10), 'stream').state).toBe('not-applicable')
+    expect(cropSafety(c, a(10, true), 'smart').state).toBe('not-applicable')
+  })
+})
