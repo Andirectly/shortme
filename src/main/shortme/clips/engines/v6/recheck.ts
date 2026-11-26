@@ -18,7 +18,7 @@ export async function recheckV6(meta: ProjectMeta, t: Transcript, clip: ShortmeC
   const A = adapterFor()
   await mkdir(dir, { recursive: true })
   const hasAudio = meta.hasAudio !== false
-  const { exp, eff } = await exportEffective(meta, t, clip, join(dir, 'output'), { captions: true }, signal)
+  const { exp, eff } = await exportEffective(meta, t, clip, join(dir, 'output'), { captions: true, reuse: false }, signal)
   const tech = await technicalCheck(exp.path, { durationSec: exp.durationSec, hasAudio }, signal)
   const h = createHash('sha256')
   await new Promise<void>((res, rej) => createReadStream(exp.path).on('data', (d) => h.update(d)).on('end', () => res()).on('error', rej))

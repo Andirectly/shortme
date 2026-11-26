@@ -1,0 +1,9 @@
+{
+  "quelle": "test-videos/solo.mp4 (10:19 min, 1 Sprecher), Projekt 2cda68aece…, Wunsch 10 Clips (Standard), Inhaltstyp Standard, RTX 5090 (32 GB), Windows 11",
+  "hinweis": "Kalt = Engine-Caches (Sprachsuche, Bildindex, Checkpoints) vor dem Lauf gelöscht; ASR, YAMNet und Kamerawechsel waren in beiden Fällen schon vorhanden. Reihenfolge nicht gemischt, je Konfiguration 1 Lauf – keine Streuung ausgewiesen.",
+  "engine4_kalt": { "runId": "v4-mwxf33e3-aql4z", "wallSec": 1340.2, "clips": 10, "geprueft_acceptable": 3, "av_phase_sec": 1285 },
+  "engine6_kalt_lauf2": { "runId": "v6-mwxfwwq5-lkkki", "wallSec": 705.9, "firstVerifiedSec": 586.6, "clips": 9, "verified": 4, "shortfall": 1, "peakVramMb": 28675, "peakRssMb": 364, "aenderung": "Render nach der Planung nacheinander" },
+  "engine6_kalt_lauf3": { "runId": "v6-mwxgeack-adl6e", "wallSec": 609.4, "firstVerifiedSec": 406, "clips": 9, "verified": 4, "shortfall": 1, "peakVramMb": 28879, "peakRssMb": 373, "aenderung": "Render überlappt mit AV-Planung, Reserven nur bei Bedarf, crop-safety ohne pauschale Strafe", "reserveActivated": 2, "repairs": 3, "roiCalls": 2 },
+  "engine6_warm_lauf2": { "runId": "v6-mwxeoqgy-6w8dw", "wallSec": 650.2, "hinweis": "Sprachsuche/Bildindex/Ranking aus Cache", "clips": 10, "verified": 5 },
+  "lauf1_fehler": "worker.py: len(frames) nach del frames → alle AV-Aufrufe schlugen fehl (495 s, 5 Clips, 0 verified, 9 Kandidaten nicht untersucht). Behoben."
+}

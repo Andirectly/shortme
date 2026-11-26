@@ -117,3 +117,5 @@ Für Suchen in Referenz-Repos einen Subagenten nutzen, der nur eine kurze Zusamm
 - Hauptagent Opus; Haiku-Subagent `log-reader` (.claude/agents) für große Logs/Lauf-Ordner/Dateisuchen, Sonnet für Standardarbeit (UI, IPC, Tests, Doku); Delegieren nur wenn es Gesamtkosten senkt
 - Fortschritt in `docs/ENGINE_V6_PROGRESS.md` pflegen (erledigt, Entscheidungen, nächster Schritt) und vor Kontextkürzung speichern; PDF nicht erneut komplett lesen
 - Volle Test-/Build-Logs auf Platte (`> log 2>&1`), nur Fehlerzeilen lesen; gezielte Tests beim Entwickeln, volle Suite an Meilensteinen
+
+- Engine 6 (Windows, solo/Podcast kalt gegen Engine 4): −55 %/−33 % Zeit, weniger Clips aber mehr „geprüft“; Hebel = Render überlappt mit AV-Planung + Host-Schnitt aus Satz-IDs + Reserven nur bei Bedarf; neue Python-Operationen nie `len(frames)` nach `del frames`; Recheck/Export: geprüfte Datei nur bei gleichem Fingerabdruck+SHA wiederverwenden (Recheck `reuse:false`, sonst fehlen Untertitelwörter); Mac: Engine 6 ausgeblendet bis getestet (`ENGINE6_ON_MAC`); Stand `docs/ENGINE_V6_STATUS.md`

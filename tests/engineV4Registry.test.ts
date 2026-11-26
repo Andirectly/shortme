@@ -10,7 +10,7 @@ describe('V4 Registrierung und Dispatcher (V4-001/003/004/005)', () => {
   it('sechs Engines, Engine 4 mit eigenem Manifest; je System nur die lauffähigen', () => {
     expect(ENGINE_IDS).toEqual(['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4', 'engine-mac', 'engine6'])
     expect(enginesFor('win32')).toEqual(['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4', 'engine6'])
-    expect(enginesFor('darwin')).toEqual(['engine-mac', 'engine6'])
+    expect(enginesFor('darwin')).toEqual(['engine-mac']) // Engine 6 auf dem Mac erst nach Mac-Test (ENGINE6_ON_MAC)
     expect(hasProfiles('engine-mac')).toBe(false)
     expect(ENGINE_LABEL.engine4).toBe('Engine 4')
     expect(ENGINE4_MANIFEST).toMatchObject({ id: 'engine4', pipelineVersion: '4.0', protocolVersion: 1 })

@@ -5,7 +5,9 @@
 export type SelectionEngineId = 'legacy' | 'multimodal-v2' | 'adaptive-v3' | 'engine4' | 'engine-mac' | 'engine6'
 export const ENGINE_IDS: SelectionEngineId[] = ['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4', 'engine-mac', 'engine6']
 /** Welche Engines auf welchem System laufen können (Engine 3/4 brauchen CUDA, die Mac-Engine Apple Silicon). */
-export const enginesFor = (platform: string): SelectionEngineId[] => platform === 'darwin' ? ['engine-mac', 'engine6'] : ['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4', 'engine6']
+/** Engine 6 auf dem Mac: Adapter vorhanden, aber nie auf Apple Silicon gelaufen → ausgeblendet, bis sie dort getestet ist (docs/ENGINE_V6_STATUS.md). */
+export const ENGINE6_ON_MAC = false
+export const enginesFor = (platform: string): SelectionEngineId[] => platform === 'darwin' ? ['engine-mac', ...(ENGINE6_ON_MAC ? ['engine6' as const] : [])] : ['legacy', 'multimodal-v2', 'adaptive-v3', 'engine4', 'engine6']
 /** Remote: ausdrücklich angeforderte Engine, die auf diesem System fehlt (andere Plattform/ältere Version) → ablehnen statt still ersetzen. */
 export const isUnsupportedEngine = (e: string | undefined, platform: string): boolean => !!e && e !== 'default' && !enginesFor(platform).includes(e as SelectionEngineId)
 export const ENGINE_LABEL: Record<SelectionEngineId, string> = { legacy: 'Engine 1 – Original', 'multimodal-v2': 'Engine 2 – Multimodal', 'adaptive-v3': 'Engine 3 – Adaptive AI', engine4: 'Engine 4', 'engine-mac': 'Engine Mac', engine6: 'Engine 6' }

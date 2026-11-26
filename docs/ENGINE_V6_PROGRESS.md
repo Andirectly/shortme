@@ -9,7 +9,10 @@ Auf main: Remote-Abnahme Windows, Einzelinstanz-Fix, Lock-Prüfsumme CRLF.
 ## Echter Lauf 1 (solo, 10 min, Wunsch 10, 495 s)
 Fehler gefunden: `worker.py` `analyze_av` nutzte `len(frames)` nach `del frames` → ALLE AV-Aufrufe schlugen fehl → 9 Kandidaten „Kernereignis nicht beobachtet“, alle Prüfpakete ungültig (korrekt nie `verified`). Fix: `n_frames` (nicht committet, siehe unten).
 
-## Nächste Schritte
+## Stand 26.11.
+Läufe solo + Podcast (kalt) gegen Engine 4 gemessen, UI/Export/Recheck/Neustart im echten Fenster geprüft, volle Suite grün (1233), Mac ausgeblendet. Offen: menschliche Blindbewertung, Mac-Test, Release-Entscheidung, gepackte App testen.
+
+## Nächste Schritte (alt)
 1. Skip-Gründe mit `inv.stopReason` loggen; AV-Ausfälle als Fehler melden (statt still).
 2. Lauf 2 solo mit Engine 6; Baseline Engine 4 (gleiche Quelle/Optionen) – Zeit, Clips, geprüft.
 3. crop-safety „Einstellung ohne Person“ prüfen (Solo-Video).

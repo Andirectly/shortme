@@ -106,11 +106,12 @@ describe('Engine 6 – Redundanzreduktion', () => {
 describe('Engine 6 – Registry und Remote', () => {
   it('wählbar auf Windows und Mac, nicht als v4 deklariert', () => {
     expect(enginesFor('win32')).toContain('engine6')
-    expect(enginesFor('darwin')).toContain('engine6')
+    expect(enginesFor('darwin')).not.toContain('engine6') // UNTESTED auf dem Mac → ausgeblendet
     expect(isV4Pipeline('engine6')).toBe(false)
   })
   it('Worker lehnt unbekannte Engine ab statt still die Standard-Engine zu nehmen', () => {
     expect(isUnsupportedEngine('engine6', 'win32')).toBe(false)
+    expect(isUnsupportedEngine('engine6', 'darwin')).toBe(true)
     expect(isUnsupportedEngine('engine4', 'darwin')).toBe(true)
     expect(isUnsupportedEngine('engine9', 'win32')).toBe(true)
     expect(isUnsupportedEngine(undefined, 'win32')).toBe(false)
