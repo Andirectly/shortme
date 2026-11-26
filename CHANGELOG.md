@@ -6,6 +6,12 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.54.0] - 2026-11-27
+
+### Added
+
+- Nur Untertitel: Ein fertiges Short ohne Untertitel auf der Startseite ablegen, im Dialog „Nur Untertitel“ wählen – Shortme transkribiert es und öffnet es im Editor. Das Video bleibt unverändert (kein Schnitt, keine entfernten Pausen, kein Cold Opener, kein Hook); beim Export werden nur Untertitel eingebrannt. Stil, Position und Wörter lassen sich im Editor ändern.
+
 ## [0.53.3] - 2026-11-27
 
 ### Fixed
