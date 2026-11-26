@@ -485,12 +485,13 @@ def op_analyze_av(req, p):
         sampling = {"do_sample": True, "temperature": min(max(temp, 0.05), 1.0), "top_p": 0.9} if temp > 0 else {"do_sample": False}
         text = m.chat(msgs=msgs, tokenizer=tok, omni_mode=has_audio, max_slice_nums=1, use_tts_template=False, max_new_tokens=max_new, **sampling)
     peak = int(torch.cuda.max_memory_allocated())
+    n_frames = len(frames)
     del msgs, contents, frames, audio_chunks
     import gc
 
     gc.collect()
     torch.cuda.empty_cache()
-    return {"text": text if isinstance(text, str) else str(text), "seconds": round(time.time() - t0, 2), "hasAudio": has_audio, "vramPeakBytes": peak, "vramAllocatedBytes": int(torch.cuda.memory_allocated()), "framesTotal": len(frames), "framesUsed": used}
+    return {"text": text if isinstance(text, str) else str(text), "seconds": round(time.time() - t0, 2), "hasAudio": has_audio, "vramPeakBytes": peak, "vramAllocatedBytes": int(torch.cuda.memory_allocated()), "framesTotal": n_frames, "framesUsed": used}
 
 
 # gemessen (M1 Pro, 40-s-Ausschnitt): 20 Bilder 38 s / 11,5 GB Spitze, ~10 Bilder 21 s / 8,1 GB, 8 Bilder 20 s / 7,5 GB → 12 (ergibt ~10) für 16 GB

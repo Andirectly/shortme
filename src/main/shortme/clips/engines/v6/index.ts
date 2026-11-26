@@ -227,7 +227,7 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
             } catch (e) { if (signal?.aborted) throw e; fail(`roi ${c.id}`, e) }
           }
           // ungeklärt (keine beobachtete Kernrolle) oder Widerspruch: bleibt unknown → nicht geschnitten, nächste Reserve
-          if (!inv || inv.graph.contradiction || !inv.graph.nodes.some((n) => n.state === 'observed' && n.role !== 'context' && n.role !== 'unknown')) { await tracer.log('v6-selection.jsonl', { candidate: c.id, skipped: inv ? (inv.graph.contradiction ? 'Widerspruch' : 'Kernereignis nicht beobachtet') : 'Untersuchung fehlgeschlagen' }); continue }
+          if (!inv || inv.graph.contradiction || !inv.graph.nodes.some((n) => n.state === 'observed' && n.role !== 'context' && n.role !== 'unknown')) { await tracer.log('v6-selection.jsonl', { candidate: c.id, skipped: inv ? (inv.graph.contradiction ? 'Widerspruch' : `Kernereignis nicht beobachtet (${inv.stopReason})`) : 'Untersuchung fehlgeschlagen' }); if (inv?.stopReason.startsWith('Modellantwort ungültig')) fail(`investigate ${c.id}`, new Error(inv.stopReason)); continue }
         }
         // E Plan
         let plan: V6CutPlan | null = null, why = ''
