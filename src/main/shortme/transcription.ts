@@ -1,5 +1,5 @@
 import { createWriteStream, existsSync } from 'node:fs'
-import { readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { once } from 'node:events'
 import { runFfmpeg } from '../pipeline/ffmpeg'
 import { diarizeWav, fillGaps, transcribeWav } from '../engines/asr/client'
@@ -99,16 +99,56 @@ export function mergeFilled(base: AsrSegment[], found: Range[], filled: AsrSegme
   return { segments: kept, report: { found: found.length, filled: fillable.size, foundSec: +found.reduce((n, [a, b]) => n + b - a, 0).toFixed(1), wordsAdded, ranges: found.map(([a, b]) => [+a.toFixed(2), +b.toFixed(2)] as Range) } }
 }
 
+/**
+ * Version des Audio-Checkpoints (Inhalt von `audio.done`). 2 = mit Zeitachsen-Ausgleich: Lücken im Ton der Quelle (typisch bei Streamlink-Mitschnitten und manchen
+ * Downloads) werden mit Stille gefüllt, damit Wortzeiten und Bild dieselbe Zeitachse haben. Version 1 ließ die Lücken weg (gemessen: 5 s kürzere WAV bei 15 min →
+ * Untertitel eines Clips bei Minute 9 mehrere Sekunden neben der Sprache).
+ */
+export const AUDIO_VERSION = '2'
+const WAV_DEPENDENT = ['asr.jsonl', 'asr.done', 'gaps.json', 'gaps.done', 'transcript.json', 'events.json', 'signals.json', 'analysis/audio-v2.json']
+/** Länge einer 16-kHz-Mono-WAV (s16le, 44-Byte-Kopf) in Sekunden. */
+export const wavSeconds = (bytes: number): number => Math.max(0, (bytes - 44) / 32000)
+const extractWav = (src: string, out: string, signal?: AbortSignal): Promise<unknown> =>
+  runFfmpeg(['-y', '-i', src, '-vn', '-af', 'aresample=async=1000:first_pts=0', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', out], { signal })
+
+/**
+ * Alte Audio-Dateien (Marker ≠ Version 2) prüfen: weicht die Länge um mehr als 1,5 s von der Quelle ab, neu extrahieren. Ändert sich die Länge dabei wirklich
+ * (> 0,3 s), hingen Transkript, ASR-Zwischenstände, Signale und Ton-Ereignisse an der falschen Zeitachse → verwerfen (true = Transkript muss neu erstellt werden).
+ * Bleibt die Länge gleich (z. B. Tonspur endet früher als das Bild), bleibt alles, nur der Marker wird aktualisiert – keine Wiederholung.
+ */
+export async function refreshStaleAudio(meta: ProjectMeta, signal?: AbortSignal): Promise<boolean> {
+  const done = projectFile(meta.hash, 'audio.done'), wav = projectFile(meta.hash, 'audio.wav')
+  if (!existsSync(done) || !existsSync(wav) || !existsSync(meta.sourcePath)) return false
+  if ((await readFile(done, 'utf8')).trim() === AUDIO_VERSION) return false
+  const old = wavSeconds((await stat(wav)).size)
+  let changed = false
+  if (Math.abs(old - meta.durationSec) > 1.5) {
+    const tmp = `${wav}.fix.wav`
+    await rm(tmp, { force: true })
+    await extractWav(meta.sourcePath, tmp, signal)
+    const fresh = wavSeconds((await stat(tmp)).size)
+    if (Math.abs(fresh - old) > 0.3) {
+      await rm(wav, { force: true })
+      await rename(tmp, wav)
+      for (const f of WAV_DEPENDENT) await rm(projectFile(meta.hash, f), { force: true })
+      console.info(`[Audio] ${meta.hash.slice(0, 8)}: WAV ${old.toFixed(1)} s → ${fresh.toFixed(1)} s (Quelle ${meta.durationSec.toFixed(1)} s), Transkript wird neu erstellt`)
+      changed = true
+    } else await rm(tmp, { force: true })
+  }
+  await writeFile(done, AUDIO_VERSION)
+  return changed
+}
+
 /** Audio (16 kHz mono WAV) extrahieren – Checkpoint `audio.wav`; nur mit Marker `audio.done` gültig. */
 async function ensureAudio(meta: ProjectMeta, signal?: AbortSignal): Promise<string> {
   const wav = projectFile(meta.hash, 'audio.wav')
   if (existsSync(projectFile(meta.hash, 'audio.done')) && existsSync(wav)) return wav
   const tmp = `${wav}.part.wav`
   await rm(tmp, { force: true })
-  await runFfmpeg(['-y', '-i', meta.sourcePath, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', tmp], { signal })
+  await extractWav(meta.sourcePath, tmp, signal)
   await rm(wav, { force: true })
   await rename(tmp, wav)
-  await writeFile(projectFile(meta.hash, 'audio.done'), '1')
+  await writeFile(projectFile(meta.hash, 'audio.done'), AUDIO_VERSION)
   return wav
 }
 
@@ -120,6 +160,7 @@ export async function runTranscription(meta: ProjectMeta, opts: TranscribeOption
   const { signal } = opts
   const report = (stage: Stage, fraction: number, message: string): void => opts.onProgress?.({ stage, fraction, message })
 
+  await refreshStaleAudio(meta, signal)
   const cached = await loadTranscript(meta.hash)
   if (cached && (!opts.diarize || cached.diarized)) { report('finalize', 1, 'Aus dem Cache'); return cached }
 

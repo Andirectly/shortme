@@ -5,6 +5,7 @@ import { importUrl } from './importer'
 import type { JobQueue } from './jobs'
 import { loadMeta, saveMeta, type ProjectMeta } from './project'
 import { runAnalysis } from './clips/analysis'
+import { refreshStaleAudio, runTranscription } from './transcription'
 import { loadProfile, rememberChoice, sourceKey } from './profiles'
 import { claimProject, isLocalEngine, loadDefaultEngine, saveDefaultEngine, switchEngine, type SwitchRequest } from './clips/engines/control'
 import { engineRevisions } from './clips/engines'
@@ -37,6 +38,8 @@ export function enqueueAnalysis(jobs: JobQueue, meta: ProjectMeta, o: { engine: 
       report('audio', 0, 'Video wird neu geladen …')
       await importUrl(meta.sourceUrl, (p, message) => report('audio', p, message))
     }
+    // Ton gegenüber dem Bild verschoben (alte Audio-Datei ohne Zeitachsen-Ausgleich)? Dann Transkript vor der Analyse neu erstellen
+    if (await refreshStaleAudio(meta, signal)) await runTranscription(meta, { signal, onProgress: (p) => report(p.stage, p.fraction, `Ton war gegenüber dem Bild verschoben – neu transkribieren: ${p.message}`) })
     await runAnalysis(meta, { engine: o.engine, query: o.query, contentType: o.contentType, frame: o.frame, wanted: o.wanted, profile: o.profile, signal, onProgress: report, timing })
   })
   return info.id
