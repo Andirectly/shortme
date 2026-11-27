@@ -6,6 +6,16 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.54.1] - 2026-11-27
+
+### Added
+
+- Untertitel ausblenden: Schalter „Untertitel anzeigen“ oben im Untertitel-Tab des Editors (gilt für Vorschau und Export, pro Clip; „Auf alle anwenden“ übernimmt ihn).
+
+### Fixed
+
+- „Aus“ bei Untertitel im Erstellen-Dialog hatte keine Wirkung – neue Clips starten jetzt ohne Untertitel.
+
 ## [0.54.0] - 2026-11-27
 
 ### Added
