@@ -13,11 +13,11 @@ const coldOpen = (x: unknown): number | undefined => (typeof x === 'number' && N
 export async function loadStyle(): Promise<StyleDefaults> {
   try {
     const s = JSON.parse(await readFile(file(), 'utf8')) as Record<string, unknown>
-    return { presetId: typeof s.presetId === 'string' ? s.presetId : undefined, style: typeof s.style === 'object' && s.style ? (s.style as StyleDefaults['style']) : undefined, titleEnabled: typeof s.titleEnabled === 'boolean' ? s.titleEnabled : undefined, coldOpenSec: coldOpen(s.coldOpenSec) }
+    return { presetId: typeof s.presetId === 'string' ? s.presetId : undefined, style: typeof s.style === 'object' && s.style ? (s.style as StyleDefaults['style']) : undefined, titleEnabled: typeof s.titleEnabled === 'boolean' ? s.titleEnabled : undefined, captionsEnabled: typeof s.captionsEnabled === 'boolean' ? s.captionsEnabled : undefined, coldOpenSec: coldOpen(s.coldOpenSec) }
   } catch { return {} }
 }
 export async function saveStyle(s: StyleDefaults): Promise<StyleDefaults> {
-  const clean: StyleDefaults = { ...(s.presetId ? { presetId: s.presetId } : {}), ...(s.style ? { style: s.style } : {}), ...(typeof s.titleEnabled === 'boolean' ? { titleEnabled: s.titleEnabled } : {}), ...(coldOpen(s.coldOpenSec) ? { coldOpenSec: coldOpen(s.coldOpenSec) } : {}) }
+  const clean: StyleDefaults = { ...(s.presetId ? { presetId: s.presetId } : {}), ...(s.style ? { style: s.style } : {}), ...(typeof s.titleEnabled === 'boolean' ? { titleEnabled: s.titleEnabled } : {}), ...(typeof s.captionsEnabled === 'boolean' ? { captionsEnabled: s.captionsEnabled } : {}), ...(coldOpen(s.coldOpenSec) ? { coldOpenSec: coldOpen(s.coldOpenSec) } : {}) }
   await writeFileAtomic(file(), JSON.stringify(clean, null, 1))
   return clean
 }

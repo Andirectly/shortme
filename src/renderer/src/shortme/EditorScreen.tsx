@@ -350,7 +350,7 @@ export function EditorScreen(): React.JSX.Element {
   }
   const applyAll = async (): Promise<void> => {
     const others = (allReal ?? []).map((c) => c.id).filter((id) => id !== clipId)
-    if (hasApi && hash) await window.cutawan.shortme.applyAll(hash, others, { presetId: st.caption.presetId, style: st.caption.style, resetStyle: true, highlight: st.caption.highlight })
+    if (hasApi && hash) await window.cutawan.shortme.applyAll(hash, others, { presetId: st.caption.presetId, style: st.caption.style, resetStyle: true, highlight: st.caption.highlight, enabled: st.caption.enabled !== false })
   }
   const streamShot = shotNow?.shot.layout === 'stream' && shotNow.shot.stream ? { ...shotNow.shot.stream, ...(streamLive ?? {}) } : null
   const contentKind: ContentType = contentFromFile ?? 'podcast'
@@ -459,8 +459,8 @@ export function EditorScreen(): React.JSX.Element {
               ? <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
               : <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${clip.thumb})`, backgroundSize: 'cover' }} />}
             {remotionOn
-              ? <RemotionPreview preset={preset} words={words.filter((w) => !cut.includes(w.g)).map((w) => ({ w: w.w, start: w.t, end: w.e, tag: w.hi ? ('emphasis' as const) : undefined }))} t={t} highlight={st.caption.highlight} titleText={st.hook.enabled ? hook : ''} titleSeconds={st.hook.seconds} duration={D} />
-              : <CaptionLayer preset={preset} groups={groups} t={t} highlight={st.caption.highlight} fontCss={fontCss} onMove={(y) => setLive({ caption: { y } })} onCommit={(y) => styleCommit({ caption: { y } })} />}
+              ? <RemotionPreview preset={preset} words={st.caption.enabled === false ? [] : words.filter((w) => !cut.includes(w.g)).map((w) => ({ w: w.w, start: w.t, end: w.e, tag: w.hi ? ('emphasis' as const) : undefined }))} t={t} highlight={st.caption.highlight} titleText={st.hook.enabled ? hook : ''} titleSeconds={st.hook.seconds} duration={D} />
+              : st.caption.enabled !== false && <CaptionLayer preset={preset} groups={groups} t={t} highlight={st.caption.highlight} fontCss={fontCss} onMove={(y) => setLive({ caption: { y } })} onCommit={(y) => styleCommit({ caption: { y } })} />}
             {!remotionOn && st.hook.enabled && hook && <TitleLayer preset={preset} text={hook} t={t} seconds={st.hook.seconds} onMove={(y) => setLive({ title: { y } })} onCommit={(y) => styleCommit({ title: { y } })} />}
             {zn && <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}><div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${zn.top * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${zn.bottom * 100}%`, background: 'rgba(255,255,255,0.16)' }} /><div style={{ position: 'absolute', right: 0, top: `${zn.top * 100}%`, bottom: `${zn.bottom * 100}%`, width: `${zn.right * 100}%`, background: 'rgba(255,255,255,0.16)' }} /></div>}
           </div>
@@ -471,6 +471,7 @@ export function EditorScreen(): React.JSX.Element {
           <Segmented options={['Untertitel', 'Animation', 'Titel', 'Bildausschnitt']} value={tab} onChange={setTab} />
           {tab === 'Untertitel' && (
             <div>
+              <Row label="Untertitel anzeigen" toggle={<Switch on={st.caption.enabled !== false} onChange={(b) => caption({ enabled: b })} label="Untertitel anzeigen" />} />
               <Row label="Vorlage"><PresetPicker presetId={st.caption.presetId} onPick={(id, p) => { setLive(null); caption({ presetId: id, resetStyle: true, style: {} }); if (!isBuiltin(id)) commit({ t: 'hook', enabled: p.title.enabled }) }} /></Row>
               <PresetBar preset={preset} presetId={st.caption.presetId} patch={st.caption.style} titleEnabled={st.hook.enabled} hasApi={hasApi} canApplyAll={(allReal?.length ?? 0) > 1} onApplyAll={() => void applyAll()} />
               <CaptionControls compact value={preset} onLive={(p) => setLive(p)} onCommit={styleCommit} fonts={fonts} onImportFonts={() => void importFonts()} hasApi={hasApi} />

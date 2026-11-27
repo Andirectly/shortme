@@ -377,7 +377,7 @@ export async function runExportSelfTestIfRequested(): Promise<void> {
     if (!meta || !clip || !transcript) throw new Error('Projekt/Clip/Transkript fehlt')
     const signals = await ensureSignals(meta)
     const t0 = Date.now()
-    const r = await exportClip(meta, clip, transcript, signals, { outDir: join(process.cwd(), '.tmp', 'selftest-export'), engine: engine === 'ass' ? 'ass' : 'tscaps', hook: !process.env.SHORTME_SELFTEST_NOTITLE, renderer: process.env.SHORTME_SELFTEST_RENDERER === 'remotion' ? 'remotion' : 'tscaps', hookText: process.env.SHORTME_SELFTEST_TITLE, style: effectivePreset(await allPresets(), { presetId: process.env.SHORTME_SELFTEST_PRESET ?? 'glow-karaoke', highlight: true, zone: 'Aus', style: process.env.SHORTME_SELFTEST_PATCH ? JSON.parse(process.env.SHORTME_SELFTEST_PATCH) : {} }) })
+    const r = await exportClip(meta, clip, transcript, signals, { outDir: join(process.cwd(), '.tmp', 'selftest-export'), engine: engine === 'ass' ? 'ass' : 'tscaps', hook: !process.env.SHORTME_SELFTEST_NOTITLE, renderer: process.env.SHORTME_SELFTEST_RENDERER === 'remotion' ? 'remotion' : 'tscaps', hookText: process.env.SHORTME_SELFTEST_TITLE, style: effectivePreset(await allPresets(), { presetId: process.env.SHORTME_SELFTEST_PRESET ?? 'glow-karaoke', enabled: true, highlight: true, zone: 'Aus', style: process.env.SHORTME_SELFTEST_PATCH ? JSON.parse(process.env.SHORTME_SELFTEST_PATCH) : {} }) })
     console.log(`SELFTEST export engine=${r.captionEngine} path=${r.path} dur=${r.durationSec.toFixed(2)} took=${((Date.now() - t0) / 1000).toFixed(1)}s`)
   } catch (e) {
     console.log(`SELFTEST export error ${e instanceof Error ? e.message : e}`)

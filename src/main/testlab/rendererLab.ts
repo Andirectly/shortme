@@ -44,7 +44,7 @@ export async function runRendererSide(model: string, path: string, start: number
   const tr = await loadTranscript(imp.meta.hash)
   const end = Math.min(imp.meta.durationSec, start + dur)
   const words = (tr?.words ?? []).filter((w) => w.start >= start && w.end <= end).map((w) => ({ w: w.w, start: w.start - start, end: w.end - start }))
-  const style = effectivePreset(await allPresets(), { presetId, highlight: true, zone: 'Aus', style: {} })
+  const style = effectivePreset(await allPresets(), { presetId, enabled: true, highlight: true, zone: 'Aus', style: {} })
   const seconds = end - start
   const key = createHash('sha1').update(`${path}|${statSync(path).size}|${start}|${dur}|${presetId}|${JSON.stringify(style)}|${words.length}|renderer-v1`).digest('hex').slice(0, 16)
   const dir = join(dataRoot(), 'testlab', `renderer-${key}`)

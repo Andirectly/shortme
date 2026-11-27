@@ -327,8 +327,8 @@ function CreateSheet(): React.JSX.Element {
               {!captionsOnly && <Row label="Bildausschnitt"><Segmented options={Object.values(FRAME_LABELS)} value={frame} onChange={setFrame} /></Row>}
               <Row label="Untertitel">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
-                  {allPresets.map((p) => <PresetTile key={p.id} preset={p} selected={opts.captions === 'preset' && (style.presetId ?? presetId) === p.id} onClick={() => { setPreset(p.id); setOpts({ captions: 'preset' }); void saveStyle({ ...style, presetId: p.id, style: {} }) }} />)}
-                  <button className="sm-tile" aria-pressed={opts.captions === 'off'} onClick={() => setOpts({ captions: 'off' })}>
+                  {allPresets.map((p) => <PresetTile key={p.id} preset={p} selected={style.captionsEnabled !== false && (style.presetId ?? presetId) === p.id} onClick={() => { setPreset(p.id); setOpts({ captions: 'preset' }); void saveStyle({ ...style, presetId: p.id, style: {}, captionsEnabled: true }) }} />)}
+                  <button className="sm-tile" aria-pressed={style.captionsEnabled === false} onClick={() => { setOpts({ captions: 'off' }); void saveStyle({ ...style, captionsEnabled: false }) }}>
                     <div style={{ fontSize: 15, color: 'var(--text-3)' }}>Aus</div>
                     <small style={{ display: 'block', marginTop: 6 }}>Keine Untertitel</small>
                   </button>

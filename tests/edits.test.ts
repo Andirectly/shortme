@@ -8,6 +8,13 @@ const words = Array.from({ length: 60 }, (_, i) => ({ start: 95 + i * 0.5, end: 
 const base = baseState(clip)
 
 describe('Operationslog', () => {
+  it('Untertitel aus: Standard aus den Vorgaben, pro Clip umschaltbar, andere Patches lassen es stehen', () => {
+    expect(base.caption.enabled).toBe(true)
+    expect(baseState(clip, 'pop', { captionsEnabled: false }).caption.enabled).toBe(false)
+    const off = reduce(base, [{ t: 'caption', patch: { enabled: false } }, { t: 'caption', patch: { presetId: 'pop' } }])
+    expect(off.caption.enabled).toBe(false)
+    expect(reduce(off, [{ t: 'caption', patch: { enabled: true } }]).caption.enabled).toBe(true)
+  })
   it('Undo/Redo bewegen nur den Cursor; neue Operation verwirft den Redo-Zweig', () => {
     let log = emptyLog('c')
     log = push(log, { t: 'hook', text: 'A' })

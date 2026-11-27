@@ -15,6 +15,8 @@ export interface CaptionPatch {
   resetStyle?: boolean
   /** KI-Hervorhebung (betonte Wörter) an/aus */
   highlight?: boolean
+  /** Untertitel ein-/ausblenden (Vorschau und Export). */
+  enabled?: boolean
   /** Sicherheitszone (nur Anzeige im Editor). */
   zone?: 'Aus' | 'TikTok' | 'Reels' | 'Shorts'
 }
@@ -51,7 +53,7 @@ export interface EditState {
   hook: { text: string; seconds: number; enabled: boolean }
   /** Globaler Wortindex → geänderter Untertitel-Text. */
   wordEdits: Record<number, string>
-  caption: { presetId: string; highlight: boolean; zone: NonNullable<CaptionPatch['zone']>; style: PresetPatch }
+  caption: { presetId: string; enabled: boolean; highlight: boolean; zone: NonNullable<CaptionPatch['zone']>; style: PresetPatch }
   layoutOps: Array<Extract<Op, { t: 'layout' | 'follow' | 'layoutClip' }>>
   /** Facecam-Layout-Änderungen in Reihenfolge (letzte gewinnt). */
   streamOps: Array<Extract<Op, { t: 'stream' }>>
@@ -60,10 +62,10 @@ export interface EditState {
 export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops: [], cursor: 0 })
 
 /** Globale Standardwerte (Stil-Studio → „Als Standard festlegen“, Erstellen-Dialog): Preset, Änderungen daran, Titel an/aus. */
-export interface StyleDefaults { presetId?: string; style?: PresetPatch; titleEnabled?: boolean; /** Cold Opener: Zieldauer des Vorspanns in Sekunden (0–5, 0 = aus); wirkt beim Export auf Clips mit Vorschlag. */ coldOpenSec?: number }
+export interface StyleDefaults { presetId?: string; style?: PresetPatch; titleEnabled?: boolean; /** Untertitel für neue Clips (Standard an). */ captionsEnabled?: boolean; /** Cold Opener: Zieldauer des Vorspanns in Sekunden (0–5, 0 = aus); wirkt beim Export auf Clips mit Vorschlag. */ coldOpenSec?: number }
 
 export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string>; autoCuts?: ShortmeClip['autoCuts'] }, presetId = 'glow-karaoke', defaults: StyleDefaults = {}): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], autoCuts: (clip.autoCuts ?? []).map((c) => ({ start: c.start, end: c.end })), hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [] }
+  return { start: clip.start, end: clip.end, cutWords: [], autoCuts: (clip.autoCuts ?? []).map((c) => ({ start: c.start, end: c.end })), hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, enabled: defaults.captionsEnabled !== false, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */
@@ -88,7 +90,7 @@ export function reduce(base: EditState, ops: Op[]): EditState {
       case 'editWord': if (op.text.trim()) s.wordEdits[op.word] = op.text.trim(); else delete s.wordEdits[op.word]; break
       case 'caption': {
         const p = op.patch
-        s.caption = { presetId: p.presetId ?? s.caption.presetId, highlight: p.highlight ?? s.caption.highlight, zone: p.zone ?? s.caption.zone, style: p.resetStyle ? (p.style ?? {}) : deepMerge(s.caption.style, p.style ?? {}) }
+        s.caption = { presetId: p.presetId ?? s.caption.presetId, enabled: p.enabled ?? s.caption.enabled ?? true, highlight: p.highlight ?? s.caption.highlight, zone: p.zone ?? s.caption.zone, style: p.resetStyle ? (p.style ?? {}) : deepMerge(s.caption.style, p.style ?? {}) }
         break
       }
       case 'layoutClip': s.layoutOps = []; s.layoutOps.push(op); break
