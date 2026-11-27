@@ -6,6 +6,12 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.55.1] - 2026-11-27
+
+### Added
+
+- Originalton bereichsweise pegeln: in der Wellenform einen Bereich ziehen und mit dem Regler lauter oder leiser machen (gelb = lauter, blau = leiser); anklicken zum Ändern, Entf zum Entfernen. Lauter geht bis zur Aussteuerungsgrenze, Spitzen fängt ein Limiter ab.
+
 ## [0.55.0] - 2026-11-27
 
 ### Added
