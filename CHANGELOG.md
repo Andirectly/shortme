@@ -6,6 +6,21 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.56.0] - 2026-11-27
+
+### Added
+
+- Schnitt durch alle Ebenen: S, Strg+B oder „Teilen“ teilt Video und alle Tonspuren am Abspielkopf; gelöschte Stücke machen ihre Tonstücke stumm, ↺ bringt beides zurück.
+- Videostücke verschieben (Reihenfolge im Export, Untertitel folgen), Tonspuren teilen und an den Rändern kürzen.
+- Zeitleiste in der Höhe verstellbar (Griff darüber, Doppelklick = Standard); sie wächst mit dem Fenster und mit der Zahl der Tonspuren.
+- Bewertungen (Daumen, Gründe) fließen in die Auswahl ein: Suchweg-Gewichte ab 10 Urteilen, Gründe als Vorliebe in der Engine-6-Rangfolge.
+
+### Changed
+
+- Zeitleiste zeigt die Export-Zeit (wie in Schnittprogrammen): Gelöschtes verschwindet, Stücke schließen lückenlos an.
+- Pegel bis +30 dB (vorher +12); die Vorschau spielt Verstärkung über 0 dB hörbar ab.
+- Engine 6: fehlen Clips zur Wunschzahl, werden technisch einwandfreie, nur von der KI kritisierte Clips als „Bitte prüfen“ aufgefüllt (vorher wurden sie verworfen – bei einem 1-h-Stream 6 statt 15 Clips).
+
 ## [0.55.1] - 2026-11-27
 
 ### Added
