@@ -359,7 +359,7 @@ ${meta.sourcePath}` }
     const st = stateOf(baseState(clip, presetId, await loadStyle()), sanitizeLog(rawLog, clipId))
     const eff = effectiveClip(clip, transcript.words, st, (await loadLayoutInput(hash, clipId)) ?? (await ensureLayoutInput(meta, clip)))
     const signals = await ensureSignals(meta)
-    const plan = planExport(eff, transcript, signals, !clip.captionOnly, eff.removed)
+    const plan = planExport(eff, transcript, signals, !clip.captionOnly, eff.removed, {}, 0, eff.moves)
     return { start: eff.start, end: eff.end, duration: plan.duration, cuts: plan.cuts, shots: eff.shots ?? [], pieces: plan.pieces.map((p) => ({ src0: p.src0, src1: p.src1, out0: p.out0, zoom: p.zoom, shot: p.shot })) }
   })
   ipcMain.handle('shortme:jobs', () => jobs.list())

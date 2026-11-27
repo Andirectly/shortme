@@ -85,6 +85,15 @@ export class TimeMap {
     return i < 0 ? this.keeps.length - 1 : i
   }
   words<T extends { start: number; end: number }>(ws: T[]): T[] {
+    // Verschobene Stücke (nicht aufsteigend): jedes Wort über den Abschnitt, in dem es beginnt; Ende dort gekappt; nach Ausgabezeit sortiert
+    if (this.keeps.some((k, i) => i > 0 && k.src0 < this.keeps[i - 1].src1 - 1e-6)) {
+      const out: T[] = []
+      for (const w of ws) {
+        const k = this.keeps.find((x) => w.start >= x.src0 - 1e-6 && w.start < x.src1) ?? this.keeps.find((x) => w.end > x.src0 && w.start < x.src1)
+        if (k) out.push({ ...w, start: k.out0 + Math.max(0, w.start - k.src0), end: k.out0 + Math.min(w.end, k.src1) - k.src0 })
+      }
+      return out.sort((a, b) => a.start - b.start)
+    }
     return ws.filter((w) => this.keeps.some((k) => w.end > k.src0 && w.start < k.src1)).map((w) => ({ ...w, start: this.toOut(w.start), end: this.toOut(w.end) }))
   }
 }

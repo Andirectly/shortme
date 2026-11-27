@@ -24,7 +24,7 @@ import type { SelectionOutcome, SelectionRequest } from '..'
 import { ensureSeries, decodeSeries } from '../v2/audioIndex'
 import { frameDiffs, keyframeScan } from '../v2/visualIndex'
 import { decilesCovered, firstRepairable, fuseSeeds, requiredSpan, selectBalanced, type CoverageWindow, type Criterion, type Span } from '../v4/core'
-import { learnedLaneWeights } from '../v4/laneWeights'
+import { learnedLaneWeights, learnedPreferences } from '../v4/laneWeights'
 import { audioLane, chatLane, crossModalLane, expandQueries, QUERY_BANK, speechLane, speechUncertainWindows, visualLane, type LaneResult } from '../v4/lanes'
 import { investigateGroup, type InvestigationResult } from '../v4/investigate'
 import { actionEdges, audioPhraseEdges, buildEdges, judgeCuts, makeVariants } from '../v4/cut'
@@ -141,11 +141,14 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
     report('rate', 0, `Redaktionelles Ranking (${cands.length} Kandidaten, vollständiger Wortlaut) …`)
     const seed = parseInt(src.sha256.slice(0, 8), 16)
     const lang = langOf(t)
-    const rkey = checkpointKey([src.sha256, cands.map((c) => [c.id, c.text, c.wordless, c.lanes]), req.options.query ?? '', V6_RANK_PROMPT, A.models.text, seed, lang])
+    // Vorlieben aus den Bewertungen des Nutzers (Gründe wie „Lustig“, „Ende abgeschnitten“) ergänzen den Suchwunsch der Rangfolge
+    const prefs = await learnedPreferences().catch(() => '')
+    const rankQuery = [req.options.query ? `Der Nutzer sucht besonders: ${req.options.query}` : '', prefs].filter(Boolean).join('\n')
+    const rkey = checkpointKey([src.sha256, cands.map((c) => [c.id, c.text, c.wordless, c.lanes]), rankQuery, V6_RANK_PROMPT, A.models.text, seed, lang])
     let ranking = await loadCheckpoint<{ order: string[]; decisions: Array<[string, RankDecision]>; rounds: unknown[]; incomplete: string[] }>(project.hash, 'v6-rank', rkey)
     if (ranking) prof.count('cache:ranking')
     else {
-      const r = await prof.phase('ranking', () => A.withText((url, model) => rankCandidates(url, cands, { query: req.options.query, lang, seed, maxChars: B.rankMaxChars, signal, model, onRound: (x) => report('rate', 0.5, `Ranking ${x.round}: ${x.ok ? 'gültig' : 'ungültig – ' + x.error}`) })))
+      const r = await prof.phase('ranking', () => A.withText((url, model) => rankCandidates(url, cands, { query: rankQuery, raw: true, lang, seed, maxChars: B.rankMaxChars, signal, model, onRound: (x) => report('rate', 0.5, `Ranking ${x.round}: ${x.ok ? 'gültig' : 'ungültig – ' + x.error}`) })))
       ranking = { order: r.order, decisions: [...r.decisions], rounds: r.rounds, incomplete: r.incomplete }
       if (!r.incomplete.length) await saveCheckpoint(project.hash, 'v6-rank', rkey, ranking)
       prof.count('rank:rounds', r.rounds.length)
@@ -362,7 +365,10 @@ export async function selectV6(req: SelectionRequest): Promise<SelectionOutcome>
     // ------------------------------------------------------------------------------------------------ Auswahl & Ausgabe
     // redaktionell beste brauchbare zuerst: geprüft vor „bitte prüfen“, abgelehnte nicht veröffentlicht; Reserven nur zum Auffüllen der Wunschzahl
     const usable = planned.map((p) => ({ p, a: best.get(p.clip.id) })).filter((x): x is { p: Planned; a: Attempt } => !!x.a?.audit && x.a.audit.status !== 'rejected')
-    const chosen = [...usable.filter((x) => x.a.audit!.status === 'verified'), ...usable.filter((x) => x.a.audit!.status === 'needs-review')].slice(0, wanted)
+    // Nur redaktionell abgelehnt (Hook/Kontext/Ertrag …), technisch einwandfrei: füllt bis zur Wunschzahl auf und erscheint als „bitte prüfen“ mit der Kritik.
+    // Das Modellurteil ist bei Streams/Gaming oft zu streng (gemessen: 11 von 17 abgelehnt, 1-h-Stream) – entscheiden soll der Nutzer, seine Bewertung fließt ins Lernen.
+    const editorialOnly = planned.map((p) => ({ p, a: best.get(p.clip.id) })).filter((x): x is { p: Planned; a: Attempt } => x.a?.audit?.status === 'rejected' && x.a.audit.technical.ok)
+    const chosen = [...usable.filter((x) => x.a.audit!.status === 'verified'), ...usable.filter((x) => x.a.audit!.status === 'needs-review'), ...editorialOnly].slice(0, wanted)
     chosen.sort((x, y) => (x.a.audit!.status === y.a.audit!.status ? x.p.rank - y.p.rank : rankStatus(x.a.audit!.status) - rankStatus(y.a.audit!.status)))
     const clips: ShortmeClip[] = chosen.map(({ p, a }, n) => {
       const au = a.audit!

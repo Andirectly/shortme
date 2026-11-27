@@ -21,8 +21,8 @@ describe('Tonspuren', () => {
   })
   it('Operationen: hinzufügen, verschieben, pegeln (begrenzt), entfernen, Originalton', () => {
     const b = baseState({ start: 100, end: 120, hookText: '' })
-    let s = reduce(b, [{ t: 'audio', id: 'a', clip: clip({}) }, { t: 'audio', id: 'a', patch: { at: 107, gainDb: 40 } }, { t: 'voice', gainDb: -6 }])
-    expect(s.audio[0]).toMatchObject({ at: 107, gainDb: 12 })
+    let s = reduce(b, [{ t: 'audio', id: 'a', clip: clip({}) }, { t: 'audio', id: 'a', patch: { at: 107, gainDb: 50 } }, { t: 'voice', gainDb: -6 }])
+    expect(s.audio[0]).toMatchObject({ at: 107, gainDb: 30 })
     expect(s.voiceDb).toBe(-6)
     s = reduce(s, [{ t: 'audio', id: 'a', remove: true }])
     expect(s.audio).toEqual([])
@@ -31,7 +31,7 @@ describe('Tonspuren', () => {
   it('Bereichspegel: Ops, Rampe an den Grenzen, Filter nur für berührte Stücke', () => {
     const b = baseState({ start: 100, end: 120, hookText: '' })
     const s = reduce(b, [{ t: 'voiceRange', id: 'r', range: { id: 'r', start: 105, end: 107, gainDb: 6 } }, { t: 'voiceRange', id: 'r', patch: { gainDb: 99 } }])
-    expect(s.voiceRanges).toEqual([{ id: 'r', start: 105, end: 107, gainDb: 12 }])
+    expect(s.voiceRanges).toEqual([{ id: 'r', start: 105, end: 107, gainDb: 30 }])
     expect(reduce(s, [{ t: 'voiceRange', id: 'r', remove: true }]).voiceRanges).toEqual([])
     const r = [{ id: 'r', start: 105, end: 107, gainDb: 6 }]
     expect(rangeDbAt(r, 104)).toBe(0)

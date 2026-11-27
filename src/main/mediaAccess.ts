@@ -90,7 +90,9 @@ export async function serveMediaFile(path: string, rangeHeader: string | null): 
 
   const baseHeaders = {
     'Content-Type': contentType(path),
-    'Accept-Ranges': 'bytes'
+    'Accept-Ranges': 'bytes',
+    // Editor-Vorschau leitet Ton über WebAudio (Verstärkung über 0 dB); das geht nur mit CORS-freigegebenen Medien
+    'Access-Control-Allow-Origin': '*'
   }
 
   const range = rangeHeader?.match(/^bytes=(\d*)-(\d*)$/)

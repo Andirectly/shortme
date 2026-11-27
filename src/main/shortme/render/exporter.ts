@@ -22,6 +22,7 @@ import { mergeShortShots } from '../../../shared/shots'
 import { buildPieces, keepsFromCuts, planPauseCuts, TimeMap, type Interval } from './timeline'
 import { safeFileName, uniquePath, type QualityTier } from './profiles'
 import { placeAudio, type AudioClip, type VoiceRange } from '../../../shared/audioMix'
+import { applyMoves, type SegMove } from '../../../shared/segments'
 import { mediaPath } from '../audioTracks'
 
 export interface ExportOptions {
@@ -32,6 +33,8 @@ export interface ExportOptions {
   voiceDb?: number
   /** Pegel einzelner Bereiche des Originaltons. */
   voiceRanges?: VoiceRange[]
+  /** Verschobene Videostücke (Editor). */
+  moves?: SegMove[]
   /** Wirksames Preset (Preset + Änderungen aus Stil-Studio/Editor), renderer-unabhängig; Standard: erstes eingebautes. */
   style?: StylePreset
   /** Untertitel eingebrannt; false = ohne. */
@@ -67,11 +70,11 @@ export interface ExportOptions {
 export interface ExportResult { path: string; durationSec: number; srtPath?: string; ass: string; wordsOut: CapWord[]; pieces: number; captionEngine: 'tscaps' | 'ass' | 'remotion' | 'none'; /** Titel musste weggelassen werden (Grund). */ titleDropped?: string }
 
 /** Reine Planung eines Clips: Pausenschnitte, Zeitachse, Stücke, Wörter auf der gekürzten Zeitleiste. */
-export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = [], wordEdits: Record<number, string> = {}, coldOpenSec = 0) {
+export function planExport(clip: ShortmeClip, t: Transcript, signals: Pick<Signals, 'silences'>, removePauses: boolean, extraCuts: Interval[] = [], wordEdits: Record<number, string> = {}, coldOpenSec = 0, moves: SegMove[] = []) {
   const range: Interval = [clip.start, clip.end]
   const words = t.words.slice(clip.firstWord, clip.lastWord + 1)
   const cuts = mergeIntervals([...(removePauses ? planPauseCuts(range, words, signals.silences, t.speech) : []), ...extraCuts.filter((c) => c[1] > range[0] && c[0] < range[1])])
-  const main = keepsFromCuts(range, cuts)
+  const main = moves.length ? applyMoves(keepsFromCuts(range, cuts), moves) : keepsFromCuts(range, cuts)
   const tagByWord = new Map(clip.tags.map((g) => [g.word, g.kind]))
   const wordObjs = words.map((w, i) => ({ w: wordEdits[clip.firstWord + i] ?? w.w, start: w.start, end: w.end, tag: tagByWord.get(clip.firstWord + i) }))
   const mainWords: CapWord[] = new TimeMap(main).words(wordObjs)
@@ -134,7 +137,7 @@ export const filterPath = (p: string): string => p.replace(/\\/g, '/').replace(/
 
 export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transcript, signals: Signals, opts: ExportOptions): Promise<ExportResult> {
   const report = opts.onProgress ?? (() => undefined)
-  const plan = planExport(clip, t, signals, opts.removePauses ?? true, opts.extraCuts ?? [], opts.wordEdits ?? {}, opts.coldOpenSec ?? 0)
+  const plan = planExport(clip, t, signals, opts.removePauses ?? true, opts.extraCuts ?? [], opts.wordEdits ?? {}, opts.coldOpenSec ?? 0, opts.moves ?? [])
   if (plan.pieces.length === 0) throw new Error('Clip enthält nichts zu exportieren')
   await mkdir(opts.outDir, { recursive: true })
   const style: StylePreset = opts.style ?? BUILTIN_PRESETS[0]

@@ -9,15 +9,19 @@ export interface AudioClip {
   name: string
   /** Beginn in Quellzeit (wie Trim/Schnitte); der Ton läuft ab dort ohne Unterbrechung auf der Ausgabe weiter. */
   at: number
-  /** Länge der Datei in Sekunden. */
+  /** Hörbare Länge in Sekunden (nach Kürzen/Teilen). */
   dur: number
+  /** Sprung in die Datei (vorn gekürzt oder hinterer Teil nach dem Teilen). */
+  in?: number
+  /** Länge der ganzen Datei (Grenze beim Verlängern); fehlt bei alten Spuren → in + dur. */
+  fileDur?: number
   /** Pegel in dB (0 = unverändert). */
   gainDb: number
   kind: 'sfx' | 'music'
 }
 
 export const GAIN_MIN_DB = -40
-export const GAIN_MAX_DB = 12
+export const GAIN_MAX_DB = 30
 export const clampDb = (db: number): number => Math.min(GAIN_MAX_DB, Math.max(GAIN_MIN_DB, Math.round(db * 10) / 10))
 export const dbToGain = (db: number): number => Math.pow(10, db / 20)
 
@@ -37,6 +41,9 @@ export interface PlacedAudio {
 
 /** Quellzeit → Ausgabezeit über die Abschnitte des eigentlichen Clips (ohne Cold-Opener-Vorspann); in einer entfernten Lücke der Beginn des nächsten Abschnitts. */
 export function outTimeOf(src: number, keeps: KeepSpan[]): number {
+  // verschobene Stücke (nicht aufsteigend): zuerst das Stück, das die Zeit enthält
+  const hit = keeps.find((k) => src >= k.src0 && src < k.src1)
+  if (hit) return hit.out0 + (src - hit.src0)
   for (const k of keeps) {
     if (src < k.src0) return k.out0
     if (src < k.src1) return k.out0 + (src - k.src0)
@@ -52,9 +59,10 @@ export function placeAudio(clips: AudioClip[], keeps: KeepSpan[], outDuration: n
   for (const c of clips) {
     if (!(c.dur > 0) || c.gainDb <= GAIN_MIN_DB) continue
     // Beginnt der Ton vor dem Clip, fehlt sein Anfang (wie beim Video)
-    const offset = Math.max(0, first - c.at)
-    const delay = offset > 0 ? outTimeOf(first, keeps) : outTimeOf(c.at, keeps)
-    const len = Math.min(c.dur - offset, outDuration - delay)
+    const lead = Math.max(0, first - c.at)
+    const offset = (c.in ?? 0) + lead
+    const delay = lead > 0 ? outTimeOf(first, keeps) : outTimeOf(c.at, keeps)
+    const len = Math.min(c.dur - lead, outDuration - delay)
     if (len > 0.02) out.push({ file: c.file, delay, offset, len, gainDb: c.gainDb })
   }
   return out

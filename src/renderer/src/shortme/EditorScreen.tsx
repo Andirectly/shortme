@@ -5,7 +5,7 @@ import { clipRevision, qualityOf } from '@shared/review'
 import { LogReportButton } from './LogReport'
 import { ArrowLeft, Undo2, Redo2, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ReviewBadge } from './ReviewScreen'
-import { baseState, canRedo, canUndo, editWindow, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
+import { baseState, canRedo, canUndo, editWindow, isAudioDeleted, liveAudio, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
 import type { PreviewPlan, ShortmeShot } from '@shared/shortme'
 import { groupWords } from '@shared/captions'
 import type { PresetPatch } from '@shared/preset'
@@ -27,6 +27,7 @@ import { StreamFrames } from './StreamFrames'
 import { RatingBar, useRatingKeys } from './RatingBar'
 import { Timeline, FPS } from './Timeline'
 import { LyricsTranscript } from './LyricsTranscript'
+import { setLevel, startBoost } from './audioBoost'
 import { dbToGain, outTimeOf, rangeDbAt } from '@shared/audioMix'
 
 const ZONES: Record<string, { top: number; bottom: number; right: number }> = { TikTok: { top: 0.12, bottom: 0.2, right: 0.14 }, Reels: { top: 0.1, bottom: 0.18, right: 0.1 }, Shorts: { top: 0.1, bottom: 0.22, right: 0.12 } }
@@ -108,6 +109,9 @@ export function EditorScreen(): React.JSX.Element {
   /** Lautstärke nur für die Wiedergabe im Editor – wirkt nicht auf den Export. */
   const [volume, setVolume] = useState(1)
   const [tab, setTab] = useState('Untertitel')
+  /** Höhe der Zeitleiste in % der Fensterhöhe (gemerkt je Rechner); wächst mit dem Fenster. */
+  const [tlVh, setTlVh] = useState<number>(() => { try { const v = Number(localStorage.getItem('sm.timelineVh')); return v >= 20 && v <= 72 ? v : 32 } catch { return 32 } })
+  const tlDrag = useRef<{ y: number; vh: number } | null>(null)
   const [showSource, setShowSource] = useState(true)
   const [zone, setZone] = useState('Aus')
   const [sel, setSel] = useState<number | null>(null)
@@ -153,6 +157,8 @@ export function EditorScreen(): React.JSX.Element {
     return () => { alive = false; clearTimeout(id) }
   }, [log, loaded, hasApi, hash, clipId, st.caption.presetId])
   const planRef = useRef<PreviewPlan | null>(null)
+  /** Stück (Index in plan.pieces), das die Vorschau gerade abspielt. */
+  const pieceRef = useRef(0)
   planRef.current = plan
   useEffect(() => { setStreamLive(null) }, [plan])
 
@@ -230,8 +236,8 @@ export function EditorScreen(): React.JSX.Element {
   }, [hasApi, hash, audioFilesKey])
   const audioEls = useRef(new Map<string, HTMLAudioElement>())
   useEffect(() => () => { for (const el of audioEls.current.values()) el.pause(); audioEls.current.clear() }, [clipId])
-  const audioRef = useRef(st.audio)
-  audioRef.current = st.audio
+  const audioRef = useRef(liveAudio(st))
+  audioRef.current = liveAudio(st)
   const urlsRef = useRef(audioUrls)
   urlsRef.current = audioUrls
   const mixRef = useRef({ muted, volume, voiceDb: st.voiceDb, ranges: st.voiceRanges })
@@ -240,19 +246,18 @@ export function EditorScreen(): React.JSX.Element {
     const p = planRef.current
     const keeps = p?.pieces ?? []
     const els = audioEls.current
-    // Originalton: Gesamtpegel + Bereichspegel an dieser Stelle (shortcut: Vorschau höchstens 0 dB, Element-Lautstärke ≤ 1)
+    // Originalton: Gesamtpegel + Bereichspegel an dieser Stelle (über WebAudio auch verstärkt, wie im Export)
     const v = videoRef.current
-    if (v) v.volume = Math.min(1, mixRef.current.volume * dbToGain(mixRef.current.voiceDb + rangeDbAt(mixRef.current.ranges, abs)))
+    if (v) setLevel(v, mixRef.current.volume * dbToGain(mixRef.current.voiceDb + rangeDbAt(mixRef.current.ranges, abs)))
     for (const a of audioRef.current) {
       const url = urlsRef.current[a.file]
       if (!url) continue
       let el = els.get(a.id)
-      if (!el || el.dataset.src !== url) { el?.pause(); el = new Audio(url); el.dataset.src = url; el.preload = 'auto'; els.set(a.id, el) }
-      // shortcut: Vorschau kann nicht über 0 dB verstärken (Element-Lautstärke ≤ 1); der Export schon
-      el.volume = mixRef.current.muted ? 0 : Math.min(1, mixRef.current.volume * dbToGain(a.gainDb))
+      if (!el || el.dataset.src !== url) { el?.pause(); el = new Audio(); el.crossOrigin = 'anonymous'; el.src = url; el.dataset.src = url; el.preload = 'auto'; els.set(a.id, el) }
+      setLevel(el, mixRef.current.muted ? 0 : mixRef.current.volume * dbToGain(a.gainDb))
       const start = p?.start ?? a.at
       const pos = keeps.length ? outTimeOf(abs, keeps) - outTimeOf(Math.max(a.at, start), keeps) + Math.max(0, start - a.at) : abs - a.at
-      if (play && pos >= 0 && pos < a.dur) { if (Math.abs(el.currentTime - pos) > 0.15) el.currentTime = pos; if (el.paused) void el.play().catch(() => undefined) } else if (!el.paused) el.pause()
+      if (play && pos >= 0 && pos < a.dur) { const f = (a.in ?? 0) + pos; if (Math.abs(el.currentTime - f) > 0.15) el.currentTime = f; if (el.paused) void el.play().catch(() => undefined) } else if (!el.paused) el.pause()
     }
     for (const [id, el] of els) if (!audioRef.current.some((a) => a.id === id)) { el.pause(); els.delete(id) }
   }, [])
@@ -275,13 +280,19 @@ export function EditorScreen(): React.JSX.Element {
     vfc = v.requestVideoFrameCallback(onFrame)
     const tick = (now: number): void => {
       const abs = v.currentTime
-      if (!v.paused) {
-        // Pausenschnitte und herausgeschnittene Wörter überspringen – wie im Export
-        const cutHit = planRef.current?.cuts.find((c) => abs >= c[0] - 0.01 && abs < c[1] - 0.03)
-        if (cutHit) v.currentTime = cutHit[1]
-        const rel = abs - origStart
-        if (rel >= trimRef.current[1] - 0.02) { v.pause(); setPlaying(false) }
-      }
+      const ps = planRef.current?.pieces
+      if (!v.paused && ps?.length) {
+        // Stücke in Export-Reihenfolge abspielen: Lücken (Schnitte) überspringen, verschobene Stücke anspringen – wie im Export
+        let i = pieceRef.current
+        if (!(ps[i] && abs >= ps[i].src0 - 0.05 && abs < ps[i].src1 + 0.05)) { i = ps.findIndex((p) => abs >= p.src0 - 0.01 && abs < p.src1); pieceRef.current = i }
+        const p = ps[i]
+        if (!p) { const nx = ps.find((x) => x.src0 > abs); if (nx) { pieceRef.current = ps.indexOf(nx); v.currentTime = nx.src0 } else { v.pause(); setPlaying(false) } }
+        else if (abs >= p.src1 - 0.03) {
+          const nx = ps[i + 1]
+          if (!nx) { v.pause(); setPlaying(false) }
+          else { pieceRef.current = i + 1; if (Math.abs(nx.src0 - p.src1) > 0.02) v.currentTime = nx.src0 }
+        }
+      } else if (!v.paused && abs - origStart >= trimRef.current[1] - 0.02) { v.pause(); setPlaying(false) }
       // ohne geladenes Video (Quelle fehlt) bleibt die Zeit, wo sie ist – sonst springt der Kopf an den Pufferbeginn
       if (v.readyState > 0) {
         tRef.current = abs - origStart
@@ -313,7 +324,12 @@ export function EditorScreen(): React.JSX.Element {
     if (!v || !srcUrl) { setPlaying((p) => !p); return }
     if (v.paused) {
       const rel = v.currentTime - origStart
-      if (rel < trimRef.current[0] || rel >= trimRef.current[1] - 0.05) v.currentTime = origStart + trimRef.current[0]
+      const ps = planRef.current?.pieces
+      // am Ende (letztes Stück in Export-Reihenfolge) oder außerhalb: von vorn
+      const last = ps?.[ps.length - 1]
+      if (ps?.length && last) { if (rel < trimRef.current[0] || rel > trimRef.current[1] || (v.currentTime >= last.src1 - 0.05 && v.currentTime < last.src1 + 0.05)) { v.currentTime = ps[0].src0; pieceRef.current = 0 } }
+      else if (rel < trimRef.current[0] || rel >= trimRef.current[1] - 0.05) v.currentTime = origStart + trimRef.current[0]
+      startBoost()
       void v.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
     } else { v.pause(); setPlaying(false) }
   }, [srcUrl, origStart])
@@ -424,8 +440,12 @@ export function EditorScreen(): React.JSX.Element {
   const commitStream = (patch: Partial<StreamLayout>): void => { setStreamLive((l) => ({ ...(l ?? {}), ...patch })); commit({ t: 'stream', patch, at: scope === 'Diese Szene' ? absT : undefined }) }
   const outDuration = plan ? plan.duration : trim[1] - trim[0]
 
+  // Zeitleiste: Höhe als Anteil der Fensterhöhe (wächst mit dem Fenster), am Griff verstellbar, mindestens so hoch, dass jede Tonspur eine Zeile hat
+  const audioLanes = new Set(st.audio.map((a) => a.id.split('.')[0])).size
+  const tlNeed = 292 + Math.max(0, audioLanes - 1) * 24
+  const tlH = `clamp(240px, max(${tlNeed}px, ${tlVh}vh), 72vh)`
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'auto minmax(0, 1fr) 292px', gap: 12, height: 'calc(100vh - 60px)', paddingTop: 4 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: `auto minmax(0, 1fr) 8px ${tlH}`, rowGap: 6, columnGap: 12, height: 'calc(100vh - 60px)', paddingTop: 4, ['--tl-h' as string]: tlH }}>
       {preIssues && (
         <div role="dialog" aria-label="Clip exportieren" onClick={() => setPreIssues(null)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center', padding: 16 }}>
           <div className="sm-glass" onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 100%)', padding: 20, display: 'grid', gap: 12, background: 'rgba(22,22,28,0.97)' }}>
@@ -480,11 +500,11 @@ export function EditorScreen(): React.JSX.Element {
 
         {/* Bühne: Quellmonitor + vertikale Vorschau */}
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', alignItems: 'center', minHeight: 0, minWidth: 0 }}>
-          <div style={{ display: showSource ? 'grid' : 'none', gap: 8, flex: '1 1 0', minWidth: 0, maxWidth: `min(820px, calc((100vh - 390px) * ${srcAspect}))`, alignSelf: 'center' }}>
+          <div style={{ display: showSource ? 'grid' : 'none', gap: 8, flex: '1 1 0', minWidth: 0, maxWidth: `min(820px, calc((100vh - 98px - var(--tl-h)) * ${srcAspect}))`, alignSelf: 'center' }}>
             <div title="Klick auf eine Person: Kamera folgt ihr ab hier" onClick={(e) => { if (streamShot) return; const r = e.currentTarget.getBoundingClientRect(); commit({ t: 'follow', at: absT, cx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) }) }}
               style={{ position: 'relative', aspectRatio: `${srcAspect}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 0 0 1px var(--edge)', background: '#000', cursor: streamShot ? 'default' : 'crosshair' }}>
               {srcUrl
-                ? <video ref={videoRef} src={srcUrl} onError={() => setSrcBroken(true)} preload="auto" playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ? <video ref={videoRef} src={srcUrl} crossOrigin="anonymous" onError={() => setSrcBroken(true)} preload="auto" playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 : <div style={{ width: '100%', height: '100%', backgroundImage: `url(${IMG.source})`, backgroundSize: 'cover' }} />}
               {streamShot && source && <StreamFrames layout={streamShot} src={{ width: source.width, height: source.height }} onLive={(p) => setStreamLive((l) => ({ ...(l ?? {}), ...p }))} onCommit={commitStream} />}
               {rects.map((r, i) => <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `${r.x * 100}%`, width: `${r.w * 100}%`, border: '2px solid var(--accent)', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none', boxShadow: 'var(--accent-glow)' }} />)}
@@ -560,6 +580,16 @@ export function EditorScreen(): React.JSX.Element {
         </div>
       </div>
 
+      {/* Griff: Zeitleiste höher/niedriger ziehen (Doppelklick = Standard) */}
+      <div role="separator" aria-orientation="horizontal" aria-label="Höhe der Zeitleiste" title="Ziehen: Zeitleiste größer/kleiner · Doppelklick: Standard" tabIndex={0}
+        onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); tlDrag.current = { y: e.clientY, vh: tlVh } }}
+        onPointerMove={(e) => { const d = tlDrag.current; if (d) setTlVh(Math.min(72, Math.max(20, d.vh + ((d.y - e.clientY) / window.innerHeight) * 100))) }}
+        onPointerUp={() => { tlDrag.current = null; try { localStorage.setItem('sm.timelineVh', String(Math.round(tlVh * 10) / 10)) } catch { /* ignore */ } }}
+        onDoubleClick={() => { setTlVh(32); try { localStorage.removeItem('sm.timelineVh') } catch { /* ignore */ } }}
+        onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); setTlVh((v) => Math.min(72, Math.max(20, v + (e.key === 'ArrowUp' ? 2 : -2)))) } }}
+        style={{ cursor: 'row-resize', display: 'grid', placeItems: 'center', touchAction: 'none' }}>
+        <span style={{ width: 44, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.28)' }} />
+      </div>
       <Timeline duration={D} trim={trim} t={t} onSeek={seek} words={words} playing={playing} onToggle={togglePlay} muted={muted} onMute={() => setMuted(!muted)} volume={volume} onVolume={setVolume}
         peaks={assets?.peaks} strip={assets?.strip}
         cuts={(plan?.cuts ?? []).map((c) => [c[0] - origStart, c[1] - origStart] as [number, number])}
@@ -569,11 +599,15 @@ export function EditorScreen(): React.JSX.Element {
         onCutRange={(r) => commit({ t: 'autoCuts', ranges: [{ start: origStart + r[0], end: origStart + r[1] }], cut: true })}
         onRestoreRange={(r) => commit({ t: 'autoCuts', ranges: [{ start: origStart + r[0], end: origStart + r[1] }], cut: false })}
         onTrim={(next) => { setLiveTrim(null); if (next[0] !== committed[0] || next[1] !== committed[1]) commit({ t: 'trim', start: origStart + next[0], end: origStart + next[1] }) }} onPreview={setLiveTrim} base={base}
-        origin={origStart} audio={st.audio.map((a) => ({ ...a, at: a.at - origStart }))} voiceDb={st.voiceDb} onVoiceDb={(db) => commit({ t: 'voice', gainDb: db })}
+        origin={origStart} audio={st.audio.map((a) => ({ ...a, at: a.at - origStart, ...(isAudioDeleted(a, st) ? { deleted: true } : {}) }))} voiceDb={st.voiceDb} onVoiceDb={(db) => commit({ t: 'voice', gainDb: db })}
         onAudioFiles={hasApi && hash ? addAudio : undefined}
         gainRanges={st.voiceRanges.map((r) => ({ ...r, start: r.start - origStart, end: r.end - origStart }))}
         onRange={(id, r, create) => { const abs = r && { ...r, ...(r.start !== undefined ? { start: r.start + origStart } : {}), ...(r.end !== undefined ? { end: r.end + origStart } : {}) }; commit(!abs ? { t: 'voiceRange', id, remove: true } : create ? { t: 'voiceRange', id, range: { id, start: abs.start ?? 0, end: abs.end ?? 0, gainDb: abs.gainDb ?? 0 } } : { t: 'voiceRange', id, patch: abs }) }}
         onAudio={(id, patch) => commit(patch ? { t: 'audio', id, patch: patch.at !== undefined ? { ...patch, at: patch.at + origStart } : patch } : { t: 'audio', id, remove: true })}
+        splits={st.splits.map((x) => x - origStart)} order={(plan?.pieces ?? []).map((p) => [p.src0 - origStart, p.src1 - origStart] as [number, number])}
+        onSplit={(at) => commit({ t: 'split', at: at + origStart })}
+        onSegDelete={(g) => commit({ t: 'autoCuts', ranges: [{ start: g[0] + origStart, end: g[1] + origStart }], cut: true })}
+        onSegMove={(g, b) => commit({ t: 'moveSeg', move: { start: g[0] + origStart, end: g[1] + origStart, before: b === null ? null : b + origStart } })}
         onCheckEnd={() => { seek(Math.max(trim[0], trim[1] - 2.5)); const v = videoRef.current; if (v) void v.play().then(() => setPlaying(true)).catch(() => undefined); else setPlaying(true) }} />
     </div>
   )

@@ -15,7 +15,7 @@ import { loadStyle } from '../styleDefaults'
 import { ensureLayoutInput, ensureSignals, loadLayoutInput } from '../clips/analysis'
 import { exportClip } from './exporter'
 import { loadEdits } from '../edits'
-import { baseState, effectiveClip, stateOf } from '../../../shared/edits'
+import { baseState, effectiveClip, liveAudio, stateOf } from '../../../shared/edits'
 import { allPresets, effectivePreset } from '../presets'
 
 export const EXPORT_PIPELINE_REVISION = 'export-v1'
@@ -33,7 +33,7 @@ export async function exportEffective(meta: ProjectMeta, transcript: Transcript,
   const only = clip.captionOnly ? { removePauses: false } : {}
   const params = { ...only, style: preset, srt: !!opts?.srt, captions: opts?.captions !== false && st.caption.enabled !== false, extraCuts: eff.removed, wordEdits: eff.wordEdits, coldOpenSec: clip.captionOnly ? 0 : style.coldOpenSec ?? 0, hook: clip.captionOnly ? false : st.hook.enabled, renderer, seamCaption: st.caption.style.caption?.y === undefined, seamTitle: st.caption.style.title?.y === undefined, caption: { highlight: st.caption.highlight }, hookSeconds: st.hook.seconds, hookText: st.hook.text }
   // Tonspuren/Pegel nur wenn gesetzt: Fingerabdrücke unbearbeiteter Clips bleiben gleich
-  Object.assign(params, st.audio.length ? { audio: st.audio } : {}, st.voiceDb ? { voiceDb: st.voiceDb } : {}, st.voiceRanges.length ? { voiceRanges: st.voiceRanges } : {})
+  Object.assign(params, liveAudio(st).length ? { audio: liveAudio(st) } : {}, st.voiceDb ? { voiceDb: st.voiceDb } : {}, st.voiceRanges.length ? { voiceRanges: st.voiceRanges } : {}, st.moves.length ? { moves: st.moves } : {})
   const inputFingerprint = createHash('sha256').update(JSON.stringify([EXPORT_PIPELINE_REVISION, meta.hash, eff.start, eff.end, eff.shots, eff.title, eff.firstWord, eff.lastWord, (eff as { autoCuts?: unknown }).autoCuts ?? null, params])).digest('hex').slice(0, 24)
   // Engine 6: unveränderte, geprüfte Datei wiederverwenden (gleiche Eingaben UND unveränderter Inhalt); sonst neu rendern – der alte Prüfstatus gilt dann nicht
   const art = clip.v6?.artifact

@@ -224,7 +224,7 @@ async function runSmokeCapture(win: BrowserWindow, dir: string): Promise<void> {
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'media',
-    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true }
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true }
   }
 ])
 

@@ -6,6 +6,7 @@ import { deepMerge, type PresetPatch } from './preset'
 import { planShots, type PlanInput, type PlanTrack } from './layoutPlan'
 import { isFullStream, sameCam, type StreamLayout } from './streamLayout'
 import { clampDb, type AudioClip, type VoiceRange } from './audioMix'
+import type { SegMove } from './segments'
 
 /** Änderung am Untertitel-/Titelstil: anderes Preset und/oder Änderungen am Preset (tief zusammengeführt). */
 export interface CaptionPatch {
@@ -43,7 +44,13 @@ export type Op =
   | { t: 'layoutClip'; layout: ShortmeShot['layout'] }
   | { t: 'stream'; patch: StreamPatch; at?: number }
   /** Tonspur: `clip` = hinzufügen, `patch` = verschieben/pegeln, `remove` = entfernen. */
-  | { t: 'audio'; id: string; clip?: AudioClip; patch?: Partial<Pick<AudioClip, 'at' | 'gainDb'>>; remove?: boolean }
+  | { t: 'audio'; id: string; clip?: AudioClip; patch?: Partial<Pick<AudioClip, 'at' | 'gainDb' | 'in' | 'dur'>>; remove?: boolean }
+  /** Tonspur an Quellzeit `at` teilen: vorderer Teil behält die id, hinterer bekommt `newId`. */
+  | { t: 'audioSplit'; id: string; at: number; newId: string }
+  /** Schnittpunkt im Video setzen (oder mit remove entfernen); teilt den Clip in Stücke. */
+  | { t: 'split'; at: number; remove?: boolean }
+  /** Videostück verschieben (Reihenfolge im Export). */
+  | { t: 'moveSeg'; move: SegMove }
   /** Pegel des Originaltons in dB. */
   | { t: 'voice'; gainDb: number }
   /** Pegel eines Bereichs im Originalton: `range` = anlegen, `patch` = ändern, `remove` = entfernen. */
@@ -70,6 +77,10 @@ export interface EditState {
   voiceDb: number
   /** Pegel einzelner Bereiche des Originaltons (Quellzeit). */
   voiceRanges: VoiceRange[]
+  /** Schnittpunkte im Video (Quellzeit). */
+  splits: number[]
+  /** Verschobene Videostücke in Reihenfolge. */
+  moves: SegMove[]
 }
 
 export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops: [], cursor: 0 })
@@ -78,12 +89,12 @@ export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops:
 export interface StyleDefaults { presetId?: string; style?: PresetPatch; titleEnabled?: boolean; /** Untertitel für neue Clips (Standard an). */ captionsEnabled?: boolean; /** Cold Opener: Zieldauer des Vorspanns in Sekunden (0–5, 0 = aus); wirkt beim Export auf Clips mit Vorschlag. */ coldOpenSec?: number }
 
 export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string>; autoCuts?: ShortmeClip['autoCuts'] }, presetId = 'glow-karaoke', defaults: StyleDefaults = {}): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], autoCuts: (clip.autoCuts ?? []).map((c) => ({ start: c.start, end: c.end })), hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, enabled: defaults.captionsEnabled !== false, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [], audio: [], voiceDb: 0, voiceRanges: [] }
+  return { start: clip.start, end: clip.end, cutWords: [], autoCuts: (clip.autoCuts ?? []).map((c) => ({ start: c.start, end: c.end })), hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, enabled: defaults.captionsEnabled !== false, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [], audio: [], voiceDb: 0, voiceRanges: [], splits: [], moves: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */
 export function reduce(base: EditState, ops: Op[]): EditState {
-  const s: EditState = { ...base, cutWords: [...base.cutWords], autoCuts: (base.autoCuts ?? []).map((c) => ({ ...c })), hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption, style: { ...base.caption.style } }, layoutOps: [...base.layoutOps], streamOps: [...(base.streamOps ?? [])], audio: (base.audio ?? []).map((a) => ({ ...a })), voiceDb: base.voiceDb ?? 0, voiceRanges: (base.voiceRanges ?? []).map((r) => ({ ...r })) }
+  const s: EditState = { ...base, cutWords: [...base.cutWords], autoCuts: (base.autoCuts ?? []).map((c) => ({ ...c })), hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption, style: { ...base.caption.style } }, layoutOps: [...base.layoutOps], streamOps: [...(base.streamOps ?? [])], audio: (base.audio ?? []).map((a) => ({ ...a })), voiceDb: base.voiceDb ?? 0, voiceRanges: (base.voiceRanges ?? []).map((r) => ({ ...r })), splits: [...(base.splits ?? [])], moves: [...(base.moves ?? [])] }
   for (const op of ops) {
     switch (op.t) {
       case 'trim': s.start = Math.min(op.start, op.end - 0.5); s.end = op.end; break
@@ -114,6 +125,15 @@ export function reduce(base: EditState, ops: Op[]): EditState {
         break
       }
       case 'voice': s.voiceDb = clampDb(op.gainDb); break
+      case 'audioSplit': splitAudio(s, op.id, op.at, op.newId); break
+      case 'split': {
+        if (op.remove) { s.splits = s.splits.filter((x) => Math.abs(x - op.at) > 1e-3); break }
+        // Schnitt durch alle Ebenen (wie „alle Spuren am Abspielkopf teilen“): Video im Clip + jede Tonspur, die hier läuft
+        if (op.at > s.start + 0.02 && op.at < s.end - 0.02) s.splits = [...s.splits.filter((x) => Math.abs(x - op.at) > 1e-3), op.at].sort((a, b) => a - b)
+        for (const a of [...s.audio]) splitAudio(s, a.id, op.at, `${a.id}.${Math.round(op.at * 1000)}`)
+        break
+      }
+      case 'moveSeg': s.moves.push(op.move); break
       case 'voiceRange': {
         const i = s.voiceRanges.findIndex((r) => r.id === op.id)
         if (op.remove) { if (i >= 0) s.voiceRanges.splice(i, 1) } else if (op.range) { const r = { ...op.range, gainDb: clampDb(op.range.gainDb) }; if (i >= 0) s.voiceRanges[i] = r; else s.voiceRanges.push(r) } else if (i >= 0 && op.patch) s.voiceRanges[i] = { ...s.voiceRanges[i], ...op.patch, gainDb: clampDb(op.patch.gainDb ?? s.voiceRanges[i].gainDb) }
@@ -127,6 +147,20 @@ export function reduce(base: EditState, ops: Op[]): EditState {
 }
 
 export const stateOf = (base: EditState, log: EditLog): EditState => reduce(base, log.ops.slice(0, log.cursor))
+
+/** Tonspur an Quellzeit `at` teilen (nichts, wenn `at` nicht innerhalb liegt): vorderer Teil behält die id, hinterer spielt ab dieser Stelle der Datei weiter. */
+function splitAudio(s: EditState, id: string, at: number, newId: string): void {
+  const i = s.audio.findIndex((a) => a.id === id)
+  const a = s.audio[i]
+  const cut = a ? at - a.at : 0
+  if (!a || cut < 0.02 || cut > a.dur - 0.02) return
+  s.audio[i] = { ...a, dur: cut }
+  s.audio.splice(i + 1, 0, { ...a, id: newId, at, in: (a.in ?? 0) + cut, dur: a.dur - cut, fileDur: a.fileDur ?? (a.in ?? 0) + a.dur })
+}
+
+/** Gelöschte Stücke gelten für alle Ebenen: Tonstücke, die in einem gelöschten Bereich beginnen, sind stumm (Wiederherstellen bringt sie zurück). */
+export const isAudioDeleted = (a: Pick<AudioClip, 'at'>, st: Pick<EditState, 'autoCuts'>): boolean => (st.autoCuts ?? []).some((c) => a.at >= c.start - 1e-3 && a.at < c.end - 1e-3)
+export const liveAudio = (st: Pick<EditState, 'audio' | 'autoCuts'>): AudioClip[] => st.audio.filter((a) => !isAudioDeleted(a, st))
 
 /** Neue Operation anhängen; alles hinter dem Cursor (Redo-Zweig) wird verworfen. Mehrere Trim-/Hook-/Caption-Operationen direkt hintereinander verschmelzen nicht – jede ist ein Undo-Schritt. */
 export function push(log: EditLog, op: Op): EditLog {
@@ -154,7 +188,7 @@ export const editWindow = (start: number, end: number, sourceSec: number): [numb
 export interface WordT { start: number; end: number }
 
 /** Wirksamer Clip nach den Edits: neue Wortgrenzen, Shots auf den neuen Beginn bezogen und mit Layout-/Follow-Überschreibungen. */
-export function effectiveClip<C extends Pick<ShortmeClip, 'start' | 'end' | 'firstWord' | 'lastWord' | 'shots' | 'hookText'>>(clip: C, words: WordT[], st: EditState, layout?: PlanInput | null): C & { removed: Array<[number, number]>; wordEdits: Record<number, string> } {
+export function effectiveClip<C extends Pick<ShortmeClip, 'start' | 'end' | 'firstWord' | 'lastWord' | 'shots' | 'hookText'>>(clip: C, words: WordT[], st: EditState, layout?: PlanInput | null): C & { moves: SegMove[]; removed: Array<[number, number]>; wordEdits: Record<number, string> } {
   let first = clip.firstWord
   let last = clip.lastWord
   // Wörter, die vollständig im Bereich liegen
@@ -170,7 +204,7 @@ export function effectiveClip<C extends Pick<ShortmeClip, 'start' | 'end' | 'fir
   // Shots auf absolute Zeit, dann Überschreibungen, dann auf neuen Beginn beziehen
   const abs = (clip.shots ?? []).map((s) => ({ ...s, start: clip.start + s.start, end: clip.start + s.end }))
   const shots = applyStreamOps(applyLayoutOps(abs, st.layoutOps, st.start, st.end, layout ? { input: layout, clipStart: clip.start } : undefined), st.streamOps ?? [], (clip as { stream?: StreamLayout }).stream).map((s) => ({ ...s, start: s.start - st.start, end: s.end - st.start }))
-  return { ...clip, start: st.start, end: st.end, firstWord: first, lastWord: last, shots, hookText: st.hook.text, removed, wordEdits: st.wordEdits }
+  return { ...clip, start: st.start, end: st.end, firstWord: first, lastWord: last, shots, hookText: st.hook.text, removed, wordEdits: st.wordEdits, moves: st.moves ?? [] }
 }
 
 /** Facecam-Layout je Stream-Szene: Grundlage = Layout der Szene, sonst das des Clips; dann die Änderungen (Clip weit, dann nur die Szene um `at`). */
