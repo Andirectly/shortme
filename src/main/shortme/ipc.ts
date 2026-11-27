@@ -38,6 +38,7 @@ import { ensureLayoutInput, ensureShots, ensureSignals, loadLayoutInput } from '
 import { exportClip } from './render/exporter'
 import { publishCaptionOnly } from './clips/captionOnly'
 import { exportEffective } from './render/exportOne'
+import { audioPaths, importAudio } from './audioTracks'
 import { addExport } from '../upload/store'
 import { deleteClip } from './corrections'
 import { logCorrection } from './corrections'
@@ -336,6 +337,11 @@ ${meta.sourcePath}` }
     return out.sort((a, b) => b.created.localeCompare(a.created))
   })
   /** Editor: echte Wellenform und Filmstreifen des Clips. */
+  ipcMain.handle('shortme:audioImport', async (_e, hash: string, src: string, at: number) => {
+    if (!(await loadMeta(hash))) throw new Error('Projekt nicht gefunden')
+    return importAudio(hash, String(src), Number(at) || 0)
+  })
+  ipcMain.handle('shortme:audioPaths', (_e, hash: string, files: string[]) => audioPaths(hash, Array.isArray(files) ? files.map(String) : []))
   ipcMain.handle('shortme:editorAssets', async (_e, hash: string, clipId: string) => {
     const meta = await loadMeta(hash)
     const clip = (await findClip(hash, clipId))?.clip

@@ -23,6 +23,7 @@ import type {
 import type { OpenRouterCatalog } from '@shared/openrouter'
 import type { AssetSpec, AssetStatus, CheckItem, HardwareInfo } from '@shared/engines'
 import type { CaptionPatch, EditLog } from '@shared/edits'
+import type { AudioClip } from '@shared/audioMix'
 import type { StylePreset } from '@shared/preset'
 import type { StyleDefaults } from '@shared/edits'
 import type { ContentType, FrameChoice, KindProfile } from '@shared/videoKind'
@@ -223,6 +224,8 @@ const api = {
     presetSave: (p: StylePreset, mode: 'new' | 'overwrite'): Promise<{ saved: StylePreset; all: StylePreset[] }> => ipcRenderer.invoke('shortme:presetSave', p, mode),
     presetDelete: (id: string): Promise<StylePreset[]> => ipcRenderer.invoke('shortme:presetDelete', id),
     projects: (): Promise<Array<{ hash: string; title: string; durationSec: number; clips: number; created: string; poster: string | null; source: string; isUrl: boolean; /** none = noch nie analysiert, running = Analyse läuft, done = Clipliste vorhanden */ status: 'none' | 'running' | 'done' }>> => ipcRenderer.invoke('shortme:projects'),
+    audioImport: (hash: string, src: string, at: number): Promise<AudioClip & { path: string }> => ipcRenderer.invoke('shortme:audioImport', hash, src, at),
+    audioPaths: (hash: string, files: string[]): Promise<Record<string, string>> => ipcRenderer.invoke('shortme:audioPaths', hash, files),
     editorAssets: (hash: string, clipId: string): Promise<{ peaks: number[]; step: number; strip: string[] }> => ipcRenderer.invoke('shortme:editorAssets', hash, clipId),
     previewPlan: (hash: string, clipId: string, log: EditLog, presetId?: string): Promise<PreviewPlan> => ipcRenderer.invoke('shortme:previewPlan', hash, clipId, log, presetId),
     styleGet: (): Promise<StyleDefaults> => ipcRenderer.invoke('shortme:styleGet'),

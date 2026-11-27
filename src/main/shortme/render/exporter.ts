@@ -21,9 +21,15 @@ import { compositeOverlay, remotionAvailable, renderRemotionOverlay } from '../.
 import { mergeShortShots } from '../../../shared/shots'
 import { buildPieces, keepsFromCuts, planPauseCuts, TimeMap, type Interval } from './timeline'
 import { safeFileName, uniquePath, type QualityTier } from './profiles'
+import { placeAudio, type AudioClip } from '../../../shared/audioMix'
+import { mediaPath } from '../audioTracks'
 
 export interface ExportOptions {
   outDir: string
+  /** Zusätzliche Tonspuren aus dem Editor (Dateien in `<Projekt>/media`). */
+  audio?: AudioClip[]
+  /** Pegel des Originaltons in dB. */
+  voiceDb?: number
   /** Wirksames Preset (Preset + Änderungen aus Stil-Studio/Editor), renderer-unabhängig; Standard: erstes eingebautes. */
   style?: StylePreset
   /** Untertitel eingebrannt; false = ohne. */
@@ -162,6 +168,8 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
     const quality = opts.quality ?? 'standard'
     const src = { width: meta.width, height: meta.height }
     const audioFilter = stats ? loudnormFilter(stats) : undefined
+    // Tonspuren an der Ausgabe-Zeitachse des eigentlichen Clips (ohne Cold-Opener-Vorspann); shortcut: Quelle ohne Ton bekommt keine Spuren
+    const placed = hasAudio ? placeAudio(opts.audio ?? [], plan.coldOpen ? plan.map.keeps.slice(1) : plan.map.keeps, plan.duration) : []
 
     let titleDropped = ''
     /** Ein FFmpeg-Lauf: Stücke → Zusammenschnitt (+ optional eingebrannte ASS-Datei). */
@@ -173,7 +181,8 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
         await writeFile(assPath, assText, 'utf8')
         post = `ass='${filterPath(assPath)}':fontsdir='${filterPath(fontsDirForRender)}'`
       }
-      const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, audio: hasAudio, videoPost: post, overlay: title ? { x: title.x, y: title.y } : undefined })
+      const mix = { first: title ? 2 : 1, tracks: placed, voiceDb: opts.voiceDb ?? 0 }
+      const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, audio: hasAudio, videoPost: post, overlay: title ? { x: title.x, y: title.y } : undefined, mix })
       const scriptPath = join(work, `${basename(dest)}.graph.txt`)
       await writeFile(scriptPath, filter, 'utf8')
       const onProgress = (t: number): void => report(span[0] + (span[1] - span[0]) * Math.min(1, t / Math.max(0.1, plan.duration)), 'Rendert …')
@@ -181,7 +190,8 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
       const run = (): Promise<void> => runWithGraphFile((bin, args) => runBinary(bin, args, { signal: opts.signal, onProgress }), enc.bin, [
         '-hide_banner', '-nostats', '-nostdin', '-y',
         '-ss', clip.start.toFixed(3), '-t', (clip.end - clip.start).toFixed(3), '-i', meta.sourcePath,
-        ...(title ? ['-framerate', String(title.fps), '-i', title.pattern] : [])
+        ...(title ? ['-framerate', String(title.fps), '-i', title.pattern] : []),
+        ...placed.flatMap((p) => ['-i', mediaPath(meta.hash, p.file)])
       ], filter, scriptPath, [
         '-map', '[v]', ...(hasAudio ? ['-map', '[a]'] : []),
         ...encoderArgs(enc.kind, q), '-r', '30', ...(hasAudio ? [...audioArgs(q), '-ar', '48000'] : ['-an']),

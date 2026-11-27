@@ -1,3 +1,4 @@
+import type { PlacedAudio } from '../../../shared/audioMix'
 import type { Piece } from './timeline'
 
 import { cropBox, OUT_H, OUT_W, type SourceDims } from '@shared/framing'
@@ -53,6 +54,15 @@ export interface GraphOptions {
   duration: number
   /** false: Quelle ohne Tonspur → nur `[v]` (keine erfundene Stille). Standard: true. */
   audio?: boolean
+  /** Zusätzliche Tonspuren (Eingänge ab `first`) und Pegel des Originaltons; ohne Spuren und mit 0 dB bleibt der Graph unverändert. */
+  mix?: { first: number; tracks: PlacedAudio[]; voiceDb: number }
+}
+
+/** Eine Tonspur: zuschneiden, pegeln, klickfrei ein-/ausblenden, auf ihre Ausgabezeit verschieben. */
+export function mixChain(p: PlacedAudio, input: number, k: number): string {
+  const f = Math.min(0.02, p.len / 4)
+  const ms = Math.round(p.delay * 1000)
+  return `[${input}:a]atrim=start=${p.offset.toFixed(3)}:duration=${p.len.toFixed(3)},asetpts=PTS-STARTPTS,volume=${p.gainDb.toFixed(1)}dB,afade=t=in:d=${f.toFixed(3)},afade=t=out:st=${(p.len - f).toFixed(3)}:d=${f.toFixed(3)},adelay=${ms}:all=1[x${k}]`
 }
 
 /** Kompletter filter_complex: Stücke zuschneiden/skalieren, aneinanderhängen, Audio normalisieren. Ausgänge `[v]` und `[a]`. */
@@ -62,12 +72,22 @@ export function buildFilterGraph(pieces: Piece[], o: GraphOptions): string {
   pieces.forEach((p, k) => { parts.push(videoChain(p, k, o.src, o.base)); if (audio) parts.push(audioChain(p, k, o.base)) })
   const n = pieces.length
   const labels = pieces.map((_, k) => (audio ? `[v${k}][a${k}]` : `[v${k}]`)).join('')
-  const post = audio ? [o.audioFilter, o.fadeOutSec ? `afade=t=out:st=${Math.max(0, o.duration - o.fadeOutSec).toFixed(3)}:d=${o.fadeOutSec}` : ''].filter(Boolean).join(',') : ''
+  const tracks = audio ? o.mix?.tracks ?? [] : []
+  const voice = audio && o.mix?.voiceDb ? `volume=${o.mix.voiceDb.toFixed(1)}dB` : ''
+  const fade = audio && o.fadeOutSec ? `afade=t=out:st=${Math.max(0, o.duration - o.fadeOutSec).toFixed(3)}:d=${o.fadeOutSec}` : ''
+  const post = !audio ? '' : tracks.length
+    ? [o.audioFilter, voice].filter(Boolean).join(',') || 'anull'
+    : [o.audioFilter, voice, fade].filter(Boolean).join(',')
   const vOut = o.overlay || o.videoPost ? 'vc' : 'v'
   parts.push(audio ? `${labels}concat=n=${n}:v=1:a=1[${vOut}][${post ? 'ac' : 'a'}]` : `${labels}concat=n=${n}:v=1:a=0[${vOut}]`)
   let cur = 'vc'
   if (o.overlay) { parts.push(`[${cur}][1:v]overlay=${o.overlay.x}:${o.overlay.y}:eof_action=pass:format=auto[${o.videoPost ? 'vo' : 'v'}]`); cur = 'vo' }
   if (o.videoPost) parts.push(`[${cur}]${o.videoPost}[v]`)
-  if (post) parts.push(`[ac]${post}[a]`)
+  if (tracks.length) {
+    // Originalton (normalisiert, gepegelt) + Spuren ohne Gesamtnormalisierung mischen; Limiter gegen Übersteuern, dann die Ausblendung am Ende
+    parts.push(`[ac]${post}[av]`)
+    tracks.forEach((p, k) => parts.push(mixChain(p, o.mix!.first + k, k)))
+    parts.push(`[av]${tracks.map((_, k) => `[x${k}]`).join('')}amix=inputs=${tracks.length + 1}:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95:level=0${fade ? `,${fade}` : ''}[a]`)
+  } else if (post) parts.push(`[ac]${post}[a]`)
   return parts.join(';\n')
 }

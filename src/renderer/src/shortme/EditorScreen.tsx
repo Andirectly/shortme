@@ -1,10 +1,9 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { modKey } from './Commands'
 import { blocks, needsConfirm, preflight, type PreflightIssue } from '@shared/preflight'
 import { clipRevision, qualityOf } from '@shared/review'
 import { LogReportButton } from './LogReport'
-import { motion } from 'motion/react'
-import { ArrowLeft, Play, Pause, Undo2, Redo2, Scissors, Rewind, Check, SkipBack, SkipForward, Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Undo2, Redo2, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ReviewBadge } from './ReviewScreen'
 import { baseState, canRedo, canUndo, editWindow, emptyLog, push, redo as redoLog, sanitizeLog, stateOf, undo as undoLog, type CaptionPatch, type EditLog, type Op } from '@shared/edits'
 import type { PreviewPlan, ShortmeShot } from '@shared/shortme'
@@ -26,14 +25,15 @@ import { STREAM_PRESETS, streamSeamY, type StreamLayout } from '@shared/streamLa
 import { CONTENT_TYPES, contentLabel, type ContentType } from '@shared/videoKind'
 import { StreamFrames } from './StreamFrames'
 import { RatingBar, useRatingKeys } from './RatingBar'
+import { Timeline, FPS } from './Timeline'
+import { LyricsTranscript } from './LyricsTranscript'
+import { dbToGain, outTimeOf } from '@shared/audioMix'
 
 const ZONES: Record<string, { top: number; bottom: number; right: number }> = { TikTok: { top: 0.12, bottom: 0.2, right: 0.14 }, Reels: { top: 0.1, bottom: 0.18, right: 0.1 }, Shorts: { top: 0.1, bottom: 0.22, right: 0.12 } }
 const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', Fest: 'fixed', Vollbild: 'fit', Split: 'split', 'Facecam + Gameplay': 'stream' }
 const LAYOUT_LABEL: Record<ShortmeShot['layout'], string> = { smart: 'Smart', fit: 'Vollbild', split: 'Split', fixed: 'Fest', stream: 'Facecam + Gameplay' }
-const LAYOUT_COLOR: Record<ShortmeShot['layout'], string> = { smart: 'rgba(255,255,255,0.55)', fit: 'rgba(255,255,255,0.32)', split: 'rgba(255,255,255,0.62)', fixed: 'rgba(255,255,255,0.18)', stream: 'rgba(255,214,10,0.55)' }
 const CANVAS_W = 540
 const CANVAS_H = 960
-const fmt = (s: number): string => `${Math.floor(Math.max(0, s) / 60)}:${(Math.max(0, s) % 60).toFixed(1).padStart(4, '0')}`
 
 export function EditorScreen(): React.JSX.Element {
   const clipId = useStore((s) => s.activeClip)
@@ -219,6 +219,48 @@ export function EditorScreen(): React.JSX.Element {
     if (v && srcUrl) v.currentTime = origStart + r
   }, [D, origStart, srcUrl])
 
+  // ---------- Tonspuren: Vorschau auf derselben Ausgabe-Zeitachse wie der Export ----------
+  const [audioUrls, setAudioUrls] = useState<Record<string, string>>({})
+  const audioFilesKey = st.audio.map((a) => a.file).join('|')
+  useEffect(() => {
+    if (!hasApi || !hash || !audioFilesKey) return
+    let alive = true
+    void window.cutawan.shortme.audioPaths(hash, audioFilesKey.split('|')).then((p) => { if (alive) setAudioUrls(Object.fromEntries(Object.entries(p).map(([k, v]) => [k, window.cutawan.mediaUrl(v)]))) }).catch(() => undefined)
+    return () => { alive = false }
+  }, [hasApi, hash, audioFilesKey])
+  const audioEls = useRef(new Map<string, HTMLAudioElement>())
+  useEffect(() => () => { for (const el of audioEls.current.values()) el.pause(); audioEls.current.clear() }, [clipId])
+  const audioRef = useRef(st.audio)
+  audioRef.current = st.audio
+  const urlsRef = useRef(audioUrls)
+  urlsRef.current = audioUrls
+  const mixRef = useRef({ muted, volume })
+  mixRef.current = { muted, volume }
+  const syncAudio = useCallback((abs: number, play: boolean): void => {
+    const p = planRef.current
+    const keeps = p?.pieces ?? []
+    const els = audioEls.current
+    for (const a of audioRef.current) {
+      const url = urlsRef.current[a.file]
+      if (!url) continue
+      let el = els.get(a.id)
+      if (!el || el.dataset.src !== url) { el?.pause(); el = new Audio(url); el.dataset.src = url; el.preload = 'auto'; els.set(a.id, el) }
+      // shortcut: Vorschau kann nicht über 0 dB verstärken (Element-Lautstärke ≤ 1); der Export schon
+      el.volume = mixRef.current.muted ? 0 : Math.min(1, mixRef.current.volume * dbToGain(a.gainDb))
+      const start = p?.start ?? a.at
+      const pos = keeps.length ? outTimeOf(abs, keeps) - outTimeOf(Math.max(a.at, start), keeps) + Math.max(0, start - a.at) : abs - a.at
+      if (play && pos >= 0 && pos < a.dur) { if (Math.abs(el.currentTime - pos) > 0.15) el.currentTime = pos; if (el.paused) void el.play().catch(() => undefined) } else if (!el.paused) el.pause()
+    }
+    for (const [id, el] of els) if (!audioRef.current.some((a) => a.id === id)) { el.pause(); els.delete(id) }
+  }, [])
+  const addAudio = async (files: File[], at: number): Promise<void> => {
+    if (!hasApi || !hash) return
+    for (const f of files) {
+      const { path: _p, ...clip } = await window.cutawan.shortme.audioImport(hash, window.cutawan.pathForFile(f), origStart + at)
+      commit({ t: 'audio', id: clip.id, clip })
+    }
+  }
+
   useEffect(() => {
     const v = videoRef.current
     if (!v || !srcUrl) return
@@ -242,12 +284,13 @@ export function EditorScreen(): React.JSX.Element {
         tRef.current = abs - origStart
         if (now - last > 66 || v.paused) { last = now; setT(tRef.current) }
       }
+      syncAudio(abs, !v.paused)
       if (v.paused) draw() // im Stand (Springen, Ziehen, Stiländerung) zeichnet die Schleife; beim Abspielen der Bild-Rückruf
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => { cancelAnimationFrame(raf); v.cancelVideoFrameCallback(vfc) }
-  }, [srcUrl, origStart, draw])
+  }, [srcUrl, origStart, draw, syncAudio])
 
   useEffect(() => {
     const v = videoRef.current
@@ -258,7 +301,8 @@ export function EditorScreen(): React.JSX.Element {
     return () => { v.removeEventListener('loadedmetadata', onLoaded) }
   }, [srcUrl, origStart, clipId])
   useEffect(() => { if (videoRef.current) videoRef.current.muted = muted }, [muted])
-  useEffect(() => { if (videoRef.current) videoRef.current.volume = volume }, [volume, srcUrl])
+  // shortcut: Originalton in der Vorschau höchstens 0 dB (Element-Lautstärke ≤ 1)
+  useEffect(() => { if (videoRef.current) videoRef.current.volume = volume * Math.min(1, dbToGain(st.voiceDb)) }, [volume, srcUrl, st.voiceDb])
 
   const selRef = useRef<number | null>(null)
   selRef.current = sel
@@ -290,8 +334,8 @@ export function EditorScreen(): React.JSX.Element {
       else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo() }
       else if (e.key === ' ') { e.preventDefault(); togglePlay() }
       else if ((e.key === 'Delete' || e.key === 'Backspace') && selRef.current !== null) { e.preventDefault(); toggleCutRef.current(selRef.current) }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(tRef.current - (e.shiftKey ? 5 : 1)) }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); seek(tRef.current + (e.shiftKey ? 5 : 1)) }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(tRef.current - (e.shiftKey ? 1 : 1 / FPS)) }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); seek(tRef.current + (e.shiftKey ? 1 : 1 / FPS)) }
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
@@ -380,7 +424,7 @@ export function EditorScreen(): React.JSX.Element {
   const outDuration = plan ? plan.duration : trim[1] - trim[0]
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'auto minmax(0, 1fr) 262px', gap: 12, height: 'calc(100vh - 60px)', paddingTop: 4 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'auto minmax(0, 1fr) 292px', gap: 12, height: 'calc(100vh - 60px)', paddingTop: 4 }}>
       {preIssues && (
         <div role="dialog" aria-label="Clip exportieren" onClick={() => setPreIssues(null)} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center', padding: 16 }}>
           <div className="sm-glass" onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 100%)', padding: 20, display: 'grid', gap: 12, background: 'rgba(22,22,28,0.97)' }}>
@@ -421,20 +465,12 @@ export function EditorScreen(): React.JSX.Element {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'clamp(240px, 22vw, 440px) minmax(0, 1fr) clamp(280px, 24vw, 480px)', gap: 14, minHeight: 0 }}>
         {/* Transkript */}
-        <div className="sm-glass" style={{ padding: 16, overflowY: 'auto' }}>
-          <h3 style={{ marginBottom: 10 }}>Transkript</h3>
-          <div style={{ lineHeight: 1.75, fontSize: 14, textAlign: 'left', wordSpacing: 0 }}>
-            {words.map((w, i) => (
-              <Fragment key={w.g}>
-                {editing === w.g
-                  ? <input autoFocus value={draft} size={Math.max(3, draft.length + 1)} onChange={(ev) => setDraft(ev.target.value)} onBlur={() => finishEdit(true)} onKeyDown={(ev) => { if (ev.key === 'Enter') finishEdit(true); else if (ev.key === 'Escape') finishEdit(false) }}
-                      style={{ font: 'inherit', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: 4, color: '#fff', padding: '0 3px', outline: 'none' }} />
-                  : <span ref={i === curIdx ? wordRef : undefined} onClick={(ev) => { setSel(w.g); if (ev.altKey) toggleCut(w.g); else seek(w.t) }} onDoubleClick={() => startEdit(w.g, w.w)} title="Klick: springen/auswählen · Doppelklick: Text ändern · Entf: herausschneiden"
-                      style={{ cursor: 'pointer', padding: '1px 2px', borderRadius: 4, textDecoration: cut.includes(w.g) ? 'line-through' : w.edited ? 'underline dotted rgba(255,255,255,0.6)' : 'none', opacity: cut.includes(w.g) ? 0.35 : w.t < trim[0] - 0.01 || w.e > trim[1] + 0.05 ? 0.4 : 1, background: i === curIdx ? 'rgba(255,255,255,0.22)' : 'transparent', outline: sel === w.g ? '1px solid rgba(255,255,255,0.55)' : 'none', color: cut.includes(w.g) ? 'rgba(255,255,255,0.45)' : undefined }}>{w.w}</span>}{' '}
-              </Fragment>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        {/* Transkript ohne Rahmen direkt auf dem App-Hintergrund (wie Apple-Music-Lyrics) */}
+        <div style={{ padding: '4px 4px 0', display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr) auto', gap: 8, minHeight: 0 }}>
+          <h3 style={{ padding: '2px 0' }}>Transkript</h3>
+          <LyricsTranscript words={words} t={t} playing={playing} cut={cut} trim={trim} sel={sel} editing={editing} draft={draft}
+            onDraft={setDraft} onFinish={finishEdit} onWord={(w, alt) => { setSel(w.g); if (alt) toggleCut(w.g); else seek(w.t) }} onEdit={(w) => startEdit(w.g, w.w)} />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Pill onClick={() => { const w = words.find((x) => x.g === sel); if (w) startEdit(w.g, w.w) }}>Text ändern</Pill>
             <Pill onClick={() => { if (sel !== null) toggleCut(sel) }}>{sel !== null && cut.includes(sel) ? 'Wieder einfügen' : 'Herausschneiden'}</Pill>
             {!!real?.autoCuts?.length && <Pill onClick={() => commit({ t: 'autoCuts', ranges: real.autoCuts ?? [], cut: st.autoCuts.length === 0 })}>{st.autoCuts.length ? `Automatische Kürzung zurücknehmen (${st.autoCuts.length})` : 'Automatische Kürzung anwenden'}</Pill>}
@@ -443,7 +479,7 @@ export function EditorScreen(): React.JSX.Element {
 
         {/* Bühne: Quellmonitor + vertikale Vorschau */}
         <div style={{ display: 'flex', gap: 20, justifyContent: 'center', alignItems: 'center', minHeight: 0, minWidth: 0 }}>
-          <div style={{ display: showSource ? 'grid' : 'none', gap: 8, flex: '1 1 0', minWidth: 0, maxWidth: `min(820px, calc((100vh - 360px) * ${srcAspect}))`, alignSelf: 'center' }}>
+          <div style={{ display: showSource ? 'grid' : 'none', gap: 8, flex: '1 1 0', minWidth: 0, maxWidth: `min(820px, calc((100vh - 390px) * ${srcAspect}))`, alignSelf: 'center' }}>
             <div title="Klick auf eine Person: Kamera folgt ihr ab hier" onClick={(e) => { if (streamShot) return; const r = e.currentTarget.getBoundingClientRect(); commit({ t: 'follow', at: absT, cx: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) }) }}
               style={{ position: 'relative', aspectRatio: `${srcAspect}`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 0 0 1px var(--edge)', background: '#000', cursor: streamShot ? 'default' : 'crosshair' }}>
               {srcUrl
@@ -532,117 +568,10 @@ export function EditorScreen(): React.JSX.Element {
         onCutRange={(r) => commit({ t: 'autoCuts', ranges: [{ start: origStart + r[0], end: origStart + r[1] }], cut: true })}
         onRestoreRange={(r) => commit({ t: 'autoCuts', ranges: [{ start: origStart + r[0], end: origStart + r[1] }], cut: false })}
         onTrim={(next) => { setLiveTrim(null); if (next[0] !== committed[0] || next[1] !== committed[1]) commit({ t: 'trim', start: origStart + next[0], end: origStart + next[1] }) }} onPreview={setLiveTrim} base={base}
+        origin={origStart} audio={st.audio.map((a) => ({ ...a, at: a.at - origStart }))} voiceDb={st.voiceDb} onVoiceDb={(db) => commit({ t: 'voice', gainDb: db })}
+        onAudioFiles={hasApi && hash ? addAudio : undefined}
+        onAudio={(id, patch) => commit(patch ? { t: 'audio', id, patch: patch.at !== undefined ? { ...patch, at: patch.at + origStart } : patch } : { t: 'audio', id, remove: true })}
         onCheckEnd={() => { seek(Math.max(trim[0], trim[1] - 2.5)); const v = videoRef.current; if (v) void v.play().then(() => setPlaying(true)).catch(() => undefined); else setPlaying(true) }} />
-    </div>
-  )
-}
-
-interface TimelineProps {
-  duration: number; trim: [number, number]; t: number; onSeek: (n: number) => void; words: { t: number; e: number }[]; playing: boolean; onToggle: () => void; muted: boolean; onMute: () => void; volume: number; onVolume: (v: number) => void
-  peaks?: number[]; strip?: string[]; cuts: Array<[number, number]>; shots: ShortmeShot[]; outDuration: number
-  onTrim: (t: [number, number]) => void; onPreview: (t: [number, number]) => void; onCheckEnd: () => void; base: object
-  /** Von Hand (oder automatisch) herausgeschnittene Zeitbereiche, relativ zum Clip; Klick stellt wieder her. */
-  ranges: Array<[number, number]>; onCutRange: (r: [number, number]) => void; onRestoreRange: (r: [number, number]) => void
-}
-
-function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, onMute, volume, onVolume, peaks, strip, cuts, shots, outDuration, onTrim, onPreview, onCheckEnd, base, ranges, onCutRange, onRestoreRange }: TimelineProps): React.JSX.Element {
-  const track = useRef<HTMLDivElement>(null)
-  /** Anfang eines Bereichs, der gelöscht werden soll (Abspielposition beim Markieren); Ende = aktuelle Position. */
-  const [mark, setMark] = useState<number | null>(null)
-  const [grab, setGrab] = useState<'in' | 'out' | 'head' | null>(null)
-  const live = useRef<[number, number]>(trim)
-  const offset = useRef(0)
-  const bounds = useMemo(() => words.flatMap((w, i) => [w.t, words[i + 1]?.t ?? duration]), [words, duration])
-  const snap = useCallback((x: number) => bounds.reduce((b, c) => (Math.abs(c - x) < Math.abs(b - x) ? c : b), bounds[0] ?? x), [bounds])
-  const toTime = (clientX: number): number => { const r = track.current!.getBoundingClientRect(); return ((clientX - r.left) / r.width) * duration }
-  const pct = (x: number): string => `${(Math.min(duration, Math.max(0, x)) / duration) * 100}%`
-  const wave = useMemo(() => {
-    const p = peaks && peaks.length ? peaks : Array.from({ length: Math.max(10, Math.round(duration / 0.1)) }, (_, i) => 0.2 + 0.5 * Math.abs(Math.sin(i * 0.37) * Math.cos(i * 0.113 + 1.3)))
-    const n = p.length
-    const up = p.map((v, i) => `${i},${(50 - Math.min(1, v * 1.15) * 48).toFixed(1)}`)
-    const dn = p.map((v, i) => `${i},${(50 + Math.min(1, v * 1.15) * 48).toFixed(1)}`).reverse()
-    return { n, d: `M${up.join(' L')} L${dn.join(' L')} Z` }
-  }, [peaks, duration])
-
-  const down = (which: 'in' | 'out') => (e: React.PointerEvent): void => {
-    e.stopPropagation()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    live.current = trim
-    offset.current = toTime(e.clientX) - trim[which === 'in' ? 0 : 1] // Grab-Offset: 1:1, kein Springen zur Mitte
-    setGrab(which)
-  }
-  const move = (e: React.PointerEvent): void => {
-    if (grab === 'head') { onSeek(toTime(e.clientX)); return }
-    if (!grab) return
-    const x = toTime(e.clientX) - offset.current
-    const v = Math.min(duration, Math.max(0, snap(x)))
-    const next: [number, number] = grab === 'in' ? [Math.min(v, live.current[1] - 1), live.current[1]] : [live.current[0], Math.max(v, live.current[0] + 1)]
-    live.current = next
-    onPreview(next)
-  }
-  const up = (): void => {
-    if (!grab) return
-    const was = grab
-    setGrab(null)
-    if (was !== 'head') onTrim(live.current) // genau ein Undo-Schritt je Ziehen
-  }
-
-  return (
-    <div className="sm-glass" style={{ padding: 14, display: 'grid', gridTemplateRows: 'auto 1fr auto', gap: 8, minHeight: 0 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        <Button variant="ghost" aria-label="5 Sekunden zurück" onClick={() => onSeek(t - 5)}><SkipBack size={15} /></Button>
-        <Button variant="primary" aria-label={playing ? 'Pause' : 'Abspielen'} onClick={onToggle} style={{ width: 44, padding: 0 }}>{playing ? <Pause size={16} /> : <Play size={16} />}</Button>
-        <Button variant="ghost" aria-label="5 Sekunden vor" onClick={() => onSeek(t + 5)}><SkipForward size={15} /></Button>
-        <Button variant="ghost" aria-label={muted ? 'Ton an' : 'Ton aus'} onClick={onMute}>{muted ? <VolumeX size={15} /> : <Volume2 size={15} />}</Button>
-        <input className="sm-range" type="range" aria-label="Lautstärke (nur Vorschau)" title="Lautstärke nur im Editor, nicht im Export" min={0} max={100} value={Math.round(volume * 100)} onChange={(e) => onVolume(Number(e.target.value) / 100)} style={{ width: 80 }} />
-        <small style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-1)', minWidth: 130 }}>{fmt(Math.max(0, t - trim[0]))} / {fmt(trim[1] - trim[0])}</small>
-        <small>Export nach Kürzen: <b style={{ color: 'var(--text-1)' }}>{outDuration.toFixed(1)} s</b></small>
-        {/* eigene Gruppe: rutscht geschlossen in die nächste Zeile, statt einzeln umzubrechen */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginLeft: 'auto' }}>
-        {mark === null
-          ? <Pill onClick={() => setMark(t)}><Scissors size={13} /> Ab hier markieren</Pill>
-          : <>
-              <Pill onClick={() => { const a = snap(Math.min(mark, t)), b = snap(Math.max(mark, t)); if (b - a >= 0.2) onCutRange([a, b]); setMark(null) }}><Scissors size={13} /> Bis hier löschen ({Math.abs(t - mark).toFixed(1)} s)</Pill>
-              <Pill onClick={() => setMark(null)}>Abbrechen</Pill>
-            </>}
-        <Pill onClick={onCheckEnd}><Rewind size={13} /> Ende prüfen</Pill>
-        <Pill onClick={() => onTrim([trim[0], Math.min(duration, snap(trim[1] + 4))])}><Scissors size={13} /> Satz verlängern</Pill>
-        <Pill onClick={() => onTrim([trim[0], Math.max(trim[0] + 1, snap(trim[1] - 4))])}><Scissors size={13} /> Satz kürzen</Pill>
-        </div>
-      </div>
-
-      <div ref={track} style={{ position: 'relative', minHeight: 0, touchAction: 'none', display: 'grid', gridTemplateRows: '52px 1fr 24px', gap: 4, cursor: 'pointer' }}
-        onPointerDown={(e) => { if (grab) return; e.currentTarget.setPointerCapture(e.pointerId); setGrab('head'); onSeek(toTime(e.clientX)) }} onPointerMove={move} onPointerUp={up}>
-        {/* Filmstreifen */}
-        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
-          {(strip ?? []).map((s, i) => <img key={i} src={s} alt="" draggable={false} style={{ flex: 1, minWidth: 0, height: '100%', objectFit: 'cover', display: 'block' }} />)}
-        </div>
-        {/* Wellenform */}
-        <div style={{ position: 'relative', borderRadius: 8, background: 'rgba(0,0,0,0.25)' }}>
-          <svg viewBox={`0 0 ${wave.n} 100`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-            <path d={wave.d} fill="rgba(255,255,255,0.55)" />
-          </svg>
-          {cuts.map((c, i) => <div key={i} title="Wird im Export entfernt" style={{ position: 'absolute', top: 0, bottom: 0, left: pct(c[0]), width: `calc(${pct(c[1])} - ${pct(c[0])})`, background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.38) 0 4px, rgba(255,255,255,0.1) 4px 8px)', borderLeft: '1px solid rgba(255,255,255,0.8)', borderRight: '1px solid rgba(255,255,255,0.8)' }} />)}
-        </div>
-        {/* Shots */}
-        <div style={{ position: 'relative', borderRadius: 6, background: 'rgba(255,255,255,0.04)' }}>
-          {shots.map((s, i) => <div key={i} title={`${LAYOUT_LABEL[s.layout]}${s.auto ? " (automatisch: keine Person im Ausschnitt → Vollbild)" : ""} · ${fmt(s.start)}–${fmt(s.end)}`} style={{ position: 'absolute', top: 2, bottom: 2, left: pct(s.start), width: `calc(${pct(s.end)} - ${pct(s.start)})`, background: LAYOUT_COLOR[s.layout], borderRadius: 4, fontSize: 10, lineHeight: '20px', paddingLeft: 4, overflow: 'hidden', whiteSpace: 'nowrap', color: '#fff', ...(s.auto ? { outline: '1px dashed var(--warn)' } : {}) }}>{(s.end - s.start) / duration >= 0.035 && <>{LAYOUT_LABEL[s.layout]}{s.auto ? ' · auto' : ''}</>}</div>)}{/* schmale Einstellungen ohne Text (sonst „Vc S Smart Sn …“), Name steht im Tooltip */}
-        </div>
-        {mark !== null && <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: pct(Math.min(mark, t)), width: `calc(${pct(Math.max(mark, t))} - ${pct(Math.min(mark, t))})`, background: 'rgba(255,80,80,0.28)', border: '1px solid rgba(255,120,120,0.9)', borderRadius: 6, pointerEvents: 'none' }} />}
-        {ranges.map((r, i) => <button key={`r${i}`} type="button" title={`Gelöscht ${fmt(r[0])}–${fmt(r[1])} · Klicken zum Wiederherstellen`} aria-label={`Gelöschten Bereich ${fmt(r[0])} bis ${fmt(r[1])} wiederherstellen`} onPointerDown={(e) => e.stopPropagation()} onClick={() => onRestoreRange(r)} style={{ position: 'absolute', top: 56, height: 22, left: pct(r[0]), width: `calc(${pct(r[1])} - ${pct(r[0])})`, minWidth: 14, zIndex: 2, border: '1px solid rgba(255,255,255,0.8)', borderRadius: 6, background: 'rgba(255,80,80,0.35)', color: '#fff', fontSize: 11, lineHeight: '18px', padding: 0, cursor: 'pointer', overflow: 'hidden' }}>↺</button>)}
-        {/* außerhalb des Beschnitts abdunkeln */}
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: pct(trim[0]), background: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: `calc(100% - ${pct(trim[1])})`, background: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: pct(trim[0]), width: `calc(${pct(trim[1])} - ${pct(trim[0])})`, border: '2px solid var(--accent)', borderRadius: 10, pointerEvents: 'none', boxShadow: 'var(--accent-glow)' }} />
-        {(['in', 'out'] as const).map((w) => (
-          <motion.div key={w} role="slider" aria-label={w === 'in' ? 'Start' : 'Ende'} aria-valuenow={trim[w === 'in' ? 0 : 1]} tabIndex={0}
-            animate={{ scale: grab === w ? 1.18 : 1, y: grab === w ? -3 : 0 }} transition={base}
-            onPointerDown={down(w)} style={{ position: 'absolute', top: -4, bottom: -4, left: `calc(${pct(trim[w === 'in' ? 0 : 1])} - 8px)`, width: 16, padding: '0 5px', borderRadius: 8, background: '#fff', backgroundClip: 'content-box', filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.5))', cursor: 'ew-resize' }} />
-        ))}
-        <div style={{ position: 'absolute', top: -6, bottom: -6, left: pct(t), width: 2, background: '#fff', pointerEvents: 'none', boxShadow: '0 0 8px rgba(255,255,255,0.8)' }}>
-          <span style={{ position: 'absolute', top: -2, left: -5, width: 12, height: 12, background: '#fff', borderRadius: '3px 3px 6px 6px' }} />
-        </div>
-      </div>
     </div>
   )
 }

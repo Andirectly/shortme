@@ -53,6 +53,8 @@
 
 /* Glas */
 .sm-glass { background: var(--glass-panel); border: 1px solid var(--edge); box-shadow: inset 0 1px 0 var(--edge-highlight); backdrop-filter: var(--glass-blur); border-radius: var(--r-panel); }
+.sm-lyric-line { transition: background 200ms ease; }
+.sm-lyric-line:hover { background: rgba(255,255,255,0.07); }
 .sm-card { background: var(--glass-card); border: 1px solid var(--edge); box-shadow: inset 0 1px 0 var(--edge-highlight); border-radius: var(--r-card); }
 
 /* Navigation: schwebende Pille links */
