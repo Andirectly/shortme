@@ -59,3 +59,42 @@ export function placeAudio(clips: AudioClip[], keeps: KeepSpan[], outDuration: n
   }
   return out
 }
+
+/** Pegel für einen Bereich des Originaltons (Quellzeit), z. B. eine leise Stelle lauter machen. Überlappende Bereiche addieren sich. */
+export interface VoiceRange { id: string; start: number; end: number; gainDb: number }
+
+/** Übergangszeit an den Bereichsgrenzen (klickfrei). */
+export const RANGE_RAMP = 0.03
+
+/** Zusätzlicher Pegel (dB) an Quellzeit `t` – mit derselben Rampe wie im Export. */
+export function rangeDbAt(ranges: VoiceRange[], t: number): number {
+  let db = 0
+  for (const r of ranges) {
+    const w = Math.min(1, Math.max(0, Math.min((t - r.start) / RANGE_RAMP, (r.end - t) / RANGE_RAMP)))
+    if (w > 0) db += 20 * Math.log10(1 + (dbToGain(r.gainDb) - 1) * w)
+  }
+  return db
+}
+
+/**
+ * FFmpeg-Filter auf der Ausgabe-Zeitachse (nach der Lautheitsnormalisierung – sonst gleicht diese den Pegel wieder aus).
+ * `pieces` = Stücke in Ausgabereihenfolge; ein Bereich über einen Schnitt hinweg wird zu aneinanderliegenden Ausgabe-Intervallen, die verschmelzen (keine Delle an der Naht).
+ */
+export function rangeFilters(ranges: VoiceRange[], pieces: KeepSpan[]): string[] {
+  const out: string[] = []
+  for (const r of ranges) {
+    if (!r.gainDb) continue
+    const iv: Array<[number, number]> = []
+    for (const p of pieces) {
+      const a = Math.max(r.start, p.src0), b = Math.min(r.end, p.src1)
+      if (b <= a) continue
+      const o0 = p.out0 + (a - p.src0), o1 = p.out0 + (b - p.src0)
+      const last = iv[iv.length - 1]
+      if (last && Math.abs(last[1] - o0) < 1e-3) last[1] = o1
+      else iv.push([o0, o1])
+    }
+    const g = dbToGain(r.gainDb).toFixed(5)
+    for (const [a, b] of iv) out.push(`volume='1+(${g}-1)*clip(min((t-${a.toFixed(3)})/${RANGE_RAMP},(${b.toFixed(3)}-t)/${RANGE_RAMP}),0,1)':eval=frame`)
+  }
+  return out
+}

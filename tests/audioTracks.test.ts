@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { outTimeOf, placeAudio, type AudioClip } from '../src/shared/audioMix'
+import { outTimeOf, placeAudio, rangeDbAt, rangeFilters, type AudioClip } from '../src/shared/audioMix'
 import { baseState, reduce } from '../src/shared/edits'
 import { buildFilterGraph } from '../src/main/shortme/render/graph'
 
@@ -27,6 +27,21 @@ describe('Tonspuren', () => {
     s = reduce(s, [{ t: 'audio', id: 'a', remove: true }])
     expect(s.audio).toEqual([])
     expect(b.audio).toEqual([])
+  })
+  it('Bereichspegel: Ops, Rampe an den Grenzen, Filter nur für berührte Stücke', () => {
+    const b = baseState({ start: 100, end: 120, hookText: '' })
+    const s = reduce(b, [{ t: 'voiceRange', id: 'r', range: { id: 'r', start: 105, end: 107, gainDb: 6 } }, { t: 'voiceRange', id: 'r', patch: { gainDb: 99 } }])
+    expect(s.voiceRanges).toEqual([{ id: 'r', start: 105, end: 107, gainDb: 12 }])
+    expect(reduce(s, [{ t: 'voiceRange', id: 'r', remove: true }]).voiceRanges).toEqual([])
+    const r = [{ id: 'r', start: 105, end: 107, gainDb: 6 }]
+    expect(rangeDbAt(r, 104)).toBe(0)
+    expect(rangeDbAt(r, 106)).toBeCloseTo(6, 5)
+    expect(rangeDbAt(r, 105.015)).toBeGreaterThan(0)
+    expect(rangeDbAt(r, 105.015)).toBeLessThan(6)
+    expect(rangeFilters(r, [{ src0: 110, src1: 112, out0: 0 }])).toEqual([])
+    // über einen Schnitt (106–106,5 entfernt): ein zusammenhängendes Ausgabe-Intervall 1,0–2,5
+    expect(rangeFilters(r, [{ src0: 104, src1: 106, out0: 0 }, { src0: 106.5, src1: 110, out0: 2 }])).toEqual(["volume='1+(1.99526-1)*clip(min((t-1.000)/0.03,(2.500-t)/0.03),0,1)':eval=frame"])
+    expect(rangeFilters(r, [{ src0: 104, src1: 110, out0: 0 }])[0]).toBe("volume='1+(1.99526-1)*clip(min((t-1.000)/0.03,(3.000-t)/0.03),0,1)':eval=frame")
   })
   it('Graph: ohne Spuren unverändert, mit Spuren Mischung + Limiter, Eingänge nach dem Titel', () => {
     const piece = { src0: 10, src1: 20, out0: 0, zoom: 1, keep: 0, shot: { start: 0, end: 10, layout: 'fixed', cx: 0.5, zoom: 1 } } as never

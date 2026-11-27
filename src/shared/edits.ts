@@ -5,7 +5,7 @@ import type { ShortmeClip, ShortmeShot } from './shortme'
 import { deepMerge, type PresetPatch } from './preset'
 import { planShots, type PlanInput, type PlanTrack } from './layoutPlan'
 import { isFullStream, sameCam, type StreamLayout } from './streamLayout'
-import { clampDb, type AudioClip } from './audioMix'
+import { clampDb, type AudioClip, type VoiceRange } from './audioMix'
 
 /** Änderung am Untertitel-/Titelstil: anderes Preset und/oder Änderungen am Preset (tief zusammengeführt). */
 export interface CaptionPatch {
@@ -46,6 +46,8 @@ export type Op =
   | { t: 'audio'; id: string; clip?: AudioClip; patch?: Partial<Pick<AudioClip, 'at' | 'gainDb'>>; remove?: boolean }
   /** Pegel des Originaltons in dB. */
   | { t: 'voice'; gainDb: number }
+  /** Pegel eines Bereichs im Originalton: `range` = anlegen, `patch` = ändern, `remove` = entfernen. */
+  | { t: 'voiceRange'; id: string; range?: VoiceRange; patch?: Partial<Omit<VoiceRange, 'id'>>; remove?: boolean }
 
 export interface EditLog { version: 1; clipId: string; ops: Op[]; /** Anzahl angewendeter Operationen (Rest = Redo). */ cursor: number }
 
@@ -66,6 +68,8 @@ export interface EditState {
   audio: AudioClip[]
   /** Pegel des Originaltons in dB. */
   voiceDb: number
+  /** Pegel einzelner Bereiche des Originaltons (Quellzeit). */
+  voiceRanges: VoiceRange[]
 }
 
 export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops: [], cursor: 0 })
@@ -74,12 +78,12 @@ export const emptyLog = (clipId: string): EditLog => ({ version: 1, clipId, ops:
 export interface StyleDefaults { presetId?: string; style?: PresetPatch; titleEnabled?: boolean; /** Untertitel für neue Clips (Standard an). */ captionsEnabled?: boolean; /** Cold Opener: Zieldauer des Vorspanns in Sekunden (0–5, 0 = aus); wirkt beim Export auf Clips mit Vorschlag. */ coldOpenSec?: number }
 
 export function baseState(clip: Pick<ShortmeClip, 'start' | 'end' | 'hookText'> & { corrections?: Record<number, string>; autoCuts?: ShortmeClip['autoCuts'] }, presetId = 'glow-karaoke', defaults: StyleDefaults = {}): EditState {
-  return { start: clip.start, end: clip.end, cutWords: [], autoCuts: (clip.autoCuts ?? []).map((c) => ({ start: c.start, end: c.end })), hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, enabled: defaults.captionsEnabled !== false, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [], audio: [], voiceDb: 0 }
+  return { start: clip.start, end: clip.end, cutWords: [], autoCuts: (clip.autoCuts ?? []).map((c) => ({ start: c.start, end: c.end })), hook: { text: clip.hookText, seconds: 3, enabled: !!defaults.titleEnabled }, wordEdits: { ...(clip.corrections ?? {}) }, caption: { presetId: defaults.presetId ?? presetId, enabled: defaults.captionsEnabled !== false, highlight: true, zone: 'Aus', style: defaults.style ?? {} }, layoutOps: [], streamOps: [], audio: [], voiceDb: 0, voiceRanges: [] }
 }
 
 /** Zustand = Basis + alle Operationen bis zum Cursor. */
 export function reduce(base: EditState, ops: Op[]): EditState {
-  const s: EditState = { ...base, cutWords: [...base.cutWords], autoCuts: (base.autoCuts ?? []).map((c) => ({ ...c })), hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption, style: { ...base.caption.style } }, layoutOps: [...base.layoutOps], streamOps: [...(base.streamOps ?? [])], audio: (base.audio ?? []).map((a) => ({ ...a })), voiceDb: base.voiceDb ?? 0 }
+  const s: EditState = { ...base, cutWords: [...base.cutWords], autoCuts: (base.autoCuts ?? []).map((c) => ({ ...c })), hook: { ...base.hook }, wordEdits: { ...base.wordEdits }, caption: { ...base.caption, style: { ...base.caption.style } }, layoutOps: [...base.layoutOps], streamOps: [...(base.streamOps ?? [])], audio: (base.audio ?? []).map((a) => ({ ...a })), voiceDb: base.voiceDb ?? 0, voiceRanges: (base.voiceRanges ?? []).map((r) => ({ ...r })) }
   for (const op of ops) {
     switch (op.t) {
       case 'trim': s.start = Math.min(op.start, op.end - 0.5); s.end = op.end; break
@@ -110,6 +114,11 @@ export function reduce(base: EditState, ops: Op[]): EditState {
         break
       }
       case 'voice': s.voiceDb = clampDb(op.gainDb); break
+      case 'voiceRange': {
+        const i = s.voiceRanges.findIndex((r) => r.id === op.id)
+        if (op.remove) { if (i >= 0) s.voiceRanges.splice(i, 1) } else if (op.range) { const r = { ...op.range, gainDb: clampDb(op.range.gainDb) }; if (i >= 0) s.voiceRanges[i] = r; else s.voiceRanges.push(r) } else if (i >= 0 && op.patch) s.voiceRanges[i] = { ...s.voiceRanges[i], ...op.patch, gainDb: clampDb(op.patch.gainDb ?? s.voiceRanges[i].gainDb) }
+        break
+      }
       case 'layout':
       case 'follow': s.layoutOps.push(op); break
     }

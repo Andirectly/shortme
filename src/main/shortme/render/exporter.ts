@@ -21,7 +21,7 @@ import { compositeOverlay, remotionAvailable, renderRemotionOverlay } from '../.
 import { mergeShortShots } from '../../../shared/shots'
 import { buildPieces, keepsFromCuts, planPauseCuts, TimeMap, type Interval } from './timeline'
 import { safeFileName, uniquePath, type QualityTier } from './profiles'
-import { placeAudio, type AudioClip } from '../../../shared/audioMix'
+import { placeAudio, type AudioClip, type VoiceRange } from '../../../shared/audioMix'
 import { mediaPath } from '../audioTracks'
 
 export interface ExportOptions {
@@ -30,6 +30,8 @@ export interface ExportOptions {
   audio?: AudioClip[]
   /** Pegel des Originaltons in dB. */
   voiceDb?: number
+  /** Pegel einzelner Bereiche des Originaltons. */
+  voiceRanges?: VoiceRange[]
   /** Wirksames Preset (Preset + Änderungen aus Stil-Studio/Editor), renderer-unabhängig; Standard: erstes eingebautes. */
   style?: StylePreset
   /** Untertitel eingebrannt; false = ohne. */
@@ -181,7 +183,7 @@ export async function exportClip(meta: ProjectMeta, clip: ShortmeClip, t: Transc
         await writeFile(assPath, assText, 'utf8')
         post = `ass='${filterPath(assPath)}':fontsdir='${filterPath(fontsDirForRender)}'`
       }
-      const mix = { first: title ? 2 : 1, tracks: placed, voiceDb: opts.voiceDb ?? 0 }
+      const mix = { first: title ? 2 : 1, tracks: placed, voiceDb: opts.voiceDb ?? 0, ranges: opts.voiceRanges ?? [] }
       const filter = buildFilterGraph(plan.pieces, { src, base: clip.start, audioFilter, fadeOutSec: 0.25, duration: plan.duration, audio: hasAudio, videoPost: post, overlay: title ? { x: title.x, y: title.y } : undefined, mix })
       const scriptPath = join(work, `${basename(dest)}.graph.txt`)
       await writeFile(scriptPath, filter, 'utf8')

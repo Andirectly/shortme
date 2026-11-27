@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { motion } from 'motion/react'
 import { Play, Pause, Scissors, Rewind, SkipBack, SkipForward, Volume2, VolumeX, ZoomIn, ZoomOut, Music, Plus, Trash2 } from 'lucide-react'
 import type { ShortmeShot } from '@shared/shortme'
-import { GAIN_MAX_DB, GAIN_MIN_DB, type AudioClip } from '@shared/audioMix'
+import { GAIN_MAX_DB, GAIN_MIN_DB, type AudioClip, type VoiceRange } from '@shared/audioMix'
 import { Button, Pill } from './ui'
 
 export const FPS = 30
@@ -33,15 +33,22 @@ interface TimelineProps {
   onAudioFiles?: (files: File[], at: number) => Promise<void>
   onAudio: (id: string, patch: { at?: number; gainDb?: number } | null) => void
   onVoiceDb: (db: number) => void
+  /** Pegel einzelner Bereiche des Originaltons (Zeiten relativ zur Zeitleiste); in der Wellenform ziehen = Bereich wählen. */
+  gainRanges?: VoiceRange[]
+  onRange?: (id: string, r: Partial<Omit<VoiceRange, 'id'>> | null, create?: boolean) => void
 }
 
-export function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, onMute, volume, onVolume, peaks, strip, cuts, shots, outDuration, onTrim, onPreview, onCheckEnd, base, ranges, onCutRange, onRestoreRange, origin, audio, voiceDb, onAudioFiles, onAudio, onVoiceDb }: TimelineProps): React.JSX.Element {
+export function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, muted, onMute, volume, onVolume, peaks, strip, cuts, shots, outDuration, onTrim, onPreview, onCheckEnd, base, ranges, onCutRange, onRestoreRange, origin, audio, voiceDb, onAudioFiles, onAudio, onVoiceDb, gainRanges: vr = [], onRange }: TimelineProps): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   /** Anfang eines Bereichs, der gelöscht werden soll (Abspielposition beim Markieren); Ende = aktuelle Position. */
   const [mark, setMark] = useState<number | null>(null)
-  const [grab, setGrab] = useState<'in' | 'out' | 'head' | 'audio' | null>(null)
+  const [grab, setGrab] = useState<'in' | 'out' | 'head' | 'audio' | 'range' | null>(null)
+  /** Bereich im Originalton: neu gezogen (noch ohne Pegel) bzw. gewählter vorhandener Bereich. */
+  const [pending, setPending] = useState<[number, number] | null>(null)
+  const [selRange, setSelRange] = useState<string | null>(null)
+  const rangeFrom = useRef(0)
   const live = useRef<[number, number]>(trim)
   const offset = useRef(0)
   const [zoom, setZoom] = useState(1)
@@ -127,6 +134,11 @@ export function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, 
   }
   const move = (e: React.PointerEvent): void => {
     if (grab === 'head') { onSeek(snapFrame(toTime(e.clientX), true)); return }
+    if (grab === 'range') {
+      const x = snapFrame(toTime(e.clientX), e.altKey, [t, trim[0], trim[1]])
+      if (Math.abs(x - rangeFrom.current) * pxPerSec >= 4) setPending([Math.min(x, rangeFrom.current), Math.max(x, rangeFrom.current)])
+      return
+    }
     if (grab !== 'in' && grab !== 'out') return
     const next = setTrim(grab, snapFrame(toTime(e.clientX) - offset.current, e.altKey, [t]))
     live.current = next
@@ -136,6 +148,8 @@ export function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, 
     if (!grab) return
     const was = grab
     setGrab(null)
+    // kein Ziehen in der Wellenform = wie bisher springen
+    if (was === 'range') { if (!pending || pending[1] - pending[0] < 2 * FRAME) { setPending(null); onSeek(rangeFrom.current) } return }
     if (was === 'in' || was === 'out') onTrim(live.current) // genau ein Undo-Schritt je Ziehen
   }
   /** Pfeiltasten auf einem Griff: 1 Bild (Umschalt: 10 Bilder); jeder Schritt ist ein Undo-Schritt. */
@@ -181,6 +195,7 @@ export function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, 
     try { await onAudioFiles(files, at); setBusy('') } catch (err) { setBusy(err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(err)) }
   }
   const sel = audio.find((a) => a.id === selAudio)
+  const curRange = vr.find((r) => r.id === selRange)
   const rows = Math.min(3, Math.max(1, audio.length))
   const isFileDrag = (e: React.DragEvent): boolean => Array.from(e.dataTransfer.types).includes('Files')
 
@@ -224,11 +239,16 @@ export function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, 
           <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
             {(strip ?? []).map((s, i) => <img key={i} src={s} alt="" draggable={false} style={{ flex: 1, minWidth: 0, height: '100%', objectFit: 'cover', display: 'block' }} />)}
           </div>
-          {/* Wellenform */}
-          <div style={{ position: 'relative', borderRadius: 8, background: 'rgba(0,0,0,0.25)' }}>
+          {/* Wellenform: ziehen = Bereich wählen und pegeln, klicken = springen */}
+          <div title={onRange ? 'Ziehen: Bereich im Originalton wählen und lauter/leiser machen' : undefined} style={{ position: 'relative', borderRadius: 8, background: 'rgba(0,0,0,0.25)', cursor: onRange ? 'text' : undefined }}
+            onPointerDown={onRange ? (e) => { if (grab) return; e.stopPropagation(); track.current?.setPointerCapture(e.pointerId); rangeFrom.current = snapFrame(toTime(e.clientX), e.altKey, [t, trim[0], trim[1]]); setPending(null); setSelRange(null); setSelAudio(null); setGrab('range') } : undefined}>
             <svg viewBox={`0 0 ${wave.n} 100`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
               <path d={wave.d} fill="rgba(255,255,255,0.55)" />
             </svg>
+            {vr.map((r) => <div key={r.id} role="button" tabIndex={0} aria-label={`Pegelbereich ${timecode(r.start - trim[0])} bis ${timecode(r.end - trim[0])}, ${r.gainDb} dB`} title="Bereich anklicken zum Ändern · Entf: entfernen"
+              onPointerDown={(e) => { e.stopPropagation(); setSelRange(r.id); setPending(null); setSelAudio(null) }} onKeyDown={(e) => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); onRange?.(r.id, null); setSelRange(null) } }}
+              style={{ position: 'absolute', top: 0, bottom: 0, left: pct(r.start), width: `calc(${pct(r.end)} - ${pct(r.start)})`, zIndex: 1, borderRadius: 4, cursor: 'pointer', background: r.gainDb >= 0 ? 'rgba(255,214,10,0.22)' : 'rgba(10,132,255,0.22)', border: `1px solid ${selRange === r.id ? '#fff' : r.gainDb >= 0 ? 'rgba(255,214,10,0.8)' : 'rgba(10,132,255,0.8)'}`, fontSize: 10, color: '#fff', padding: '1px 4px', overflow: 'hidden', whiteSpace: 'nowrap' }}>{r.gainDb > 0 ? '+' : ''}{r.gainDb} dB</div>)}
+            {pending && <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: pct(pending[0]), width: `calc(${pct(pending[1])} - ${pct(pending[0])})`, zIndex: 1, borderRadius: 4, background: 'rgba(255,255,255,0.16)', border: '1px dashed #fff', pointerEvents: 'none' }} />}
             {cuts.map((c, i) => <div key={i} title="Wird im Export entfernt" style={{ position: 'absolute', top: 0, bottom: 0, left: pct(c[0]), width: `calc(${pct(c[1])} - ${pct(c[0])})`, background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.38) 0 4px, rgba(255,255,255,0.1) 4px 8px)', borderLeft: '1px solid rgba(255,255,255,0.8)', borderRight: '1px solid rgba(255,255,255,0.8)' }} />)}
           </div>
           {/* Shots */}
@@ -268,9 +288,17 @@ export function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, 
         </div>
       </div>
 
-      {/* Pegel: gewählte Spur oder Originalton */}
+      {/* Pegel: gewählte Spur, gewählter/neuer Bereich im Originalton oder Originalton gesamt */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 28, fontSize: 12 }}>
-        {sel ? <>
+        {!sel && (curRange || pending) ? <>
+          <span style={{ fontWeight: 600 }}>Originalton-Bereich</span>
+          <small style={{ fontVariantNumeric: 'tabular-nums' }}>{timecode(Math.max(0, (curRange?.start ?? pending![0]) - trim[0]))}–{timecode(Math.max(0, (curRange?.end ?? pending![1]) - trim[0]))}</small>
+          <GainSlider label="Pegel des Bereichs" value={curRange?.gainDb ?? 0} onCommit={(db) => { if (curRange) onRange?.(curRange.id, { gainDb: db }); else if (pending) { const id = Math.random().toString(36).slice(2, 10); onRange?.(id, { start: pending[0], end: pending[1], gainDb: db }, true); setPending(null); setSelRange(id) } }} />
+          {curRange && <Button variant="ghost" aria-label="Bereich entfernen" title="Bereich entfernen (Entf)" onClick={() => { onRange?.(curRange.id, null); setSelRange(null) }}><Trash2 size={14} /></Button>}
+          {!curRange && <small style={{ color: 'var(--text-2)' }}>Regler bewegen, um den Bereich lauter oder leiser zu machen</small>}
+          {(curRange?.gainDb ?? 0) > 0 && <small style={{ color: 'var(--text-2)' }}>Lauter geht nur bis zur Aussteuerungsgrenze – Spitzen werden abgefangen statt zu verzerren</small>}
+          <Button variant="ghost" onClick={() => { setPending(null); setSelRange(null) }}>Fertig</Button>
+        </> : sel ? <>
           <span style={{ fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel.kind === 'music' ? '♪ ' : ''}{sel.name}</span>
           <small style={{ fontVariantNumeric: 'tabular-nums' }}>ab {timecode(Math.max(0, sel.at - trim[0]))}</small>
           <GainSlider label={`Pegel ${sel.name}`} value={sel.gainDb} onCommit={(db) => onAudio(sel.id, { gainDb: db })} />
@@ -279,7 +307,7 @@ export function Timeline({ duration, trim, t, onSeek, words, playing, onToggle, 
           <span style={{ color: 'var(--text-2)' }}>Originalton</span>
           <GainSlider label="Pegel Originalton" value={voiceDb} onCommit={onVoiceDb} />
           {busy && audio.length > 0 && <small style={{ color: 'var(--text-2)' }}>{busy}</small>}
-          {!busy && <small style={{ color: 'var(--text-2)' }}>Spur anklicken zum Pegeln · Strg + Mausrad zoomt bis auf einzelne Bilder</small>}
+          {!busy && <small style={{ color: 'var(--text-2)' }}>In der Wellenform ziehen: Bereich lauter/leiser · Spur anklicken zum Pegeln · Strg + Mausrad zoomt</small>}
         </>}
       </div>
     </div>

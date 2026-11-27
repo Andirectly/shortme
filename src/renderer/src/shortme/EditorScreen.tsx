@@ -27,7 +27,7 @@ import { StreamFrames } from './StreamFrames'
 import { RatingBar, useRatingKeys } from './RatingBar'
 import { Timeline, FPS } from './Timeline'
 import { LyricsTranscript } from './LyricsTranscript'
-import { dbToGain, outTimeOf } from '@shared/audioMix'
+import { dbToGain, outTimeOf, rangeDbAt } from '@shared/audioMix'
 
 const ZONES: Record<string, { top: number; bottom: number; right: number }> = { TikTok: { top: 0.12, bottom: 0.2, right: 0.14 }, Reels: { top: 0.1, bottom: 0.18, right: 0.1 }, Shorts: { top: 0.1, bottom: 0.22, right: 0.12 } }
 const LAYOUTS: Record<string, ShortmeShot['layout']> = { Smart: 'smart', Fest: 'fixed', Vollbild: 'fit', Split: 'split', 'Facecam + Gameplay': 'stream' }
@@ -234,12 +234,15 @@ export function EditorScreen(): React.JSX.Element {
   audioRef.current = st.audio
   const urlsRef = useRef(audioUrls)
   urlsRef.current = audioUrls
-  const mixRef = useRef({ muted, volume })
-  mixRef.current = { muted, volume }
+  const mixRef = useRef({ muted, volume, voiceDb: st.voiceDb, ranges: st.voiceRanges })
+  mixRef.current = { muted, volume, voiceDb: st.voiceDb, ranges: st.voiceRanges }
   const syncAudio = useCallback((abs: number, play: boolean): void => {
     const p = planRef.current
     const keeps = p?.pieces ?? []
     const els = audioEls.current
+    // Originalton: Gesamtpegel + Bereichspegel an dieser Stelle (shortcut: Vorschau höchstens 0 dB, Element-Lautstärke ≤ 1)
+    const v = videoRef.current
+    if (v) v.volume = Math.min(1, mixRef.current.volume * dbToGain(mixRef.current.voiceDb + rangeDbAt(mixRef.current.ranges, abs)))
     for (const a of audioRef.current) {
       const url = urlsRef.current[a.file]
       if (!url) continue
@@ -301,8 +304,6 @@ export function EditorScreen(): React.JSX.Element {
     return () => { v.removeEventListener('loadedmetadata', onLoaded) }
   }, [srcUrl, origStart, clipId])
   useEffect(() => { if (videoRef.current) videoRef.current.muted = muted }, [muted])
-  // shortcut: Originalton in der Vorschau höchstens 0 dB (Element-Lautstärke ≤ 1)
-  useEffect(() => { if (videoRef.current) videoRef.current.volume = volume * Math.min(1, dbToGain(st.voiceDb)) }, [volume, srcUrl, st.voiceDb])
 
   const selRef = useRef<number | null>(null)
   selRef.current = sel
@@ -570,6 +571,8 @@ export function EditorScreen(): React.JSX.Element {
         onTrim={(next) => { setLiveTrim(null); if (next[0] !== committed[0] || next[1] !== committed[1]) commit({ t: 'trim', start: origStart + next[0], end: origStart + next[1] }) }} onPreview={setLiveTrim} base={base}
         origin={origStart} audio={st.audio.map((a) => ({ ...a, at: a.at - origStart }))} voiceDb={st.voiceDb} onVoiceDb={(db) => commit({ t: 'voice', gainDb: db })}
         onAudioFiles={hasApi && hash ? addAudio : undefined}
+        gainRanges={st.voiceRanges.map((r) => ({ ...r, start: r.start - origStart, end: r.end - origStart }))}
+        onRange={(id, r, create) => { const abs = r && { ...r, ...(r.start !== undefined ? { start: r.start + origStart } : {}), ...(r.end !== undefined ? { end: r.end + origStart } : {}) }; commit(!abs ? { t: 'voiceRange', id, remove: true } : create ? { t: 'voiceRange', id, range: { id, start: abs.start ?? 0, end: abs.end ?? 0, gainDb: abs.gainDb ?? 0 } } : { t: 'voiceRange', id, patch: abs }) }}
         onAudio={(id, patch) => commit(patch ? { t: 'audio', id, patch: patch.at !== undefined ? { ...patch, at: patch.at + origStart } : patch } : { t: 'audio', id, remove: true })}
         onCheckEnd={() => { seek(Math.max(trim[0], trim[1] - 2.5)); const v = videoRef.current; if (v) void v.play().then(() => setPlaying(true)).catch(() => undefined); else setPlaying(true) }} />
     </div>

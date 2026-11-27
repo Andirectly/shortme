@@ -1,4 +1,4 @@
-import type { PlacedAudio } from '../../../shared/audioMix'
+import { rangeFilters, type PlacedAudio, type VoiceRange } from '../../../shared/audioMix'
 import type { Piece } from './timeline'
 
 import { cropBox, OUT_H, OUT_W, type SourceDims } from '@shared/framing'
@@ -55,7 +55,7 @@ export interface GraphOptions {
   /** false: Quelle ohne Tonspur → nur `[v]` (keine erfundene Stille). Standard: true. */
   audio?: boolean
   /** Zusätzliche Tonspuren (Eingänge ab `first`) und Pegel des Originaltons; ohne Spuren und mit 0 dB bleibt der Graph unverändert. */
-  mix?: { first: number; tracks: PlacedAudio[]; voiceDb: number }
+  mix?: { first: number; tracks: PlacedAudio[]; voiceDb: number; ranges?: VoiceRange[] }
 }
 
 /** Eine Tonspur: zuschneiden, pegeln, klickfrei ein-/ausblenden, auf ihre Ausgabezeit verschieben. */
@@ -73,7 +73,9 @@ export function buildFilterGraph(pieces: Piece[], o: GraphOptions): string {
   const n = pieces.length
   const labels = pieces.map((_, k) => (audio ? `[v${k}][a${k}]` : `[v${k}]`)).join('')
   const tracks = audio ? o.mix?.tracks ?? [] : []
-  const voice = audio && o.mix?.voiceDb ? `volume=${o.mix.voiceDb.toFixed(1)}dB` : ''
+  // Originalton-Pegel (gesamt + Bereiche) NACH der Normalisierung, sonst gleicht diese ihn aus; Bereiche mit Limiter gegen Übersteuern
+  const rv = audio ? rangeFilters(o.mix?.ranges ?? [], pieces) : []
+  const voice = [audio && o.mix?.voiceDb ? `volume=${o.mix.voiceDb.toFixed(1)}dB` : '', ...rv, rv.length && !tracks.length ? 'alimiter=limit=0.95:level=0' : ''].filter(Boolean).join(',')
   const fade = audio && o.fadeOutSec ? `afade=t=out:st=${Math.max(0, o.duration - o.fadeOutSec).toFixed(3)}:d=${o.fadeOutSec}` : ''
   const post = !audio ? '' : tracks.length
     ? [o.audioFilter, voice].filter(Boolean).join(',') || 'anull'
