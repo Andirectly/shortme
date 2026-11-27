@@ -6,6 +6,18 @@ the [releases page](https://github.com/JeremySNR/cutawan/releases).
 This project uses [semantic versioning](https://semver.org/), loosely: while
 still pre-1.0, minor bumps carry new features and patch bumps carry fixes.
 
+## [0.55.0] - 2026-11-27
+
+### Added
+
+- Tonspuren im Editor: Soundeffekte und Musik auf die Zeitleiste ziehen (oder „+ Ton“), verschieben, per Regler pegeln (−40 bis +12 dB), auch den Originalton; Vorschau und Export mischen gleich.
+- Bildgenaue Zeitleiste: Start/Ende rasten auf einzelne Bilder ein (Wortgrenzen magnetisch, Alt = frei), Pfeiltasten verschieben um ein Bild (Umschalt: 10), Zoom bis auf Einzelbilder (Strg + Mausrad), Zeitanzeige mit Bildern.
+
+### Changed
+
+- Transkript im Editor im Stil von Apple-Music-Lyrics: große Zeilen, Wort-für-Wort-Füllung, weiches Mitscrollen, ohne Rahmen auf schwarzem Grund. Bearbeiten wie bisher.
+- Pfeiltasten im Editor springen jetzt ein Bild statt einer Sekunde (Umschalt: eine Sekunde).
+
 ## [0.54.1] - 2026-11-27
 
 ### Added
